@@ -140,6 +140,7 @@ export class Game {
     this.hubWarnPulse = 0;
     this.starBeepWait = 0;
     this.homeOn = false;
+    this.dockOpen = false;
     this.attractOnDemo = false;
     this.attractPage = "title";
     this.attractBoard = 0;
@@ -555,6 +556,7 @@ export class Game {
     const startWave = Math.max(1, Math.min(Math.floor(Number(wave) || 1), this.save.maxWave || 1));
     this.beginAssault(startWave, true);
     this.homeOn = false;
+    this.dockOpen = false;
     this.cooldown = 0;
     this.gun = 0;
     this.burstLeft = 0;
@@ -598,6 +600,7 @@ export class Game {
     this.hud.setHubAlert(null);
     this.hud.setOre(0, 0, "");
     this.hud.hideCenter();
+    if (this.ship.docked) this.hud.showDock(this.shipId);
     this.scatterField();
     this.spawnWave();
   }
@@ -2063,11 +2066,15 @@ export class Game {
           size: 7,
         });
       } else if (this.ship.docked) {
-        this.depositOre();
-        this.refreshDock();
-        this.hud.showDock(this.shipId);
+        if (!this.dockOpen) {
+          this.dockOpen = true;
+          this.depositOre();
+          this.refreshDock();
+          this.hud.showDock(this.shipId);
+        }
         this.ship.dockHold = Math.max(0, this.ship.dockHold - t);
         if (this.ship.dockHold <= 0 && (Math.abs(this.input.surge) > 0.2 || Math.abs(this.input.strafe) > 0.2)) {
+          this.dockOpen = false;
           this.hud.hideDock();
           this.ship.release(this.input);
           this.sfx("launch");
@@ -2090,7 +2097,10 @@ export class Game {
       if (!shieldWas && this.ship.shieldOn) this.sfx("on");
       else if (shieldWas && !this.ship.shieldOn) this.sfx("off");
       if (this.cargo > 0) this.ship.setCargo(this.cargo);
-      if (!this.ship.docked) this.hud.hideDock();
+      if (!this.ship.docked) {
+        this.dockOpen = false;
+        this.hud.hideDock();
+      }
       this.hud.setShield(this.ship.shieldEnergy, this.ship.shieldOn, this.shieldPool());
       const modeLabel = this.input.mapHeld
         ? "MAP"

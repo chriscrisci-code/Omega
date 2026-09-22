@@ -18,13 +18,21 @@ export class DockBay {
     this.onPickShip = null;
     this.onBuy = null;
     this.shipId = WEDGE_ID;
+    this.upKey = "";
 
     paint(document.querySelector("#dock-title"), "BAY", 7, CYAN, HOT, "center");
     paint(document.querySelector("#dock-hint"), "LOADOUT BUY  THRUST LAUNCH", 6, DIM, CYAN, "center");
 
     this.buildShips();
     this.setUpgrades({ points: 0, levels: { gun: 1, missile: 1, emp: 1, shield: 1 }, costs: {}, max: {} });
-    this.root?.addEventListener("pointerdown", (event) => event.stopPropagation());
+    this.root?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const up = event.target instanceof Element ? event.target.closest(".dock-up") : null;
+      if (up?.dataset.id) this.onBuy?.(up.dataset.id);
+      const ship = event.target instanceof Element ? event.target.closest(".dock-ship") : null;
+      if (ship?.dataset.id) this.onPickShip?.(ship.dataset.id);
+    });
   }
 
   buildShips() {
@@ -37,11 +45,6 @@ export class DockBay {
       button.className = "dock-ship";
       button.dataset.id = item.id;
       button.innerHTML = `${catalogMiniSvg(item.spec, 28)}${vectorTextSvg(item.name, 5, DIM, CYAN, "center")}`;
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        this.onPickShip?.(item.id);
-      });
       this.ships.appendChild(button);
     }
   }
@@ -58,6 +61,9 @@ export class DockBay {
       { id: "emp", name: "EMP" },
       { id: "shield", name: "SHD" },
     ];
+    const key = `${points}|${rows.map((row) => `${row.id}:${levels[row.id] || 1}:${costs[row.id] || 0}:${max[row.id] || 0}`).join("|")}`;
+    if (key === this.upKey && this.ups.childElementCount) return;
+    this.upKey = key;
     this.ups.innerHTML = "";
     for (const row of rows) {
       const level = levels[row.id] || 1;
@@ -69,13 +75,9 @@ export class DockBay {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = `dock-up${can ? " is-on" : ""}${top ? " is-max" : ""}`;
+      btn.dataset.id = row.id;
       const price = top ? "MAX" : `${need} LP`;
       btn.innerHTML = `${vectorTextSvg(`${row.name}  ${level}`, 12, can ? CYAN : DIM, can ? HOT : CYAN, "center")}${vectorTextSvg(price, 10, can ? CYAN : DIM, can ? HOT : CYAN, "center")}`;
-      btn.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (can) this.onBuy?.(row.id);
-      });
       this.ups.appendChild(btn);
     }
   }

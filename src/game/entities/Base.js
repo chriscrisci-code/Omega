@@ -370,17 +370,23 @@ export class Base {
   tryDock(ship) {
     if (!this.hub || !this.alive || ship.docked || ship.undockLock > 0) return false;
     if (Math.hypot(ship.vx, ship.vy) > 110) return false;
-    for (const pad of this.pads) {
-      const world = this.padWorld(pad);
+    let pad = null;
+    let best = Infinity;
+    for (const item of this.pads) {
+      const world = this.padWorld(item);
       const dx = ship.x - world.x;
       const dy = ship.y - world.y;
-      if (dx * dx + dy * dy < 48 * 48) {
-        ship.dock(this, pad);
-        this.hold(ship);
-        return true;
+      const d = dx * dx + dy * dy;
+      if (d < best) {
+        best = d;
+        pad = item;
       }
     }
-    return false;
+    const atHub = Math.hypot(ship.x - this.x, ship.y - this.y) < this.radius + 48;
+    if (!pad || (best > 48 * 48 && !atHub)) return false;
+    ship.dock(this, pad);
+    this.hold(ship);
+    return true;
   }
 
   forceDock(ship, index = 0) {

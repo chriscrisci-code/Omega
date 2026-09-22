@@ -363,8 +363,22 @@ export class Ship {
   autopilotHome(dt, hub, bounds) {
     if (!this.alive) return;
     this.undockLock = Math.max(0, this.undockLock - dt);
-    const dx = wrapDelta(hub.x - this.x, bounds.width);
-    const dy = wrapDelta(hub.y - this.y, bounds.height);
+    let dx = wrapDelta(hub.x - this.x, bounds.width);
+    let dy = wrapDelta(hub.y - this.y, bounds.height);
+    if (hub.pads?.length) {
+      let best = Infinity;
+      for (const pad of hub.pads) {
+        const world = hub.padWorld(pad);
+        const px = wrapDelta(world.x - this.x, bounds.width);
+        const py = wrapDelta(world.y - this.y, bounds.height);
+        const d = px * px + py * py;
+        if (d < best) {
+          best = d;
+          dx = px;
+          dy = py;
+        }
+      }
+    }
     const dist = Math.hypot(dx, dy) || 1;
     const desired = Math.atan2(dy, dx);
     this.rotation = turnToward(this.rotation, desired, shipConfig.turnSpeed * dt);
@@ -386,7 +400,7 @@ export class Ship {
     this.vx *= drag;
     this.vy *= drag;
     const speed = Math.hypot(this.vx, this.vy);
-    const cap = dist < 260 ? 140 : shipConfig.maxSpeed;
+    const cap = dist < 260 ? 90 : shipConfig.maxSpeed;
     if (speed > cap) {
       this.vx *= cap / speed;
       this.vy *= cap / speed;

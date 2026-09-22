@@ -17,6 +17,14 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function hudControl(event) {
+  const node = event.target;
+  if (!(node instanceof Element)) return false;
+  return Boolean(
+    node.closest("button, a, input, #dock-bay, #device-pick, #wave-pick, #continue-btn, #ships-link, .touch-layer"),
+  );
+}
+
 export class Input {
   constructor(target = window) {
     this.keys = new Set();
@@ -60,6 +68,7 @@ export class Input {
     };
     this.onPointerDown = (event) => {
       if (this.layout === "phone") return;
+      if (hudControl(event)) return;
       this.hasPointer = true;
       this.mouseX = event.clientX;
       this.mouseY = event.clientY;
