@@ -2,9 +2,8 @@ const DEAD = 0.16;
 const REACH = 54;
 const TAP_MS = 280;
 const TAP_DIST = 28;
-const SWIPE_MS = 420;
-const SWIPE_MIN = 72;
-const SWIPE_SLIP = 56;
+const FLICK_MS = 320;
+const FLICK_MIN = 0.58;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -24,9 +23,6 @@ export class TouchControls {
     this.turn = this.bindStick(document.querySelector("#stick-turn"), "turn");
     this.stickIds = new Set();
     this.fingers = new Map();
-    this.lastTap = null;
-    this.aiming = false;
-    this.aimId = null;
     this.twoFinger = null;
 
     this.onStart = (event) => this.touchStart(event);
@@ -51,16 +47,17 @@ export class TouchControls {
   bindStick(root, role) {
     if (!root) return null;
     const knob = root.querySelector(".stick-knob");
-    const well = root.querySelector(".stick-well");
-    const state = { root, knob, well, id: null, x: 0, y: 0 };
+    const state = { root, knob, role, id: null, x: 0, y: 0, heldAt: 0 };
     const grab = (event) => {
       if (!this.active || event.button !== 0) return;
       event.preventDefault();
       event.stopPropagation();
       state.id = event.pointerId;
+      state.heldAt = performance.now();
       this.stickIds.add(event.pointerId);
       root.setPointerCapture?.(event.pointerId);
       this.nudgeStick(state, event.clientX, event.clientY);
+      this.syncFire();
     };
     const drag = (event) => {
       if (state.id !== event.pointerId) return;
@@ -69,18 +66,19 @@ export class TouchControls {
     };
     const drop = (event) => {
       if (state.id !== event.pointerId) return;
+      if (role === "move") this.releaseFlick(state);
       this.stickIds.delete(event.pointerId);
       state.id = null;
       state.x = 0;
       state.y = 0;
       if (knob) knob.style.transform = "translate(-50%, -50%)";
       this.syncAxes();
+      this.syncFire();
     };
     root.addEventListener("pointerdown", grab);
     root.addEventListener("pointermove", drag);
     root.addEventListener("pointerup", drop);
     root.addEventListener("pointercancel", drop);
-    state.role = role;
     return state;
   }
 
@@ -101,6 +99,13 @@ export class TouchControls {
     this.syncAxes();
   }
 
+  releaseFlick(state) {
+    const held = performance.now() - state.heldAt;
+    if (held > FLICK_MS || Math.abs(state.x) > 0.45) return;
+    if (-state.y >= FLICK_MIN) this.input._warpTicks += 1;
+    else if (state.y >= FLICK_MIN) this.input._empTicks += 1;
+  }
+
   syncAxes() {
     const move = this.move;
     const turn = this.turn;
@@ -117,14 +122,14 @@ export class TouchControls {
     this.input.touchRotate = clamp(rotate, -1, 1);
   }
 
-  onStick(id) {
-    return this.stickIds.has(id);
+  syncFire() {
+    this.input.touchFire = Boolean(this.move?.id != null);
   }
 
   touchStart(event) {
-    if (!this.active || event.pointerType === "mouse" && event.button !== 0) return;
+    if (!this.active || (event.pointerType === "mouse" && event.button !== 0)) return;
     if (event.target?.closest?.(".stick, .device-pick, .dock-bay, .continue-btn, .ships-link")) return;
-    if (this.onStick(event.pointerId)) return;
+    if (this.stickIds.has(event.pointerId)) return;
     this.fingers.set(event.pointerId, {
       x: event.clientX,
       y: event.clientY,
@@ -132,19 +137,7 @@ export class TouchControls {
       px: event.clientX,
       py: event.clientY,
     });
-    if (this.fingers.size === 2) {
-      this.twoFinger = { t: performance.now(), moved: false };
-      return;
-    }
-    if (this.fingers.size !== 1) return;
-    const now = performance.now();
-    const tap = this.lastTap;
-    if (tap && now - tap.t < TAP_MS && dist(tap.x, tap.y, event.clientX, event.clientY) < TAP_DIST * 2) {
-      this.aiming = true;
-      this.aimId = event.pointerId;
-      this.lastTap = null;
-      this.aimTo(event.clientX, event.clientY, true);
-    }
+    if (this.fingers.size === 2) this.twoFinger = { t: performance.now(), moved: false };
   }
 
   touchMove(event) {
@@ -153,64 +146,31 @@ export class TouchControls {
     if (!finger) return;
     finger.px = event.clientX;
     finger.py = event.clientY;
-    if (this.twoFinger && this.fingers.size >= 2) {
-      const start = [...this.fingers.values()][0];
-      if (start && dist(start.x, start.y, event.clientX, event.clientY) > 22) this.twoFinger.moved = true;
+    if (this.twoFinger && this.fingers.size >= 2 && dist(finger.x, finger.y, event.clientX, event.clientY) > 22) {
+      this.twoFinger.moved = true;
     }
-    if (this.aiming && event.pointerId === this.aimId) this.aimTo(event.clientX, event.clientY, true);
   }
 
   touchEnd(event) {
     if (!this.active) return;
     const finger = this.fingers.get(event.pointerId);
     this.fingers.delete(event.pointerId);
-    if (this.aiming && event.pointerId === this.aimId) {
-      this.aiming = false;
-      this.aimId = null;
-      this.input.touchFire = false;
-      this.sight?.classList.add("is-hidden");
-    }
     if (this.twoFinger && this.fingers.size === 0) {
       const held = performance.now() - this.twoFinger.t;
       if (!this.twoFinger.moved && held < TAP_MS + 80) this.input._missileTicks += 1;
       this.twoFinger = null;
       return;
     }
-    if (!finger || this.aiming) return;
+    if (!finger || this.fingers.size) return;
     const dt = performance.now() - finger.t;
-    const dx = finger.px - finger.x;
-    const dy = finger.py - finger.y;
-    if (dt < SWIPE_MS && Math.abs(dy) >= SWIPE_MIN && Math.abs(dx) < SWIPE_SLIP) {
-      if (dy < 0) this.input._warpTicks += 1;
-      else this.input._empTicks += 1;
-      this.lastTap = null;
-      return;
-    }
-    if (dt < TAP_MS && Math.hypot(dx, dy) < TAP_DIST) {
-      this.lastTap = { t: performance.now(), x: finger.x, y: finger.y };
-      this.input._pointerStart = true;
-    }
-  }
-
-  aimTo(x, y, fire) {
-    this.input.mouseX = x;
-    this.input.mouseY = y;
-    this.input.hasPointer = true;
-    this.input.touchFire = Boolean(fire);
-    if (this.sight) {
-      this.sight.classList.remove("is-hidden");
-      this.sight.style.left = `${x}px`;
-      this.sight.style.top = `${y}px`;
-    }
+    const travel = dist(finger.x, finger.y, finger.px, finger.py);
+    if (dt < TAP_MS && travel < TAP_DIST) this.input._pointerStart = true;
   }
 
   reset() {
     this.fingers.clear();
     this.stickIds.clear();
-    this.aiming = false;
-    this.aimId = null;
     this.twoFinger = null;
-    this.lastTap = null;
     this.input.touchFire = false;
     this.input.touchSurge = 0;
     this.input.touchStrafe = 0;

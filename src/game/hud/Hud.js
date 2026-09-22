@@ -168,10 +168,10 @@ export class Hud {
 
   paintHelp() {
     if (this.layout === "phone") {
-      this.help[0] && this.paint(this.help[0], "LEFT STICK THRUST  RIGHT STICK TURN", 11, DIM, CYAN, "center");
-      this.help[1] && this.paint(this.help[1], "DOUBLE TAP DRAG FIRE  SWIPE UP WARP  SWIPE DOWN EMP", 11, DIM, CYAN, "center");
+      this.help[0] && this.paint(this.help[0], "LEFT STICK THRUST HOLD FIRE  RIGHT STICK TURN", 11, DIM, CYAN, "center");
+      this.help[1] && this.paint(this.help[1], "FLICK FWD WARP  FLICK BACK EMP", 11, DIM, CYAN, "center");
       this.help[2] && this.paint(this.help[2], "TWO FINGER TAP MISSILE", 10, DIM, CYAN, "center");
-      this.paint(document.querySelector("[data-label=special]"), "SWIPE", 10, DIM, CYAN, "right");
+      this.paint(document.querySelector("[data-label=special]"), "FLICK", 10, DIM, CYAN, "right");
       return;
     }
     this.help[0] && this.paint(this.help[0], "MOUSE AIM  LEFT FIRE  WHEEL FWD WARP  WHEEL BACK EMP  WHEEL BUTTON MISSILE", 11, DIM, CYAN, "center");

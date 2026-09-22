@@ -202,8 +202,13 @@ export class Game {
     return { width: worldConfig.width, height: worldConfig.height };
   }
 
+  playZoom() {
+    const zoom = cameraConfig.zoom;
+    return this.input.layout === "phone" ? zoom / 1.25 : zoom;
+  }
+
   viewRadius() {
-    return Math.hypot(this.app.screen.width, this.app.screen.height) * 0.5 / cameraConfig.zoom;
+    return Math.hypot(this.app.screen.width, this.app.screen.height) * 0.5 / this.playZoom();
   }
 
   ringPoint(cx, cy, radius) {
@@ -652,6 +657,8 @@ export class Game {
     this.pickingDevice = false;
     this.input.setLayout(layout);
     this.touch.setActive(layout === "phone");
+    this.camZoom = this.playZoom();
+    this.world.scale.set(this.camZoom);
     this.hud.setLayout(layout);
     this.hud.hideDevicePick();
     this.hud.showTitle();
@@ -1650,7 +1657,7 @@ export class Game {
     this.camX = this.ship.x;
     this.camY = this.ship.y;
     this.camRot = this.headingUp();
-    this.camZoom = cameraConfig.zoom;
+    this.camZoom = this.playZoom();
   }
 
   placeView(entity, width, height) {
@@ -1668,7 +1675,7 @@ export class Game {
     const targetX = mapping ? space.width * 0.5 : followShip ? this.ship.x : worldConfig.width / 2;
     const targetY = mapping ? space.height * 0.5 : followShip ? this.ship.y : worldConfig.height / 2;
     const targetRot = mapping || !followShip ? 0 : this.headingUp();
-    const targetZoom = mapping ? mapZoom : cameraConfig.zoom;
+    const targetZoom = mapping ? mapZoom : this.playZoom();
     const posTau = mapping ? 0.08 : cameraConfig.posTau;
     const rotTau = mapping ? 0.1 : cameraConfig.rotTau;
 
@@ -1723,8 +1730,8 @@ export class Game {
       this.lockMark.scale.set(mapping && shipLike ? 14 : 1);
     }
 
-    const viewW = screen.width / cameraConfig.zoom;
-    const viewH = screen.height / cameraConfig.zoom;
+    const viewW = screen.width / this.playZoom();
+    const viewH = screen.height / this.playZoom();
     this.fx.container.boundsArea.x = this.camX - viewW;
     this.fx.container.boundsArea.y = this.camY - viewH;
     this.fx.container.boundsArea.width = viewW * 2;
@@ -1794,7 +1801,7 @@ export class Game {
     this.warpCool = Math.max(0, this.warpCool - t);
 
     this.input.aim =
-      this.mode === PLAYING && !this.ship.docked && !this.input.mapHeld && !this.homeOn
+      this.mode === PLAYING && !this.ship.docked && !this.input.mapHeld && !this.homeOn && this.input.layout !== "phone"
         ? this.pointerAim()
         : null;
 
