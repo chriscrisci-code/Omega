@@ -70,7 +70,7 @@ export class DockBay {
       btn.type = "button";
       btn.className = `dock-up${can ? " is-on" : ""}${top ? " is-max" : ""}`;
       const price = top ? "MAX" : `${need} LP`;
-      btn.innerHTML = `${vectorTextSvg(`${row.name}  ${level}`, 6, can ? CYAN : DIM, can ? HOT : CYAN, "center")}${vectorTextSvg(price, 5, can ? CYAN : DIM, can ? HOT : CYAN, "center")}`;
+      btn.innerHTML = `${vectorTextSvg(`${row.name}  ${level}`, 12, can ? CYAN : DIM, can ? HOT : CYAN, "center")}${vectorTextSvg(price, 10, can ? CYAN : DIM, can ? HOT : CYAN, "center")}`;
       btn.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();

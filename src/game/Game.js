@@ -421,7 +421,7 @@ export class Game {
       const dx = wrapDelta(this.ship.x - enemy.x, space.width);
       const dy = wrapDelta(this.ship.y - enemy.y, space.height);
       const dist = Math.hypot(dx, dy);
-      const locked = dist < destroyerConfig.laserRange;
+      const locked = !this.ship.docked && dist < destroyerConfig.laserRange;
       if (!enemy.laserOn) {
         if (!locked) {
           enemy.paintLaser(null);
@@ -958,11 +958,7 @@ export class Game {
 
   gunTier() {
     if (this.attractOnDemo) return 5;
-    const n = this.levels?.gun || 1;
-    if (n <= 1) return 1;
-    if (n <= 3) return 2;
-    if (n === 4) return 4;
-    return 5;
+    return Math.max(1, Math.min(5, this.levels?.gun || 1));
   }
 
   missileVolley() {
@@ -1036,33 +1032,17 @@ export class Game {
   }
 
   shoot() {
-    if (!this.ship.alive || this.ship.docked) {
-      this.burstLeft = 0;
-      this.fireWasOn = this.input.fireHeld;
-      return;
-    }
-    const gun = this.gunTier();
+    if (!this.ship.alive || this.ship.docked) return;
     const held = this.attractOnDemo || this.input.fireHeld;
-    const edge = held && !this.fireWasOn;
-    this.fireWasOn = held;
-    if (gun <= 3) {
-      if (edge) this.burstLeft = gun === 1 ? 1 : 3;
-    } else if (held) {
-      this.burstLeft = 0;
-    } else {
-      return;
-    }
-    if (this.cooldown > 0) return;
-    if (gun <= 3 && this.burstLeft <= 0) return;
-    if (gun >= 4 && !held) return;
+    if (!held || this.cooldown > 0) return;
+    const gun = this.gunTier();
     const bullet = this.shots.find((shot) => !shot.alive);
     if (!bullet) return;
     const dual = gun >= 5;
     const muzzle = this.ship.muzzle(dual ? (this.gun === 0 ? -1 : 1) : 0);
     bullet.fire(muzzle.x, muzzle.y, this.ship.rotation);
     if (dual) this.gun ^= 1;
-    this.cooldown = dual ? bullets.cooldown * 0.5 : gun <= 3 ? bullets.cooldown * 0.55 : bullets.cooldown;
-    if (this.burstLeft > 0) this.burstLeft -= 1;
+    this.cooldown = shipLevels.gunCool[gun - 1] ?? bullets.cooldown;
     this.sfx("thud");
   }
 
@@ -1871,7 +1851,7 @@ export class Game {
   }
 
   killShip() {
-    if (this.attractOnDemo || !this.ship.alive) return;
+    if (this.attractOnDemo || !this.ship.alive || this.ship.docked) return;
     this.ship.kill();
     this.spawnShards(HULL, this.ship, {
       color: colors.cyan,
@@ -2351,7 +2331,7 @@ export class Game {
         }
       }
 
-      if (this.ship.alive && this.ship.invuln <= 0) {
+      if (this.ship.alive && this.ship.invuln <= 0 && !this.ship.docked) {
         const body = this.ship.hitBody();
         for (const rock of this.asteroids) {
           if (hits(body, rock, space.width, space.height)) {

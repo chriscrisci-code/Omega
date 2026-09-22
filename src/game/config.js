@@ -48,12 +48,13 @@ export const emp = {
   cooldown: 8,
 };
 
-/** Gun 1 tap / 2-3 burst / 4 stream / 5 twin. Missiles = level-1, cap 6. EMP 1 off / 2 stun / 3 long / 4 kill. Shield 4 = 2x time. */
+/** Gun hold-fire: 1 slow / 2 / 3 / 4 original stream / 5 twin. Missiles = level-1, cap 6. EMP 1 off / 2 stun / 3 long / 4 kill. Shield 4 = 2x time. */
 export const shipLevels = {
   gun: 5,
   missile: 7,
   emp: 4,
   shield: 4,
+  gunCool: [0.2, 0.14, 0.105, 0.08, 0.04],
   cost: {
     gun: [4, 6, 10, 14],
     missile: [5, 6, 8, 10, 12, 14],

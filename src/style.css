@@ -911,10 +911,15 @@ body:has(#ships-page:not(.is-hidden)) .version {
   margin: 2px 0 4px;
 }
 
+.dock-ups {
+  gap: 8px;
+  margin: 6px 0 8px;
+}
+
 .dock-up {
-  min-width: 72px;
+  min-width: 144px;
   margin: 0;
-  padding: 3px 6px;
+  padding: 6px 12px;
   background: transparent;
   border: 1px solid rgba(102, 224, 255, 0.32);
   color: #66e0ff;
