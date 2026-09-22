@@ -3,7 +3,6 @@ const REACH = 54;
 const TAP_MS = 280;
 const TAP_DIST = 28;
 const DOUBLE_MS = 380;
-const BOTH_MS = 180;
 const FLICK_MS = 320;
 const FLICK_MIN = 0.58;
 
@@ -28,8 +27,7 @@ export class TouchControls {
     this.twoFinger = null;
     this.firing = false;
     this.turnTap = null;
-    this.bothFree = true;
-    this.shieldChord = null;
+    this.screenTap = null;
 
     this.onStart = (event) => this.touchStart(event);
     this.onMove = (event) => this.touchMove(event);
@@ -62,10 +60,7 @@ export class TouchControls {
       state.heldAt = performance.now();
       this.stickIds.add(event.pointerId);
       root.setPointerCapture?.(event.pointerId);
-      if (role === "turn") this.armFire(state);
       this.nudgeStick(state, event.clientX, event.clientY);
-      this.tryShield(role);
-      this.syncFire();
     };
     const drag = (event) => {
       if (state.id !== event.pointerId) return;
@@ -80,9 +75,7 @@ export class TouchControls {
       state.x = 0;
       state.y = 0;
       if (knob) knob.style.transform = "translate(-50%, -50%)";
-      this.markBothFree();
       this.syncAxes();
-      this.syncFire();
     };
     root.addEventListener("pointerdown", grab);
     root.addEventListener("pointermove", drag);
@@ -108,24 +101,9 @@ export class TouchControls {
     this.syncAxes();
   }
 
-  armFire(state) {
-    const now = performance.now();
-    if (this.turnTap && now - this.turnTap.t <= DOUBLE_MS) {
-      this.firing = true;
-      this.turnTap = null;
-      return;
-    }
-    this.turnTap = { t: now, x: state.x, y: state.y };
-  }
-
   releaseTurn(state) {
     const now = performance.now();
     const held = now - state.heldAt;
-    if (this.firing) {
-      this.firing = false;
-      this.turnTap = null;
-      return;
-    }
     if (held <= FLICK_MS && Math.abs(state.x) <= 0.45) {
       if (-state.y >= FLICK_MIN) {
         this.input._warpTicks += 1;
@@ -138,29 +116,17 @@ export class TouchControls {
         return;
       }
     }
-    if (held > TAP_MS) this.turnTap = null;
-  }
-
-  tryShield(role) {
-    const now = performance.now();
-    const other = role === "move" ? this.turn : this.move;
-    const otherHeld = other?.id != null;
-    if (!otherHeld && this.bothFree) {
-      this.shieldChord = now;
-      this.bothFree = false;
+    if (held <= TAP_MS && Math.hypot(state.x, state.y) < 0.35) {
+      if (this.turnTap && now - this.turnTap.t <= DOUBLE_MS) {
+        this.firing = !this.firing;
+        this.turnTap = null;
+        this.syncFire();
+        return;
+      }
+      this.turnTap = { t: now };
       return;
     }
-    if (otherHeld && this.shieldChord && now - this.shieldChord <= BOTH_MS) {
-      this.input._shieldTick = true;
-    }
-    this.shieldChord = null;
-    this.bothFree = false;
-  }
-
-  markBothFree() {
-    const free = this.move?.id == null && this.turn?.id == null;
-    this.bothFree = free;
-    if (free) this.shieldChord = null;
+    if (held > TAP_MS) this.turnTap = null;
   }
 
   syncAxes() {
@@ -180,7 +146,7 @@ export class TouchControls {
   }
 
   syncFire() {
-    this.input.touchFire = this.firing && this.turn?.id != null;
+    this.input.touchFire = this.firing;
   }
 
   touchStart(event) {
@@ -216,12 +182,22 @@ export class TouchControls {
       const held = performance.now() - this.twoFinger.t;
       if (!this.twoFinger.moved && held < TAP_MS + 80) this.input._missileTicks += 1;
       this.twoFinger = null;
+      this.screenTap = null;
       return;
     }
     if (!finger || this.fingers.size) return;
-    const dt = performance.now() - finger.t;
+    const now = performance.now();
+    const dt = now - finger.t;
     const travel = dist(finger.x, finger.y, finger.px, finger.py);
-    if (dt < TAP_MS && travel < TAP_DIST) this.input._pointerStart = true;
+    if (dt >= TAP_MS || travel >= TAP_DIST) return;
+    const tap = this.screenTap;
+    if (tap && now - tap.t <= DOUBLE_MS && dist(tap.x, tap.y, finger.x, finger.y) < TAP_DIST * 2.5) {
+      this.input._shieldTick = true;
+      this.screenTap = null;
+      return;
+    }
+    this.screenTap = { t: now, x: finger.x, y: finger.y };
+    this.input._pointerStart = true;
   }
 
   reset() {
@@ -230,8 +206,7 @@ export class TouchControls {
     this.twoFinger = null;
     this.firing = false;
     this.turnTap = null;
-    this.bothFree = true;
-    this.shieldChord = null;
+    this.screenTap = null;
     this.input.touchFire = false;
     this.input.touchSurge = 0;
     this.input.touchStrafe = 0;
