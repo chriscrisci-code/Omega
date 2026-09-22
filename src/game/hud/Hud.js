@@ -19,6 +19,7 @@ export class Hud {
   constructor() {
     this.score = document.querySelector("#score");
     this.ore = document.querySelector("#ore");
+    this.points = document.querySelector("#points");
     this.hubOre = document.querySelector("#hub-ore");
     this.lives = document.querySelector("#lives");
     this.center = document.querySelector("#center");
@@ -65,6 +66,8 @@ export class Hud {
 
     this.paint(document.querySelector("[data-label=score]"), "SCORE", 10, DIM, CYAN);
     this.paint(document.querySelector("[data-label=ore]"), "ORE", 10, DIM, CYAN, "center");
+    this.paint(document.querySelector("[data-label=pts]"), "LOADOUT", 10, DIM, CYAN, "center");
+    this.setPoints(0);
     this.paint(document.querySelector("[data-label=ships]"), "SHIPS", 10, DIM, CYAN, "right");
     this.paint(document.querySelector("[data-label=shield]"), "SHIELD", 10, DIM, CYAN, "right");
     this.paint(document.querySelector("[data-label=special]"), "WHEEL", 10, DIM, CYAN, "right");
@@ -102,6 +105,10 @@ export class Hud {
     this.paint(this.ore, String(cargo), 26, CYAN, HOT, "center");
     const line = name ? `HUB ${banked}  ${name}` : banked ? `HUB ${banked}` : "";
     this.paint(this.hubOre, line, 10, DIM, CYAN, "center");
+  }
+
+  setPoints(value) {
+    this.paint(this.points, String(Math.max(0, Math.floor(Number(value) || 0))), 26, CYAN, HOT, "center");
   }
 
   setHigh() {}

@@ -48,6 +48,20 @@ export const emp = {
   cooldown: 8,
 };
 
+/** Gun 1 tap / 2-3 burst / 4 stream / 5 twin. Missiles = level-1, cap 6. EMP 1 off / 2 stun / 3 long / 4 kill. Shield 4 = 2x time. */
+export const shipLevels = {
+  gun: 5,
+  missile: 7,
+  emp: 4,
+  shield: 4,
+  cost: {
+    gun: [4, 6, 10, 14],
+    missile: [5, 6, 8, 10, 12, 14],
+    emp: [6, 10, 16],
+    shield: [5, 8, 12],
+  },
+};
+
 export const camera = {
   posTau: 0.16,
   rotTau: 0.52,

@@ -14,13 +14,16 @@ export class DockBay {
   constructor() {
     this.root = document.querySelector("#dock-bay");
     this.ships = document.querySelector("#dock-ships");
+    this.ups = document.querySelector("#dock-ups");
     this.onPickShip = null;
+    this.onBuy = null;
     this.shipId = WEDGE_ID;
 
     paint(document.querySelector("#dock-title"), "BAY", 7, CYAN, HOT, "center");
-    paint(document.querySelector("#dock-hint"), "THRUST TO LAUNCH", 6, DIM, CYAN, "center");
+    paint(document.querySelector("#dock-hint"), "LOADOUT BUY  THRUST LAUNCH", 6, DIM, CYAN, "center");
 
     this.buildShips();
+    this.setUpgrades({ points: 0, levels: { gun: 1, missile: 1, emp: 1, shield: 1 }, costs: {}, max: {} });
     this.root?.addEventListener("pointerdown", (event) => event.stopPropagation());
   }
 
@@ -40,6 +43,40 @@ export class DockBay {
         this.onPickShip?.(item.id);
       });
       this.ships.appendChild(button);
+    }
+  }
+
+  setUpgrades(state) {
+    if (!this.ups) return;
+    const levels = state.levels || {};
+    const costs = state.costs || {};
+    const max = state.max || {};
+    const points = state.points || 0;
+    const rows = [
+      { id: "gun", name: "GUN" },
+      { id: "missile", name: "MSL" },
+      { id: "emp", name: "EMP" },
+      { id: "shield", name: "SHD" },
+    ];
+    this.ups.innerHTML = "";
+    for (const row of rows) {
+      const level = levels[row.id] || 1;
+      const cap = max[row.id] || level;
+      const cost = costs[row.id] || 0;
+      const top = level >= cap;
+      const need = top ? 0 : cost;
+      const can = !top && points >= need && need > 0;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `dock-up${can ? " is-on" : ""}${top ? " is-max" : ""}`;
+      const price = top ? "MAX" : `${need} LP`;
+      btn.innerHTML = `${vectorTextSvg(`${row.name}  ${level}`, 6, can ? CYAN : DIM, can ? HOT : CYAN, "center")}${vectorTextSvg(price, 5, can ? CYAN : DIM, can ? HOT : CYAN, "center")}`;
+      btn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (can) this.onBuy?.(row.id);
+      });
+      this.ups.appendChild(btn);
     }
   }
 

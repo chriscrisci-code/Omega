@@ -86,8 +86,14 @@ body.is-scoreboard #game {
 
 .ore-label,
 .shield-label,
-.special-label {
+.special-label,
+[data-label="pts"] {
   margin-top: 12px;
+}
+
+#points .vector-text,
+#ore .vector-text {
+  margin: 0 auto;
 }
 
 #shield {
@@ -895,13 +901,36 @@ body:has(#ships-page:not(.is-hidden)) .version {
   box-shadow: 0 0 28px rgba(102, 224, 255, 0.16);
 }
 
-.dock-ships {
+.dock-ships,
+.dock-ups {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   justify-content: center;
   align-items: center;
   margin: 2px 0 4px;
+}
+
+.dock-up {
+  min-width: 72px;
+  margin: 0;
+  padding: 3px 6px;
+  background: transparent;
+  border: 1px solid rgba(102, 224, 255, 0.32);
+  color: #66e0ff;
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: center;
+}
+
+.dock-up.is-on {
+  border-color: #c8f8ff;
+  box-shadow: 0 0 10px rgba(142, 246, 255, 0.35);
+}
+
+.dock-up.is-max {
+  opacity: 0.45;
+  cursor: default;
 }
 
 .dock-ship {

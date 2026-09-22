@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, missiles, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, warp, world as worldConfig } from "./config.js";
+import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, missiles, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, warp, world as worldConfig } from "./config.js";
 import { chipBurst, Debris, shatter } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -119,6 +119,12 @@ export class Game {
     this.assaultTime = assault.wave1;
     this.cooldown = 0;
     this.gun = 0;
+    this.shipLevel = 1;
+    this.levels = { gun: 1, missile: 1, emp: 1, shield: 1 };
+    this.points = 0;
+    this.loadoutBank = 0;
+    this.burstLeft = 0;
+    this.fireWasOn = false;
     this.missileCool = 0;
     this.timer = 0;
     this.shake = 0;
@@ -156,9 +162,11 @@ export class Game {
     };
     this.hud.onPickDevice = (id) => this.applyControls(id);
     this.hud.onPickWave = (n) => this.startRun(n);
+    this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
 
     this.hud.setHigh(this.save.highScore);
     this.hud.setScore(0);
+    this.hud.setPoints(0);
     this.hud.setLives(0);
     this.hud.setShield(0, false, shieldConfig.max);
     this.hud.setSpecial("WARP EMP MSL");
@@ -536,6 +544,9 @@ export class Game {
     this.mode = PLAYING;
     this.wavePick = null;
     this.score = 0;
+    this.points = 0;
+    this.loadoutBank = 0;
+    this.levels = { gun: 1, missile: 1, emp: 1, shield: 1 };
     this.killStreak = 0;
     this.bestStreak = 0;
     this.lives = shipConfig.lives;
@@ -546,6 +557,8 @@ export class Game {
     this.homeOn = false;
     this.cooldown = 0;
     this.gun = 0;
+    this.burstLeft = 0;
+    this.fireWasOn = false;
     this.timer = 0;
     this.shake = 0;
     this.nextLifeAt = this.lifeEvery;
@@ -566,9 +579,12 @@ export class Game {
     this.applyShipSkin();
     this.hub.forceDock(this.ship, 0);
     this.snapCamera();
+    this.applyShieldLevel(true);
     this.hud.setScore(0);
+    this.hud.setPoints(0);
     this.hud.setLives(this.lives);
-    this.hud.setShield(this.ship.shieldEnergy, false, shieldConfig.max);
+    this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
+    this.refreshDock();
     this.hud.setSpecial("WARP EMP MSL");
     this.hubThreat = 0;
     this.hubThreatClose = false;
@@ -940,14 +956,113 @@ export class Game {
     }
   }
 
+  gunTier() {
+    if (this.attractOnDemo) return 5;
+    const n = this.levels?.gun || 1;
+    if (n <= 1) return 1;
+    if (n <= 3) return 2;
+    if (n === 4) return 4;
+    return 5;
+  }
+
+  missileVolley() {
+    if (this.attractOnDemo) return missiles.volley ?? 8;
+    return Math.max(0, Math.min(6, (this.levels?.missile || 1) - 1));
+  }
+
+  empTier() {
+    if (this.attractOnDemo) return 2;
+    return Math.max(1, Math.min(4, this.levels?.emp || 1));
+  }
+
+  shieldPool() {
+    const top = shipLevels.shield || 4;
+    const n = Math.max(1, Math.min(top, this.levels?.shield || 1));
+    return shieldConfig.max * (1 + (n - 1) / (top - 1));
+  }
+
+  upgradeCost(id) {
+    const max = shipLevels[id];
+    const level = this.levels[id] || 1;
+    if (!max || level >= max) return 0;
+    return shipLevels.cost[id][level - 1] || 0;
+  }
+
+  refreshDock() {
+    this.hud.bay.setUpgrades({
+      points: this.points,
+      levels: this.levels,
+      costs: {
+        gun: this.upgradeCost("gun"),
+        missile: this.upgradeCost("missile"),
+        emp: this.upgradeCost("emp"),
+        shield: this.upgradeCost("shield"),
+      },
+      max: {
+        gun: shipLevels.gun,
+        missile: shipLevels.missile,
+        emp: shipLevels.emp,
+        shield: shipLevels.shield,
+      },
+    });
+  }
+
+  applyShieldLevel(fill = false) {
+    const pool = this.shieldPool();
+    this.ship.setShieldMax(pool, fill);
+    this.hud.setShield(this.ship.shieldEnergy, this.ship.shieldOn, pool);
+  }
+
+  addPoints(amount) {
+    if (this.attractOnDemo) return;
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!n) return;
+    this.points += n;
+    this.hud.setPoints(this.points);
+    this.refreshDock();
+  }
+
+  buyUpgrade(id) {
+    if (this.mode !== PLAYING || !this.ship.docked) return;
+    const cost = this.upgradeCost(id);
+    if (!cost || this.points < cost) return;
+    this.points -= cost;
+    this.levels[id] = (this.levels[id] || 1) + 1;
+    if (id === "shield") this.applyShieldLevel(true);
+    this.hud.setPoints(this.points);
+    this.refreshDock();
+    this.sfx("up");
+    this.hud.setMode(`${id === "missile" ? "MSL" : id === "shield" ? "SHD" : id.toUpperCase()}  ${this.levels[id]}`);
+  }
+
   shoot() {
-    if (this.cooldown > 0 || !this.ship.alive) return;
+    if (!this.ship.alive || this.ship.docked) {
+      this.burstLeft = 0;
+      this.fireWasOn = this.input.fireHeld;
+      return;
+    }
+    const gun = this.gunTier();
+    const held = this.attractOnDemo || this.input.fireHeld;
+    const edge = held && !this.fireWasOn;
+    this.fireWasOn = held;
+    if (gun <= 3) {
+      if (edge) this.burstLeft = gun === 1 ? 1 : 3;
+    } else if (held) {
+      this.burstLeft = 0;
+    } else {
+      return;
+    }
+    if (this.cooldown > 0) return;
+    if (gun <= 3 && this.burstLeft <= 0) return;
+    if (gun >= 4 && !held) return;
     const bullet = this.shots.find((shot) => !shot.alive);
     if (!bullet) return;
-    const muzzle = this.ship.muzzle(this.gun === 0 ? -1 : 1);
+    const dual = gun >= 5;
+    const muzzle = this.ship.muzzle(dual ? (this.gun === 0 ? -1 : 1) : 0);
     bullet.fire(muzzle.x, muzzle.y, this.ship.rotation);
-    this.gun ^= 1;
-    this.cooldown = bullets.cooldown * 0.5;
+    if (dual) this.gun ^= 1;
+    this.cooldown = dual ? bullets.cooldown * 0.5 : gun <= 3 ? bullets.cooldown * 0.55 : bullets.cooldown;
+    if (this.burstLeft > 0) this.burstLeft -= 1;
     this.sfx("thud");
   }
 
@@ -1085,7 +1200,8 @@ export class Game {
   fireMissile(force = false) {
     if ((!force && this.missileCool > 0) || !this.ship.alive || this.ship.docked) return;
     const space = this.space();
-    const volley = missiles.volley ?? 8;
+    const volley = this.missileVolley();
+    if (volley <= 0) return;
     const targets = this.missileTargets(space, volley);
     const nose = this.ship.nose();
     let fired = 0;
@@ -1133,6 +1249,7 @@ export class Game {
   }
 
   fireEmp(force = false) {
+    if (this.empTier() <= 1) return;
     if ((!force && this.empCool > 0) || this.emp.alive || !this.ship.alive || this.ship.docked) return;
     const reach = Math.hypot(this.app.screen.width, this.app.screen.height) * 0.5 / (this.camZoom || cameraConfig.zoom);
     this.emp.fire(this.ship.x, this.ship.y, reach);
@@ -1480,6 +1597,10 @@ export class Game {
     this.cargo = 0;
     this.ship.setCargo(0);
     const result = this.hub.deposit(n);
+    this.loadoutBank = (this.loadoutBank || 0) + n;
+    const gained = Math.floor(this.loadoutBank / 3);
+    this.loadoutBank -= gained * 3;
+    this.addPoints(gained);
     this.hud.setOre(0, this.hub.ore, this.hub.upgradeName());
     this.fx.burst(this.hub.x, this.hub.y, colors.cyanHot, 10 + n, 120);
     this.sfx(result.unlocked ? "up" : "dump");
@@ -1648,7 +1769,7 @@ export class Game {
     if (this.mode === TITLE || this.mode === GAMEOVER || this.mode === INITIALS) return;
     this.hud.hideContinue();
     if (this.ship.alive) this.ship.kill();
-    this.hud.setShield(this.ship.shieldEnergy, false, shieldConfig.max);
+    this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
     this.selected = null;
     this.lockMark.visible = false;
     this.hud.setHubAlert(null);
@@ -1771,7 +1892,7 @@ export class Game {
     this.hud.setOre(0, this.hub.ore, this.hub.upgradeName());
     this.mode = DYING;
     this.timer = shipConfig.respawnDelay;
-    this.hud.setShield(this.ship.shieldEnergy, false, shieldConfig.max);
+    this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
   }
 
   respawnOrEnd() {
@@ -1926,7 +2047,7 @@ export class Game {
       this.endRun("final");
     } else if (!this.pickingDevice && (this.mode === TITLE || this.mode === GAMEOVER) && this.mode !== INITIALS && this.input.startPressed) {
       this.offerWavePick();
-    } else if (this.mode === PLAYING && this.input.fireHeld && !this.ship.docked) {
+    } else if (this.mode === PLAYING && !this.ship.docked) {
       this.shoot();
     }
     if (this.mode === PLAYING && this.input.warpPressed) this.fireWarp();
@@ -1963,6 +2084,7 @@ export class Game {
         });
       } else if (this.ship.docked) {
         this.depositOre();
+        this.refreshDock();
         this.hud.showDock(this.shipId);
         this.ship.dockHold = Math.max(0, this.ship.dockHold - t);
         if (this.ship.dockHold <= 0 && (Math.abs(this.input.surge) > 0.2 || Math.abs(this.input.strafe) > 0.2)) {
@@ -1989,7 +2111,7 @@ export class Game {
       else if (shieldWas && !this.ship.shieldOn) this.sfx("off");
       if (this.cargo > 0) this.ship.setCargo(this.cargo);
       if (!this.ship.docked) this.hud.hideDock();
-      this.hud.setShield(this.ship.shieldEnergy, this.ship.shieldOn, shieldConfig.max);
+      this.hud.setShield(this.ship.shieldEnergy, this.ship.shieldOn, this.shieldPool());
       const modeLabel = this.input.mapHeld
         ? "MAP"
         : this.homeOn && !this.ship.docked && this.hub.alive
@@ -2026,7 +2148,8 @@ export class Game {
         if (!enemy.alive || this.emp.hit.has(enemy)) continue;
         if (hits(this.emp, enemy, space.width, space.height)) {
           this.emp.hit.add(enemy);
-          enemy.stun(emp.stun);
+          if (this.empTier() >= 4) this.killEnemy(enemy);
+          else enemy.stun(emp.stun * (this.empTier() >= 3 ? 2 : 1));
         }
       }
     }

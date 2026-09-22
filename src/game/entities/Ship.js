@@ -92,7 +92,8 @@ export class Ship {
     this.dockPad = null;
     this.undockLock = 0;
     this.dockHold = 0;
-    this.shieldEnergy = shieldConfig.max;
+    this.shieldMax = this.shieldMax || shieldConfig.max;
+    this.shieldEnergy = this.shieldMax;
     this.shieldOn = false;
     this.shieldLock = 0;
     this.shieldSpin = 0;
@@ -189,7 +190,7 @@ export class Ship {
       points.push(Math.cos(a) * radius, Math.sin(a) * radius);
     }
     const flash = Math.max(0, this.shieldFlash / 0.06);
-    const pulse = 0.55 + (this.shieldEnergy / shieldConfig.max) * 0.45;
+      const pulse = 0.55 + (this.shieldEnergy / (this.shieldMax || shieldConfig.max)) * 0.45;
     strokeGlow(this.shieldG, points, colors.cyan, colors.cyanHot, 1.25 + flash * 2.4);
     if (flash > 0) {
       const bloom = [];
@@ -205,6 +206,14 @@ export class Ship {
     }
     this.shieldG.alpha = pulse + flash * 0.45;
     this.shieldG.rotation = -this.rotation;
+  }
+
+  setShieldMax(max, fill = false) {
+    const next = Math.max(shieldConfig.max, max);
+    const extra = next - (this.shieldMax || shieldConfig.max);
+    this.shieldMax = next;
+    if (fill && extra > 0) this.shieldEnergy += extra;
+    this.shieldEnergy = Math.min(this.shieldMax, this.shieldEnergy);
   }
 
   forceShield(on) {
@@ -233,7 +242,7 @@ export class Ship {
         this.shieldLock = shieldConfig.lock;
       }
     } else {
-      this.shieldEnergy = Math.min(shieldConfig.max, this.shieldEnergy + shieldConfig.recharge * dt);
+      this.shieldEnergy = Math.min(this.shieldMax || shieldConfig.max, this.shieldEnergy + shieldConfig.recharge * dt);
     }
     this.drawShield();
   }
