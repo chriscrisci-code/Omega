@@ -2,6 +2,8 @@ const DEAD = 0.16;
 const REACH = 54;
 const TAP_MS = 280;
 const TAP_DIST = 28;
+const DOUBLE_MS = 380;
+const BOTH_MS = 180;
 const FLICK_MS = 320;
 const FLICK_MIN = 0.58;
 
@@ -24,6 +26,10 @@ export class TouchControls {
     this.stickIds = new Set();
     this.fingers = new Map();
     this.twoFinger = null;
+    this.firing = false;
+    this.turnTap = null;
+    this.bothFree = true;
+    this.shieldChord = null;
 
     this.onStart = (event) => this.touchStart(event);
     this.onMove = (event) => this.touchMove(event);
@@ -56,7 +62,9 @@ export class TouchControls {
       state.heldAt = performance.now();
       this.stickIds.add(event.pointerId);
       root.setPointerCapture?.(event.pointerId);
+      if (role === "turn") this.armFire(state);
       this.nudgeStick(state, event.clientX, event.clientY);
+      this.tryShield(role);
       this.syncFire();
     };
     const drag = (event) => {
@@ -66,12 +74,13 @@ export class TouchControls {
     };
     const drop = (event) => {
       if (state.id !== event.pointerId) return;
-      if (role === "move") this.releaseFlick(state);
+      if (role === "turn") this.releaseTurn(state);
       this.stickIds.delete(event.pointerId);
       state.id = null;
       state.x = 0;
       state.y = 0;
       if (knob) knob.style.transform = "translate(-50%, -50%)";
+      this.markBothFree();
       this.syncAxes();
       this.syncFire();
     };
@@ -99,11 +108,59 @@ export class TouchControls {
     this.syncAxes();
   }
 
-  releaseFlick(state) {
-    const held = performance.now() - state.heldAt;
-    if (held > FLICK_MS || Math.abs(state.x) > 0.45) return;
-    if (-state.y >= FLICK_MIN) this.input._warpTicks += 1;
-    else if (state.y >= FLICK_MIN) this.input._empTicks += 1;
+  armFire(state) {
+    const now = performance.now();
+    if (this.turnTap && now - this.turnTap.t <= DOUBLE_MS) {
+      this.firing = true;
+      this.turnTap = null;
+      return;
+    }
+    this.turnTap = { t: now, x: state.x, y: state.y };
+  }
+
+  releaseTurn(state) {
+    const now = performance.now();
+    const held = now - state.heldAt;
+    if (this.firing) {
+      this.firing = false;
+      this.turnTap = null;
+      return;
+    }
+    if (held <= FLICK_MS && Math.abs(state.x) <= 0.45) {
+      if (-state.y >= FLICK_MIN) {
+        this.input._warpTicks += 1;
+        this.turnTap = null;
+        return;
+      }
+      if (state.y >= FLICK_MIN) {
+        this.input._empTicks += 1;
+        this.turnTap = null;
+        return;
+      }
+    }
+    if (held > TAP_MS) this.turnTap = null;
+  }
+
+  tryShield(role) {
+    const now = performance.now();
+    const other = role === "move" ? this.turn : this.move;
+    const otherHeld = other?.id != null;
+    if (!otherHeld && this.bothFree) {
+      this.shieldChord = now;
+      this.bothFree = false;
+      return;
+    }
+    if (otherHeld && this.shieldChord && now - this.shieldChord <= BOTH_MS) {
+      this.input._shieldTick = true;
+    }
+    this.shieldChord = null;
+    this.bothFree = false;
+  }
+
+  markBothFree() {
+    const free = this.move?.id == null && this.turn?.id == null;
+    this.bothFree = free;
+    if (free) this.shieldChord = null;
   }
 
   syncAxes() {
@@ -123,7 +180,7 @@ export class TouchControls {
   }
 
   syncFire() {
-    this.input.touchFire = Boolean(this.move?.id != null);
+    this.input.touchFire = this.firing && this.turn?.id != null;
   }
 
   touchStart(event) {
@@ -171,6 +228,10 @@ export class TouchControls {
     this.fingers.clear();
     this.stickIds.clear();
     this.twoFinger = null;
+    this.firing = false;
+    this.turnTap = null;
+    this.bothFree = true;
+    this.shieldChord = null;
     this.input.touchFire = false;
     this.input.touchSurge = 0;
     this.input.touchStrafe = 0;
