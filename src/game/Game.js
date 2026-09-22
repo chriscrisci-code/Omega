@@ -12,6 +12,8 @@ import { HULL, Ship } from "./entities/Ship.js";
 import { HudMarkers } from "./hud/HudMarkers.js";
 import { Hud } from "./hud/Hud.js";
 import { Input } from "./input/Input.js";
+import { TouchControls } from "./input/TouchControls.js";
+import { maybePhone } from "./input/device.js";
 import { ParticlePool } from "./particles/ParticlePool.js";
 import { ShipsGallery } from "./ships/ShipsGallery.js";
 import { FarGrid } from "./render/FarGrid.js";
@@ -37,7 +39,9 @@ export class Game {
     this.storage = storage;
     this.save = storage.load();
     this.input = new Input();
+    this.touch = new TouchControls(this.input);
     this.hud = new Hud();
+    this.pickingDevice = false;
     this.audio = new GameAudio();
 
     this.world = new Container();
@@ -144,6 +148,7 @@ export class Game {
       this.input._continueClick = true;
       this.acceptContinue();
     };
+    this.hud.onPickDevice = (id) => this.applyControls(id);
 
     this.hud.setHigh(this.save.highScore);
     this.hud.setScore(0);
@@ -152,6 +157,7 @@ export class Game {
     this.hud.setSpecial("WARP EMP MSL");
     this.hud.setOre(0, 0, "");
     this.beginAttractLoop();
+    this.offerDevicePick();
     this.ship.reset(worldConfig.width / 2, worldConfig.height / 2);
     this.ship.view.visible = false;
     this.fx.dust(worldConfig.width, worldConfig.height, 80);
@@ -625,6 +631,34 @@ export class Game {
     this.pips.view.visible = true;
     this.hud.showTitle();
     this.beginAttractLoop();
+  }
+
+  offerDevicePick() {
+    const saved = this.save.settings.controls;
+    if (saved === "desktop" || saved === "phone") {
+      this.applyControls(saved, false);
+      return;
+    }
+    if (maybePhone()) {
+      this.pickingDevice = true;
+      this.hud.showDevicePick();
+      return;
+    }
+    this.applyControls("desktop", false);
+  }
+
+  applyControls(id, persist = true) {
+    const layout = id === "phone" ? "phone" : "desktop";
+    this.pickingDevice = false;
+    this.input.setLayout(layout);
+    this.touch.setActive(layout === "phone");
+    this.hud.setLayout(layout);
+    this.hud.hideDevicePick();
+    this.hud.showTitle();
+    if (persist) {
+      this.save.settings.controls = layout;
+      this.storage.save(this.save);
+    }
   }
 
   beginAttractLoop(page = "title", options = {}) {
@@ -1744,7 +1778,7 @@ export class Game {
       this.acceptContinue();
     } else if (this.mode === CONTINUE && this.input.selectPressed) {
       this.endRun("final");
-    } else if ((this.mode === TITLE || this.mode === GAMEOVER) && this.mode !== INITIALS && this.input.startPressed) {
+    } else if (!this.pickingDevice && (this.mode === TITLE || this.mode === GAMEOVER) && this.mode !== INITIALS && this.input.startPressed) {
       this.startRun();
     } else if (this.mode === PLAYING && this.input.fireHeld && !this.ship.docked) {
       this.shoot();

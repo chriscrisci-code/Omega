@@ -35,6 +35,11 @@ export class Input {
     this._shieldTick = false;
     this._shipsClick = false;
     this._continueClick = false;
+    this.layout = "desktop";
+    this.touchSurge = 0;
+    this.touchStrafe = 0;
+    this.touchRotate = 0;
+    this.touchFire = false;
 
     this.onKeyDown = (event) => {
       if (HOLD.has(event.code)) event.preventDefault();
@@ -44,11 +49,13 @@ export class Input {
     this.onKeyUp = (event) => this.keys.delete(event.code);
     this.onBlur = () => this.keys.clear();
     this.onPointerMove = (event) => {
+      if (this.layout === "phone") return;
       this.mouseX = event.clientX;
       this.mouseY = event.clientY;
       this.hasPointer = true;
     };
     this.onPointerDown = (event) => {
+      if (this.layout === "phone") return;
       this.hasPointer = true;
       this.mouseX = event.clientX;
       this.mouseY = event.clientY;
@@ -76,6 +83,7 @@ export class Input {
     };
     this.onContextMenu = (event) => event.preventDefault();
     this.onWheel = (event) => {
+      if (this.layout === "phone") return;
       event.preventDefault();
       this.hasPointer = true;
       if (event.deltaY < 0) this._warpTicks += 1;
@@ -136,8 +144,18 @@ export class Input {
     return codes.some((code) => this.pressed.has(code));
   }
 
+  setLayout(id) {
+    this.layout = id === "phone" ? "phone" : "desktop";
+    if (this.layout !== "phone") {
+      this.touchSurge = 0;
+      this.touchStrafe = 0;
+      this.touchRotate = 0;
+      this.touchFire = false;
+    }
+  }
+
   get rotate() {
-    let value = 0;
+    let value = this.touchRotate;
     if (this.anyDown(ROTATE_LEFT)) value -= 1;
     if (this.anyDown(ROTATE_RIGHT)) value += 1;
     const pad = this.pad();
@@ -148,7 +166,7 @@ export class Input {
   }
 
   get surge() {
-    let value = 0;
+    let value = this.touchSurge;
     if (this.anyDown(FORWARD)) value += 1;
     if (this.anyDown(BACK)) value -= 1;
     const pad = this.pad();
@@ -158,7 +176,7 @@ export class Input {
   }
 
   get strafe() {
-    let value = 0;
+    let value = this.touchStrafe;
     if (this.anyDown(STRAFE_LEFT)) value -= 1;
     if (this.anyDown(STRAFE_RIGHT)) value += 1;
     const pad = this.pad();
@@ -167,6 +185,7 @@ export class Input {
   }
 
   get fireHeld() {
+    if (this.layout === "phone") return this.touchFire;
     const pad = this.pad();
     return this.anyDown(FIRE) || (this.leftHeld && !this.mapHeld) || this.button(pad, 2) || this.button(pad, 6);
   }
@@ -181,6 +200,7 @@ export class Input {
   }
 
   get firePressed() {
+    if (this.layout === "phone") return this.touchFire;
     const pad = this.pad();
     return this.anyPressed(FIRE) || (this._pointerStart && !this.mapHeld) || this.buttonPressed(2) || this.buttonPressed(6);
   }

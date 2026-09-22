@@ -22,6 +22,7 @@ const empty = {
   settings: {
     fullscreen: false,
     difficulty: "easy",
+    controls: "",
   },
 };
 
@@ -78,6 +79,7 @@ function normalize(data) {
     settings: {
       fullscreen: Boolean(data.settings?.fullscreen),
       difficulty: data.settings?.difficulty === "hard" || data.settings?.difficulty === "medium" ? data.settings.difficulty : "easy",
+      controls: data.settings?.controls === "phone" || data.settings?.controls === "desktop" ? data.settings.controls : "",
     },
   };
 }

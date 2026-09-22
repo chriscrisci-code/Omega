@@ -40,7 +40,13 @@ export class Hud {
     this.credit = document.querySelector("#credit");
     this.scoreBoard = document.querySelector("#score-board");
     this.continueBtn = document.querySelector("#continue-btn");
+    this.devicePick = document.querySelector("#device-pick");
+    this.deviceTitle = document.querySelector("#device-title");
+    this.pickDesktop = document.querySelector("#pick-desktop");
+    this.pickPhone = document.querySelector("#pick-phone");
     this.onContinue = null;
+    this.onPickDevice = null;
+    this.layout = "desktop";
     this.trailTimer = 0;
     this.trailBeat = 0;
     this.bay = new DockBay();
@@ -58,9 +64,20 @@ export class Hud {
     this.paint(document.querySelector("[data-label=special]"), "WHEEL", 10, DIM, CYAN, "right");
     this.paint(this.alertTitle, "HUB UNDER ATTACK", 8, MAGENTA, PINK, "center");
     this.paint(this.padStatus, "GAMEPAD CONNECTED", 10, DIM, CYAN, "right");
-    this.help[0] && this.paint(this.help[0], "MOUSE AIM  LEFT FIRE  WHEEL FWD WARP  WHEEL BACK EMP  WHEEL BUTTON MISSILE", 11, DIM, CYAN, "center");
-    this.help[1] && this.paint(this.help[1], "RIGHT TOGGLE SHIELD  A D STRAFE  W S THRUST  Q E ROTATE", 11, DIM, CYAN, "center");
-    this.help[2] && this.paint(this.help[2], "M MAP  H AUTOPILOT HOME  F FULLSCREEN  ESC END RUN", 10, DIM, CYAN, "center");
+    this.paintHelp();
+    this.paint(this.deviceTitle, "CONTROLS", 16, CYAN, HOT, "center");
+    this.pickDesktop && (this.pickDesktop.innerHTML = vectorTextSvg("DESKTOP", 14, CYAN, HOT, "center"));
+    this.pickPhone && (this.pickPhone.innerHTML = vectorTextSvg("PHONE", 14, CYAN, HOT, "center"));
+    this.pickDesktop?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onPickDevice?.("desktop");
+    });
+    this.pickPhone?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onPickDevice?.("phone");
+    });
     this.paint(this.shipsLink, "S SHIPS", 14, DIM, CYAN, "center");
     this.shipsHeading && (this.shipsHeading.innerHTML = vectorTitleSvg("SHIPS", 36, CYAN, HOT));
     this.paint(this.shipsHint, "ESC RETURN  SPACE START", 11, DIM, CYAN, "center");
@@ -149,6 +166,33 @@ export class Hud {
     svg.dataset.trail = states[this.trailBeat % states.length];
   }
 
+  paintHelp() {
+    if (this.layout === "phone") {
+      this.help[0] && this.paint(this.help[0], "LEFT STICK THRUST  RIGHT STICK TURN", 11, DIM, CYAN, "center");
+      this.help[1] && this.paint(this.help[1], "DOUBLE TAP DRAG FIRE  SWIPE UP WARP  SWIPE DOWN EMP", 11, DIM, CYAN, "center");
+      this.help[2] && this.paint(this.help[2], "TWO FINGER TAP MISSILE", 10, DIM, CYAN, "center");
+      this.paint(document.querySelector("[data-label=special]"), "SWIPE", 10, DIM, CYAN, "right");
+      return;
+    }
+    this.help[0] && this.paint(this.help[0], "MOUSE AIM  LEFT FIRE  WHEEL FWD WARP  WHEEL BACK EMP  WHEEL BUTTON MISSILE", 11, DIM, CYAN, "center");
+    this.help[1] && this.paint(this.help[1], "RIGHT TOGGLE SHIELD  A D STRAFE  W S THRUST  Q E ROTATE", 11, DIM, CYAN, "center");
+    this.help[2] && this.paint(this.help[2], "M MAP  H AUTOPILOT HOME  F FULLSCREEN  ESC END RUN", 10, DIM, CYAN, "center");
+    this.paint(document.querySelector("[data-label=special]"), "WHEEL", 10, DIM, CYAN, "right");
+  }
+
+  setLayout(id) {
+    this.layout = id === "phone" ? "phone" : "desktop";
+    this.paintHelp();
+  }
+
+  showDevicePick() {
+    this.devicePick?.classList.remove("is-hidden");
+  }
+
+  hideDevicePick() {
+    this.devicePick?.classList.add("is-hidden");
+  }
+
   showTitle() {
     this.attract(true);
     this.setAttractDemo(false);
@@ -156,8 +200,9 @@ export class Hud {
     this.title.innerHTML = vectorTitleSvg("OMEGA", 64, CYAN, HOT, { motion: true });
     this.applyTrailState();
     this.paint(this.tag, "GLOW  PARTICLES  DEEP SPACE", 12, MAGENTA, PINK, "center");
-    this.cta.innerHTML = vectorTitleSvg("PRESS FIRE", 20, CYAN, HOT);
+    this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP TO START" : "PRESS FIRE", 20, CYAN, HOT);
     this.paint(this.credit, "C 1984  OMEGA", 9, DIM, CYAN, "center");
+    this.paintHelp();
     this.shipsPage?.classList.add("is-hidden");
     this.hideScores();
     this.hideContinue();
