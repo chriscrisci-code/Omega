@@ -3,8 +3,9 @@ const REACH = 54;
 const TAP_MS = 280;
 const TAP_DIST = 28;
 const DOUBLE_MS = 380;
-const FLICK_MS = 320;
-const FLICK_MIN = 0.58;
+const FLICK_MS = 240;
+const FLICK_MIN = 0.84;
+const FLICK_SLIP = 0.26;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -104,7 +105,7 @@ export class TouchControls {
   releaseTurn(state) {
     const now = performance.now();
     const held = now - state.heldAt;
-    if (held <= FLICK_MS && Math.abs(state.x) <= 0.45) {
+    if (held >= 50 && held <= FLICK_MS && Math.abs(state.x) <= FLICK_SLIP) {
       if (-state.y >= FLICK_MIN) {
         this.input._warpTicks += 1;
         this.turnTap = null;

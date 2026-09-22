@@ -40,6 +40,9 @@ export class Input {
     this.touchStrafe = 0;
     this.touchRotate = 0;
     this.touchFire = false;
+    this.wheelAcc = 0;
+    this.wheelAt = 0;
+    this.wheelLock = 0;
 
     this.onKeyDown = (event) => {
       if (HOLD.has(event.code)) event.preventDefault();
@@ -86,8 +89,25 @@ export class Input {
       if (this.layout === "phone") return;
       event.preventDefault();
       this.hasPointer = true;
-      if (event.deltaY < 0) this._warpTicks += 1;
-      else if (event.deltaY > 0) this._empTicks += 1;
+      const now = performance.now();
+      if (now < this.wheelLock) return;
+      let dy = event.deltaY;
+      if (event.deltaMode === 1) dy *= 16;
+      if (event.deltaMode === 2) dy *= 120;
+      if (now - this.wheelAt > 320) this.wheelAcc = 0;
+      this.wheelAt = now;
+      if (this.wheelAcc && Math.sign(dy) !== Math.sign(this.wheelAcc)) this.wheelAcc = 0;
+      this.wheelAcc += dy;
+      const need = 280;
+      if (this.wheelAcc <= -need) {
+        this._warpTicks += 1;
+        this.wheelAcc = 0;
+        this.wheelLock = now + 520;
+      } else if (this.wheelAcc >= need) {
+        this._empTicks += 1;
+        this.wheelAcc = 0;
+        this.wheelLock = now + 520;
+      }
     };
 
     target.addEventListener("keydown", this.onKeyDown);
