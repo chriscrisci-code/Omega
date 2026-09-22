@@ -31,6 +31,7 @@ const PLAYING = "playing";
 const DYING = "dying";
 const CONTINUE = "continue";
 const INITIALS = "initials";
+const WAVEPICK = "wavepick";
 const GAMEOVER = "gameover";
 
 export class Game {
@@ -143,6 +144,7 @@ export class Game {
     this.attractAge = 0;
     this.attractCue = null;
     this.initials = null;
+    this.wavePick = null;
     this.shipId = this.save.shipId || WEDGE_ID;
     this.difficulty = "easy";
     this.lifeEvery = extraLifeEvery;
@@ -152,6 +154,7 @@ export class Game {
       this.acceptContinue();
     };
     this.hud.onPickDevice = (id) => this.applyControls(id);
+    this.hud.onPickWave = (n) => this.startRun(n);
 
     this.hud.setHigh(this.save.highScore);
     this.hud.setScore(0);
@@ -305,6 +308,7 @@ export class Game {
     this.assaultRest = false;
     this.assaultTime = this.assaultDuration(this.assaultIndex);
     this.raiderTimer = this.assaultIndex === 1 ? raid.first : 1.1;
+    this.markWaveReached(this.assaultIndex);
     const destroyers = this.destroyerCap();
     for (const base of this.bases) {
       if (base.hub) continue;
@@ -520,7 +524,7 @@ export class Game {
     }
   }
 
-  startRun() {
+  startRun(wave = 1) {
     const tune = applyDifficulty("easy");
     this.difficulty = "easy";
     this.lifeEvery = tune.extraLifeEvery;
@@ -529,13 +533,15 @@ export class Game {
     this.stopAttract();
     this.audio.unlock();
     this.mode = PLAYING;
+    this.wavePick = null;
     this.score = 0;
     this.killStreak = 0;
     this.bestStreak = 0;
     this.lives = shipConfig.lives;
     this.wave = 1;
     this.waveCooldown = 0;
-    this.beginAssault(1, true);
+    const startWave = Math.max(1, Math.min(Math.floor(Number(wave) || 1), this.save.maxWave || 1));
+    this.beginAssault(startWave, true);
     this.homeOn = false;
     this.cooldown = 0;
     this.timer = 0;
@@ -553,7 +559,7 @@ export class Game {
     this.warpCool = 0;
     this.cargo = 0;
     for (const base of this.bases) base.resetCombat();
-    this.sleepLateBases();
+    this.seedWorldForWave(startWave);
     this.ship.reset(worldConfig.width / 2, worldConfig.height / 2);
     this.applyShipSkin();
     this.hub.forceDock(this.ship, 0);
@@ -594,7 +600,7 @@ export class Game {
     if (wasEmpty) this.baseUnlockIn = this.arriveWait;
   }
 
-  openNextBase() {
+  openNextBase(silent = false) {
     const base = this.pendingBases.shift();
     if (!base) return;
     base.resetCombat();
@@ -605,12 +611,74 @@ export class Game {
     } else if (this.castlesArmed) {
       this.armCastle(base);
     }
-    this.fx.burst(base.x, base.y, base.color, 22, 180);
-    this.fx.burst(base.x, base.y, colors.white, 10, 120);
-    this.hud.setMode(`${base.name}  ONLINE`);
-    this.sfx("castle");
+    if (!silent) {
+      this.fx.burst(base.x, base.y, base.color, 22, 180);
+      this.fx.burst(base.x, base.y, colors.white, 10, 120);
+      this.hud.setMode(`${base.name}  ONLINE`);
+      this.sfx("castle");
+    }
     this.arriveWait = Math.max(castle.arriveFloor, this.arriveWait * castle.arriveShrink);
     this.baseUnlockIn = this.pendingBases.length ? this.arriveWait : 0;
+  }
+
+  timeToWave(n) {
+    let t = 0;
+    for (let i = 1; i < n; i += 1) t += this.assaultDuration(i) + assault.rest;
+    return t;
+  }
+
+  seedWorldForWave(n) {
+    this.sleepLateBases();
+    let left = this.timeToWave(n);
+    while (this.pendingBases.length && left >= this.baseUnlockIn) {
+      left -= this.baseUnlockIn;
+      this.openNextBase(true);
+    }
+    this.baseUnlockIn = this.pendingBases.length ? Math.max(0.05, this.baseUnlockIn - left) : 0;
+  }
+
+  markWaveReached(n) {
+    if (this.attractOnDemo) return;
+    const wave = Math.max(1, Math.floor(Number(n) || 1));
+    if (wave <= (this.save.maxWave || 1)) return;
+    this.save.maxWave = wave;
+    this.storage.save(this.save);
+  }
+
+  unlockedWave() {
+    return Math.max(1, Math.floor(Number(this.save.maxWave) || 1));
+  }
+
+  offerWavePick() {
+    const max = this.unlockedWave();
+    if (max <= 1) {
+      this.startRun(1);
+      return;
+    }
+    this.stopAttract();
+    this.mode = WAVEPICK;
+    this.wavePick = { max, selected: max };
+    this.hud.showWavePick(max, max);
+  }
+
+  nudgeWave(dir) {
+    if (!this.wavePick) return;
+    const next = Math.max(1, Math.min(this.wavePick.max, this.wavePick.selected + dir));
+    if (next === this.wavePick.selected) return;
+    this.wavePick.selected = next;
+    this.hud.paintWavePick(this.wavePick.max, next);
+  }
+
+  tickWavePick() {
+    if (this.input.letterLeft) this.nudgeWave(-1);
+    if (this.input.letterRight) this.nudgeWave(1);
+    if (this.input.startPressed || this.input.firePressed) this.startRun(this.wavePick?.selected || 1);
+    else if (this.input.quitPressed) {
+      this.wavePick = null;
+      this.mode = TITLE;
+      this.hud.showTitle();
+      this.beginAttractLoop();
+    }
   }
 
   armCastle(base) {
@@ -1810,10 +1878,12 @@ export class Game {
     const space = this.space();
 
     this.touch.tick();
+    this.input.fineWheel = this.mode === INITIALS || this.mode === WAVEPICK;
     if (this.input.fullscreenPressed) this.toggleFullscreen();
     this.hud.setPad(this.input.padConnected);
     if (this.mode === TITLE || this.mode === GAMEOVER) this.tickAttract(t, space);
     if (this.mode === INITIALS) this.tickInitials();
+    if (this.mode === WAVEPICK) this.tickWavePick();
 
     if ((this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE) && this.input.quitPressed) {
       this.endRun(this.mode === CONTINUE ? "final" : "abort");
@@ -1824,13 +1894,13 @@ export class Game {
     } else if (this.mode === SHIPS && this.input.quitPressed) {
       this.closeShips();
     } else if (this.mode === SHIPS && this.input.startKeyPressed) {
-      this.startRun();
+      this.offerWavePick();
     } else if (this.mode === CONTINUE && (this.input.continueClick || this.input.startKeyPressed)) {
       this.acceptContinue();
     } else if (this.mode === CONTINUE && this.input.selectPressed) {
       this.endRun("final");
     } else if (!this.pickingDevice && (this.mode === TITLE || this.mode === GAMEOVER) && this.mode !== INITIALS && this.input.startPressed) {
-      this.startRun();
+      this.offerWavePick();
     } else if (this.mode === PLAYING && this.input.fireHeld && !this.ship.docked) {
       this.shoot();
     }

@@ -1,3 +1,4 @@
+import { version } from "../config.js";
 import { DockBay } from "./DockBay.js";
 import { shipMarksSvg, vectorTextSvg, vectorTitleSvg } from "./vectorText.js";
 
@@ -38,6 +39,11 @@ export class Hud {
     this.shipsHeading = document.querySelector("#ships-heading");
     this.shipsHint = document.querySelector("#ships-hint");
     this.credit = document.querySelector("#credit");
+    this.version = document.querySelector("#version");
+    this.paint(this.version, `V ${version}`, 8, DIM, CYAN, "right");
+    this.wavePick = document.querySelector("#wave-pick");
+    this.waveRow = document.querySelector("#wave-row");
+    this.onPickWave = null;
     this.scoreBoard = document.querySelector("#score-board");
     this.continueBtn = document.querySelector("#continue-btn");
     this.devicePick = document.querySelector("#device-pick");
@@ -204,10 +210,53 @@ export class Hud {
     this.paint(this.credit, "C 1984  OMEGA", 9, DIM, CYAN, "center");
     this.paintHelp();
     this.shipsPage?.classList.add("is-hidden");
+    this.hideWavePick();
     this.hideScores();
     this.hideContinue();
     this.setHubAlert(null);
     this.setMode("");
+  }
+
+  showWavePick(maxWave, selected) {
+    this.attract(true);
+    this.setAttractDemo(false);
+    this.center.classList.remove("is-hidden", "is-scores", "is-initials");
+    this.center.classList.add("is-wave");
+    this.title.innerHTML = "";
+    this.paint(this.tag, "WAVE", 18, MAGENTA, PINK, "center");
+    this.paintWavePick(maxWave, selected);
+    this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP WAVE" : "FIRE START", 18, CYAN, HOT);
+    this.paint(this.credit, this.layout === "phone" ? "TAP TO START" : "WHEEL OR ARROWS   ESC", 8, DIM, CYAN, "center");
+    this.shipsPage?.classList.add("is-hidden");
+    this.hideScores();
+    this.hideContinue();
+    this.setHubAlert(null);
+    this.setMode("");
+  }
+
+  paintWavePick(maxWave, selected) {
+    if (!this.waveRow) return;
+    const max = Math.max(1, Math.floor(Number(maxWave) || 1));
+    const on = Math.max(1, Math.min(max, Math.floor(Number(selected) || 1)));
+    this.waveRow.innerHTML = "";
+    for (let n = 1; n <= max; n += 1) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `wave-btn${n === on ? " is-on" : ""}`;
+      btn.innerHTML = vectorTextSvg(String(n), n === on ? 16 : 13, n === on ? CYAN : DIM, n === on ? HOT : CYAN, "center");
+      btn.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.onPickWave?.(n);
+      });
+      this.waveRow.appendChild(btn);
+    }
+    this.wavePick?.classList.remove("is-hidden");
+  }
+
+  hideWavePick() {
+    this.center?.classList.remove("is-wave");
+    this.wavePick?.classList.add("is-hidden");
   }
 
   showScores(rows, heading = "ALL TIME") {
@@ -220,6 +269,7 @@ export class Hud {
     this.cta.innerHTML = vectorTitleSvg("PRESS FIRE", 20, CYAN, HOT);
     this.paint(this.credit, "C 1984  OMEGA", 9, DIM, CYAN, "center");
     this.shipsPage?.classList.add("is-hidden");
+    this.hideWavePick();
     this.hideContinue();
     this.setHubAlert(null);
     this.setMode("");
@@ -230,11 +280,12 @@ export class Hud {
     this.setAttractDemo(false);
     this.center.classList.remove("is-hidden", "is-scores");
     this.center.classList.add("is-initials");
+    this.hideWavePick();
     document.body.classList.add("is-scoreboard");
     this.title.innerHTML = "";
     this.paint(this.tag, `${label}  ${score}`, 14, MAGENTA, PINK, "center");
     this.paintInitials(entry);
-    this.paint(this.credit, "WHEEL LETTER   FIRE NEXT", 8, DIM, CYAN, "center");
+    this.paint(this.credit, "WHEEL OR ARROWS   FIRE NEXT", 8, DIM, CYAN, "center");
     this.cta.innerHTML = "";
     this.shipsPage?.classList.add("is-hidden");
     this.hideContinue();
@@ -290,6 +341,7 @@ export class Hud {
     this.cta.innerHTML = vectorTitleSvg("PRESS FIRE", 20, CYAN, HOT);
     this.paint(this.credit, "C 1984  OMEGA", 9, DIM, CYAN, "center");
     this.shipsPage?.classList.add("is-hidden");
+    this.hideWavePick();
     this.hideScores();
     this.hideContinue();
     this.setHubAlert(null);
@@ -340,6 +392,7 @@ export class Hud {
     this.shipsPage?.classList.add("is-hidden");
     this.hideDock();
     this.hideContinue();
+    this.hideWavePick();
     this.hideScores();
   }
 

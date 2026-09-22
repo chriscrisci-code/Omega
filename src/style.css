@@ -178,6 +178,49 @@ body.is-attract .hud-center.is-demo .score-board {
   display: none;
 }
 
+.hud-center.is-wave {
+  top: 28%;
+}
+
+.hud-center.is-wave h1,
+.hud-center.is-wave .help,
+.hud-center.is-wave .attract-rule,
+.hud-center.is-wave .ships-link {
+  display: none;
+}
+
+.wave-pick {
+  margin: 8px 0 18px;
+}
+
+.wave-pick.is-hidden {
+  display: none;
+}
+
+.wave-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: min(720px, 92vw);
+  margin: 0 auto;
+}
+
+.wave-btn {
+  min-width: 48px;
+  padding: 8px 10px;
+  background: transparent;
+  border: 1px solid rgba(102, 224, 255, 0.35);
+  color: #66e0ff;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.wave-btn.is-on {
+  border-color: #c8f8ff;
+  box-shadow: 0 0 12px rgba(142, 246, 255, 0.45);
+}
+
 .hud-center.is-initials .help,
 .hud-center.is-initials .ships-link,
 .hud-center.is-initials .attract-rule {
@@ -703,6 +746,34 @@ body.is-attract .crt {
 body.is-attract .hud-bl,
 body.is-attract .hud-br,
 body.is-attract .pad-status {
+  display: none;
+}
+
+.version {
+  display: none;
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 4;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.version .vector-text {
+  width: 70px;
+  height: auto;
+  margin-left: auto;
+}
+
+body.is-attract:not(.is-demo-play):not(.is-scoreboard) .version {
+  display: block;
+}
+
+body:has(.hud-center.is-wave) .version {
+  display: none;
+}
+
+body:has(#ships-page:not(.is-hidden)) .version {
   display: none;
 }
 

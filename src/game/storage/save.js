@@ -33,6 +33,7 @@ export const SCORE_BOARDS = [
 
 const empty = {
   highScore: 0,
+  maxWave: 1,
   shipId: "WEDGE",
   macro: [],
   highScores: DEFAULT_SCORES,
@@ -140,6 +141,7 @@ function normalize(data) {
   const killStreaks = normalizeStreaks(data.killStreaks);
   return {
     highScore: Math.max(Number(data.highScore) || 0, highScores[0]?.score || 0),
+    maxWave: Math.max(1, Math.floor(Number(data.maxWave) || 1)),
     shipId: typeof data.shipId === "string" && data.shipId ? data.shipId : "WEDGE",
     macro: normalizeMacro(data.macro),
     highScores,

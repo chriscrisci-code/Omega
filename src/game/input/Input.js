@@ -43,6 +43,7 @@ export class Input {
     this.wheelAcc = 0;
     this.wheelAt = 0;
     this.wheelLock = 0;
+    this.fineWheel = false;
 
     this.onKeyDown = (event) => {
       if (HOLD.has(event.code)) event.preventDefault();
@@ -98,15 +99,16 @@ export class Input {
       this.wheelAt = now;
       if (this.wheelAcc && Math.sign(dy) !== Math.sign(this.wheelAcc)) this.wheelAcc = 0;
       this.wheelAcc += dy;
-      const need = 280;
+      const need = this.fineWheel ? 48 : 280;
+      const lock = this.fineWheel ? 70 : 520;
       if (this.wheelAcc <= -need) {
         this._warpTicks += 1;
         this.wheelAcc = 0;
-        this.wheelLock = now + 520;
+        this.wheelLock = now + lock;
       } else if (this.wheelAcc >= need) {
         this._empTicks += 1;
         this.wheelAcc = 0;
-        this.wheelLock = now + 520;
+        this.wheelLock = now + lock;
       }
     };
 
@@ -259,11 +261,11 @@ export class Input {
   }
 
   get letterLeft() {
-    return this.anyPressed(ROTATE_LEFT) || this.anyPressed(STRAFE_LEFT) || this._empTicks > 0;
+    return this.anyPressed(ROTATE_LEFT) || this.anyPressed(STRAFE_LEFT) || this.anyPressed(["ArrowDown"]) || this._empTicks > 0;
   }
 
   get letterRight() {
-    return this.anyPressed(ROTATE_RIGHT) || this.anyPressed(STRAFE_RIGHT) || this._warpTicks > 0;
+    return this.anyPressed(ROTATE_RIGHT) || this.anyPressed(STRAFE_RIGHT) || this.anyPressed(["ArrowUp"]) || this._warpTicks > 0;
   }
 
   get warpPressed() {
