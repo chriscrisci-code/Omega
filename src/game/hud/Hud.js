@@ -210,13 +210,13 @@ export class Hud {
     this.setMode("");
   }
 
-  showScores(rows) {
+  showScores(rows, heading = "ALL TIME") {
     this.attract(true);
     this.setAttractDemo(false);
     this.center.classList.remove("is-hidden", "is-initials");
     this.center.classList.add("is-scores");
     document.body.classList.add("is-scoreboard");
-    this.paintScoreBoard(rows);
+    this.paintScoreBoard(rows, heading);
     this.cta.innerHTML = vectorTitleSvg("PRESS FIRE", 20, CYAN, HOT);
     this.paint(this.credit, "C 1984  OMEGA", 9, DIM, CYAN, "center");
     this.shipsPage?.classList.add("is-hidden");
@@ -225,14 +225,14 @@ export class Hud {
     this.setMode("");
   }
 
-  showInitials(score, entry) {
+  showInitials(score, entry, label = "SCORE") {
     this.attract(true);
     this.setAttractDemo(false);
     this.center.classList.remove("is-hidden", "is-scores");
     this.center.classList.add("is-initials");
     document.body.classList.add("is-scoreboard");
     this.title.innerHTML = "";
-    this.paint(this.tag, `SCORE  ${score}`, 14, MAGENTA, PINK, "center");
+    this.paint(this.tag, `${label}  ${score}`, 14, MAGENTA, PINK, "center");
     this.paintInitials(entry);
     this.paint(this.credit, "WHEEL LETTER   FIRE NEXT", 8, DIM, CYAN, "center");
     this.cta.innerHTML = "";
@@ -242,7 +242,7 @@ export class Hud {
     this.setMode("");
   }
 
-  paintScoreBoard(rows) {
+  paintScoreBoard(rows, heading = "ALL TIME") {
     if (!this.scoreBoard) return;
     const line = (rank, name, value, color, hot, place) =>
       `<div class="score-row is-${place}"><span>${vectorTextSvg(String(rank), 18, color, hot, "left")}</span><span>${vectorTextSvg(name, 18, color, hot, "center")}</span><span>${vectorTextSvg(String(value), 18, color, hot, "right")}</span></div>`;
@@ -252,7 +252,9 @@ export class Hud {
         return line(i + 1, row.name, row.score, tint.color, tint.hot, i + 1);
       })
       .join("");
-    this.scoreBoard.innerHTML = `<span class="score-corner tl"></span><span class="score-corner tr"></span><span class="score-corner bl"></span><span class="score-corner br"></span><div class="score-rule"></div><div class="score-head">${vectorTextSvg("HIGH SCORE", 22, CYAN, HOT, "center")}</div><div class="score-rule thin"></div>${body}`;
+    const title = String(heading || "ALL TIME").toUpperCase();
+    const size = title.length > 8 ? 18 : 22;
+    this.scoreBoard.innerHTML = `<span class="score-corner tl"></span><span class="score-corner tr"></span><span class="score-corner bl"></span><span class="score-corner br"></span><div class="score-rule"></div><div class="score-head">${vectorTextSvg(title, size, CYAN, HOT, "center")}</div><div class="score-rule thin"></div>${body}`;
     this.scoreBoard.classList.remove("is-hidden");
   }
 

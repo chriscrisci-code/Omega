@@ -14,11 +14,30 @@ const DEFAULT_SCORES = [
   { name: "DOT", score: 8000 },
 ];
 
+const DEFAULT_STREAKS = [
+  { name: "ACE", score: 36 },
+  { name: "MAX", score: 28 },
+  { name: "REX", score: 22 },
+  { name: "ZOE", score: 18 },
+  { name: "KAI", score: 14 },
+  { name: "NIX", score: 11 },
+  { name: "BOB", score: 8 },
+  { name: "DOT", score: 5 },
+];
+
+export const SCORE_BOARDS = [
+  { id: "all", title: "ALL TIME" },
+  { id: "daily", title: "DAILY" },
+  { id: "streak", title: "KILL STREAK" },
+];
+
 const empty = {
   highScore: 0,
   shipId: "WEDGE",
   macro: [],
   highScores: DEFAULT_SCORES,
+  dailyScores: [],
+  killStreaks: DEFAULT_STREAKS,
   settings: {
     fullscreen: false,
     difficulty: "easy",
@@ -42,16 +61,48 @@ function cleanName(name) {
   return letters;
 }
 
-export function normalizeHighScores(list) {
+export function todayKey() {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+function rankRows(list, fallback) {
   const rows = (Array.isArray(list) ? list : [])
     .map((row) => ({
       name: cleanName(row?.name),
       score: Math.max(0, Math.floor(Number(row?.score) || 0)),
+      day: typeof row?.day === "string" ? row.day : "",
     }))
     .filter((row) => row.score > 0);
-  const merged = rows.length ? rows : DEFAULT_SCORES.map((row) => ({ ...row }));
+  const merged = rows.length || !fallback ? rows : fallback.map((row) => ({ ...row }));
   merged.sort((a, b) => b.score - a.score);
   return merged.slice(0, SCORE_SLOTS);
+}
+
+export function normalizeHighScores(list) {
+  return rankRows(list, DEFAULT_SCORES).map(({ name, score }) => ({ name, score }));
+}
+
+export function normalizeDailyScores(list) {
+  const day = todayKey();
+  return rankRows(list, null)
+    .filter((row) => row.day === day)
+    .map(({ name, score, day: when }) => ({ name, score, day: when }));
+}
+
+export function normalizeStreaks(list) {
+  return rankRows(list, DEFAULT_STREAKS).map(({ name, score }) => ({ name, score }));
+}
+
+export function padScoreRows(list) {
+  const rows = (Array.isArray(list) ? list : []).map((row) => ({
+    name: cleanName(row?.name),
+    score: Math.max(0, Math.floor(Number(row?.score) || 0)),
+  }));
+  while (rows.length < SCORE_SLOTS) rows.push({ name: "---", score: 0 });
+  return rows.slice(0, SCORE_SLOTS);
 }
 
 export function scoreQualifies(score, table) {
@@ -62,20 +113,38 @@ export function scoreQualifies(score, table) {
 }
 
 export function insertHighScore(table, name, score) {
-  const next = normalizeHighScores([...table, { name, score }]);
-  return next;
+  return normalizeHighScores([...table, { name, score }]);
+}
+
+export function insertDailyScore(table, name, score) {
+  return normalizeDailyScores([...table, { name, score, day: todayKey() }]);
+}
+
+export function insertStreak(table, name, score) {
+  return normalizeStreaks([...table, { name, score }]);
 }
 
 function normalize(data) {
   if (!data || typeof data !== "object") {
-    return { ...empty, settings: { ...empty.settings }, macro: [], highScores: normalizeHighScores(null) };
+    return {
+      ...empty,
+      settings: { ...empty.settings },
+      macro: [],
+      highScores: normalizeHighScores(null),
+      dailyScores: normalizeDailyScores(null),
+      killStreaks: normalizeStreaks(null),
+    };
   }
   const highScores = normalizeHighScores(data.highScores);
+  const dailyScores = normalizeDailyScores(data.dailyScores);
+  const killStreaks = normalizeStreaks(data.killStreaks);
   return {
     highScore: Math.max(Number(data.highScore) || 0, highScores[0]?.score || 0),
     shipId: typeof data.shipId === "string" && data.shipId ? data.shipId : "WEDGE",
     macro: normalizeMacro(data.macro),
     highScores,
+    dailyScores,
+    killStreaks,
     settings: {
       fullscreen: Boolean(data.settings?.fullscreen),
       difficulty: data.settings?.difficulty === "hard" || data.settings?.difficulty === "medium" ? data.settings.difficulty : "easy",

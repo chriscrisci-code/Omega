@@ -20,7 +20,7 @@ import { FarGrid } from "./render/FarGrid.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, insertHighScore, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, wrapCoord, wrapDelta } from "./math.js";
 import { SHIP_CATALOG, WEDGE_ID } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -134,7 +134,10 @@ export class Game {
     this.homeOn = false;
     this.attractOnDemo = false;
     this.attractPage = "title";
+    this.attractBoard = 0;
     this.attractThenTitle = false;
+    this.killStreak = 0;
+    this.bestStreak = 0;
     this.attractTimer = ATTRACT_HOLD;
     this.attractScene = 0;
     this.attractAge = 0;
@@ -527,6 +530,8 @@ export class Game {
     this.audio.unlock();
     this.mode = PLAYING;
     this.score = 0;
+    this.killStreak = 0;
+    this.bestStreak = 0;
     this.lives = shipConfig.lives;
     this.wave = 1;
     this.waveCooldown = 0;
@@ -671,16 +676,42 @@ export class Game {
   beginAttractLoop(page = "title", options = {}) {
     this.attractOnDemo = false;
     this.attractPage = page;
+    this.attractBoard = 0;
     this.attractThenTitle = Boolean(options.thenTitle);
     this.attractAge = 0;
     this.attractCue = null;
     if (page === "scores") {
       this.attractTimer = options.hold ?? ATTRACT_SCORES;
-      this.hud.showScores(this.save.highScores);
+      this.showScoreBoard();
       return;
     }
     this.attractTimer = ATTRACT_HOLD;
     this.hud.showTitle();
+  }
+
+  scoreBoardOf(id) {
+    if (id === "daily") return padScoreRows(this.save.dailyScores);
+    if (id === "streak") return padScoreRows(this.save.killStreaks);
+    return padScoreRows(this.save.highScores);
+  }
+
+  showScoreBoard() {
+    const board = SCORE_BOARDS[this.attractBoard] || SCORE_BOARDS[0];
+    this.hud.showScores(this.scoreBoardOf(board.id), board.title);
+  }
+
+  rankEntry() {
+    return {
+      all: scoreQualifies(this.score, this.save.highScores),
+      daily: scoreQualifies(this.score, this.save.dailyScores),
+      streak: scoreQualifies(this.bestStreak, this.save.killStreaks),
+    };
+  }
+
+  noteKill() {
+    if (this.attractOnDemo || this.mode !== PLAYING) return;
+    this.killStreak += 1;
+    if (this.killStreak > this.bestStreak) this.bestStreak = this.killStreak;
   }
 
   stopAttract() {
@@ -751,10 +782,15 @@ export class Game {
     if (this.attractTimer <= 0) {
       if (this.attractPage === "title") {
         this.attractPage = "scores";
+        this.attractBoard = 0;
         this.attractTimer = ATTRACT_SCORES;
-        this.hud.showScores(this.save.highScores);
+        this.showScoreBoard();
       } else if (this.attractPage === "scores") {
-        if (this.attractThenTitle) {
+        if (this.attractBoard < SCORE_BOARDS.length - 1) {
+          this.attractBoard += 1;
+          this.attractTimer = this.attractThenTitle ? 3 : ATTRACT_SCORES;
+          this.showScoreBoard();
+        } else if (this.attractThenTitle) {
           this.attractThenTitle = false;
           this.attractPage = "title";
           this.attractTimer = ATTRACT_HOLD;
@@ -1221,6 +1257,7 @@ export class Game {
     });
     this.fx.burst(enemy.x, enemy.y, enemy.color, 12, 150);
     this.addScore(enemy.role === "raider" ? 150 : enemy.role === "destroyer" ? 250 : 75);
+    this.noteKill();
     this.shake = Math.max(this.shake, 4);
     this.sfx("boom");
     enemy.destroy();
@@ -1523,10 +1560,12 @@ export class Game {
     this.lockMark.visible = false;
     this.hud.setHubAlert(null);
     this.hud.hideDock();
-    if (scoreQualifies(this.score, this.save.highScores)) {
+    const rank = this.rankEntry();
+    if (rank.all || rank.daily || rank.streak) {
       this.mode = INITIALS;
       this.initials = { letters: ["A", "A", "A"], i: 0 };
-      this.hud.showInitials(this.score, this.initials);
+      const shown = rank.all || rank.daily ? this.score : this.bestStreak;
+      this.hud.showInitials(shown, this.initials, rank.all || rank.daily ? "SCORE" : "STREAK");
       return;
     }
     this.mode = GAMEOVER;
@@ -1555,7 +1594,10 @@ export class Game {
   commitInitials() {
     if (!this.initials) return;
     const name = this.initials.letters.join("");
-    this.save.highScores = insertHighScore(this.save.highScores, name, this.score);
+    const rank = this.rankEntry();
+    if (rank.all) this.save.highScores = insertHighScore(this.save.highScores, name, this.score);
+    if (rank.daily) this.save.dailyScores = insertDailyScore(this.save.dailyScores, name, this.score);
+    if (rank.streak) this.save.killStreaks = insertStreak(this.save.killStreaks, name, this.bestStreak);
     this.save.highScore = this.save.highScores[0]?.score || this.score;
     this.storage.save(this.save);
     this.hud.setHigh(this.save.highScore);
@@ -1628,6 +1670,7 @@ export class Game {
     this.shake = 16;
     this.sfx("die");
     this.homeOn = false;
+    this.killStreak = 0;
     this.lives -= 1;
     this.hud.setLives(Math.max(0, this.lives));
     this.cargo = 0;
