@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import { colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
+import { bullets, colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
 import { ThrustFlame } from "../particles/ThrustFlame.js";
 import { createGlowTexture, strokeGlow, strokeLine } from "../render/textures.js";
 import { catalogToGameSkin } from "../ships/catalog.js";
@@ -128,9 +128,16 @@ export class Ship {
   }
 
   nose() {
+    return this.muzzle(0);
+  }
+
+  muzzle(side = 0) {
+    const c = Math.cos(this.rotation);
+    const s = Math.sin(this.rotation);
+    const across = side * bullets.gunSep;
     return {
-      x: this.x + Math.cos(this.rotation) * 16,
-      y: this.y + Math.sin(this.rotation) * 16,
+      x: this.x + c * 16 + -s * across,
+      y: this.y + s * 16 + c * across,
     };
   }
 

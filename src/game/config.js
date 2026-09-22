@@ -91,9 +91,10 @@ export const bullets = {
   speed: 980,
   life: 1.25,
   cooldown: 0.08,
-  max: 10,
+  max: 36,
   radius: 4,
   streak: 16,
+  gunSep: 5.5,
 };
 
 export const missiles = {
@@ -102,7 +103,8 @@ export const missiles = {
   ramp: 1.8,
   life: 30,
   cooldown: 0.38,
-  max: 8,
+  max: 24,
+  volley: 8,
   radius: 5,
   turn: 4.6,
   cone: 0.62,

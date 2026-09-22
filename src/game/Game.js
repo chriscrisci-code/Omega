@@ -118,6 +118,7 @@ export class Game {
     this.assaultRest = false;
     this.assaultTime = assault.wave1;
     this.cooldown = 0;
+    this.gun = 0;
     this.missileCool = 0;
     this.timer = 0;
     this.shake = 0;
@@ -544,6 +545,7 @@ export class Game {
     this.beginAssault(startWave, true);
     this.homeOn = false;
     this.cooldown = 0;
+    this.gun = 0;
     this.timer = 0;
     this.shake = 0;
     this.nextLifeAt = this.lifeEvery;
@@ -942,30 +944,45 @@ export class Game {
     if (this.cooldown > 0 || !this.ship.alive) return;
     const bullet = this.shots.find((shot) => !shot.alive);
     if (!bullet) return;
-    const nose = this.ship.nose();
-    bullet.fire(nose.x, nose.y, this.ship.rotation);
-    this.cooldown = bullets.cooldown;
+    const muzzle = this.ship.muzzle(this.gun === 0 ? -1 : 1);
+    bullet.fire(muzzle.x, muzzle.y, this.ship.rotation);
+    this.gun ^= 1;
+    this.cooldown = bullets.cooldown * 0.5;
     this.sfx("thud");
   }
 
   lockTarget(space) {
-    if (this.selected?.alive) return this.selected;
-    let best = null;
-    let bestDist = Infinity;
+    return this.missileTargets(space, 1)[0] || null;
+  }
+
+  missileTargets(space, count) {
+    const picks = [];
+    const used = new Set();
+    if (this.selected?.alive && this.enemies.includes(this.selected)) {
+      picks.push(this.selected);
+      used.add(this.selected);
+    }
+    const ranked = [];
     for (const enemy of this.enemies) {
-      if (!enemy.alive) continue;
+      if (!enemy.alive || used.has(enemy)) continue;
       const dx = wrapDelta(enemy.x - this.ship.x, space.width);
       const dy = wrapDelta(enemy.y - this.ship.y, space.height);
       const dist = Math.hypot(dx, dy);
       if (dist < 50) continue;
       const err = Math.abs(wrapDelta(this.ship.rotation - Math.atan2(dy, dx), Math.PI * 2));
-      if (err > missiles.cone) continue;
-      if (dist < bestDist) {
-        best = enemy;
-        bestDist = dist;
-      }
+      ranked.push({ enemy, dist, err });
     }
-    return best;
+    ranked.sort((a, b) => {
+      const aIn = a.err <= missiles.cone;
+      const bIn = b.err <= missiles.cone;
+      if (aIn !== bIn) return aIn ? -1 : 1;
+      return a.dist - b.dist;
+    });
+    for (const row of ranked) {
+      if (picks.length >= count) break;
+      picks.push(row.enemy);
+    }
+    return picks;
   }
 
   pointerWorld() {
@@ -1067,34 +1084,42 @@ export class Game {
 
   fireMissile(force = false) {
     if ((!force && this.missileCool > 0) || !this.ship.alive || this.ship.docked) return;
-    const missile = this.missiles.find((item) => !item.alive);
-    if (!missile) return;
     const space = this.space();
-    const target = this.lockTarget(space);
+    const volley = missiles.volley ?? 8;
+    const targets = this.missileTargets(space, volley);
     const nose = this.ship.nose();
-    missile.fire(nose.x, nose.y, this.ship.rotation, target);
+    let fired = 0;
+    for (let i = 0; i < volley; i += 1) {
+      const missile = this.missiles.find((item) => !item.alive);
+      if (!missile) break;
+      const spread = (i - (volley - 1) * 0.5) * 0.07;
+      missile.fire(nose.x, nose.y, this.ship.rotation + spread, targets[i] || null);
+      fired += 1;
+      const mark = targets[i];
+      if (mark) {
+        this.fx.emit(4, {
+          x: mark.x,
+          y: mark.y,
+          color: colors.amber,
+          speed: 36,
+          speedVar: 16,
+          life: 0.18,
+          size: 4,
+        });
+      }
+    }
+    if (!fired) return;
     this.missileCool = missiles.cooldown;
     this.sfx("missile");
-    this.fx.emit(8, {
+    this.fx.emit(10, {
       x: nose.x,
       y: nose.y,
       color: colors.amber,
-      speed: 70,
-      speedVar: 40,
-      life: 0.18,
+      speed: 80,
+      speedVar: 46,
+      life: 0.2,
       size: 6,
     });
-    if (target) {
-      this.fx.emit(6, {
-        x: target.x,
-        y: target.y,
-        color: colors.amber,
-        speed: 40,
-        speedVar: 20,
-        life: 0.22,
-        size: 5,
-      });
-    }
   }
 
   fireWarp(force = false) {
