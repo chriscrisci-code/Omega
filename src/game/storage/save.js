@@ -1,3 +1,5 @@
+import { shipLevels } from "../config.js";
+
 const KEY = "vector-game-save";
 
 export const SCORE_SLOTS = 8;
@@ -39,6 +41,14 @@ const empty = {
   highScores: DEFAULT_SCORES,
   dailyScores: [],
   killStreaks: DEFAULT_STREAKS,
+  loadout: {
+    gun: 1,
+    missile: 1,
+    emp: 1,
+    shield: 1,
+    points: 0,
+    bank: 0,
+  },
   settings: {
     fullscreen: false,
     difficulty: "easy",
@@ -125,11 +135,28 @@ export function insertStreak(table, name, score) {
   return normalizeStreaks([...table, { name, score }]);
 }
 
+function clampLevel(value, max) {
+  return Math.max(1, Math.min(max, Math.floor(Number(value) || 1)));
+}
+
+export function normalizeLoadout(data) {
+  const src = data && typeof data === "object" ? data : {};
+  return {
+    gun: clampLevel(src.gun, shipLevels.gun || 5),
+    missile: clampLevel(src.missile, shipLevels.missile || 7),
+    emp: clampLevel(src.emp, shipLevels.emp || 4),
+    shield: clampLevel(src.shield, shipLevels.shield || 4),
+    points: Math.max(0, Math.floor(Number(src.points) || 0)),
+    bank: Math.max(0, Math.floor(Number(src.bank) || 0) % 3),
+  };
+}
+
 function normalize(data) {
   if (!data || typeof data !== "object") {
     return {
       ...empty,
       settings: { ...empty.settings },
+      loadout: { ...empty.loadout },
       macro: [],
       highScores: normalizeHighScores(null),
       dailyScores: normalizeDailyScores(null),
@@ -143,6 +170,7 @@ function normalize(data) {
     highScore: Math.max(Number(data.highScore) || 0, highScores[0]?.score || 0),
     maxWave: Math.max(1, Math.floor(Number(data.maxWave) || 1)),
     shipId: typeof data.shipId === "string" && data.shipId ? data.shipId : "WEDGE",
+    loadout: normalizeLoadout(data.loadout),
     macro: normalizeMacro(data.macro),
     highScores,
     dailyScores,

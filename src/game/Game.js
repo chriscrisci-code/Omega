@@ -20,7 +20,7 @@ import { FarGrid } from "./render/FarGrid.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, wrapCoord, wrapDelta } from "./math.js";
 import { SHIP_CATALOG, WEDGE_ID } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -120,9 +120,7 @@ export class Game {
     this.cooldown = 0;
     this.gun = 0;
     this.shipLevel = 1;
-    this.levels = { gun: 1, missile: 1, emp: 1, shield: 1 };
-    this.points = 0;
-    this.loadoutBank = 0;
+    this.applySavedLoadout();
     this.burstLeft = 0;
     this.fireWasOn = false;
     this.missileCool = 0;
@@ -167,7 +165,7 @@ export class Game {
 
     this.hud.setHigh(this.save.highScore);
     this.hud.setScore(0);
-    this.hud.setPoints(0);
+    this.hud.setPoints(this.points);
     this.hud.setLives(0);
     this.hud.setShield(0, false, shieldConfig.max);
     this.hud.setSpecial("WARP EMP MSL");
@@ -545,9 +543,7 @@ export class Game {
     this.mode = PLAYING;
     this.wavePick = null;
     this.score = 0;
-    this.points = 0;
-    this.loadoutBank = 0;
-    this.levels = { gun: 1, missile: 1, emp: 1, shield: 1 };
+    this.applySavedLoadout();
     this.killStreak = 0;
     this.bestStreak = 0;
     this.lives = shipConfig.lives;
@@ -583,7 +579,7 @@ export class Game {
     this.snapCamera();
     this.applyShieldLevel(true);
     this.hud.setScore(0);
-    this.hud.setPoints(0);
+    this.hud.setPoints(this.points);
     this.hud.setLives(this.lives);
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
     this.refreshDock();
@@ -1019,6 +1015,7 @@ export class Game {
     this.points += n;
     this.hud.setPoints(this.points);
     this.refreshDock();
+    this.persistLoadout();
   }
 
   buyUpgrade(id) {
@@ -1030,6 +1027,7 @@ export class Game {
     if (id === "shield") this.applyShieldLevel(true);
     this.hud.setPoints(this.points);
     this.refreshDock();
+    this.persistLoadout();
     this.sfx("up");
     this.hud.setMode(`${id === "missile" ? "MSL" : id === "shield" ? "SHD" : id.toUpperCase()}  ${this.levels[id]}`);
   }
@@ -1163,8 +1161,29 @@ export class Game {
     this.vectors.addChild(this.lockMark);
   }
 
+  applySavedLoadout() {
+    const loadout = normalizeLoadout(this.save.loadout);
+    this.save.loadout = loadout;
+    this.levels = {
+      gun: loadout.gun,
+      missile: loadout.missile,
+      emp: loadout.emp,
+      shield: loadout.shield,
+    };
+    this.points = loadout.points;
+    this.loadoutBank = loadout.bank;
+  }
+
   persistLoadout() {
     this.save.shipId = this.shipId;
+    this.save.loadout = normalizeLoadout({
+      gun: this.levels?.gun,
+      missile: this.levels?.missile,
+      emp: this.levels?.emp,
+      shield: this.levels?.shield,
+      points: this.points,
+      bank: this.loadoutBank,
+    });
     this.storage.save(this.save);
   }
 
@@ -1750,6 +1769,7 @@ export class Game {
 
   endRun(reason = "final") {
     if (this.mode === TITLE || this.mode === GAMEOVER || this.mode === INITIALS) return;
+    this.persistLoadout();
     this.hud.hideContinue();
     if (this.ship.alive) this.ship.kill();
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
