@@ -1766,6 +1766,7 @@ export class Game {
     const screen = this.app.screen;
     const space = this.space();
 
+    this.touch.tick();
     if (this.input.fullscreenPressed) this.toggleFullscreen();
     this.hud.setPad(this.input.padConnected);
     if (this.mode === TITLE || this.mode === GAMEOVER) this.tickAttract(t, space);

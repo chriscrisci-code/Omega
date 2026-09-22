@@ -161,7 +161,7 @@ export const raid = {
 };
 
 export const assault = {
-  rest: 144,
+  rest: 72,
   wave1: 210,
   wave2: 85,
   wave3: 95,

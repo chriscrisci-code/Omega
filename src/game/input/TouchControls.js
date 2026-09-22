@@ -6,6 +6,9 @@ const DOUBLE_MS = 380;
 const FLICK_MS = 240;
 const FLICK_MIN = 0.84;
 const FLICK_SLIP = 0.26;
+const TURN_EXPO = 2.4;
+const TURN_TIME = 0.58;
+const TURN_START = 0.16;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -140,10 +143,25 @@ export class TouchControls {
       if (Math.abs(move.x) > DEAD) strafe = move.x;
       if (Math.abs(move.y) > DEAD) surge = -move.y;
     }
-    if (turn && Math.abs(turn.x) > DEAD) rotate = turn.x;
+    if (turn && Math.abs(turn.x) > DEAD) rotate = this.turnForce(turn);
     this.input.touchStrafe = clamp(strafe, -1, 1);
     this.input.touchSurge = clamp(surge, -1, 1);
     this.input.touchRotate = clamp(rotate, -1, 1);
+  }
+
+  turnForce(turn) {
+    const span = 1 - DEAD;
+    const throwAmt = clamp((Math.abs(turn.x) - DEAD) / span, 0, 1);
+    const throwGain = throwAmt ** TURN_EXPO;
+    const held = (performance.now() - turn.heldAt) / 1000;
+    const timeAmt = clamp(held / TURN_TIME, 0, 1);
+    const timeGain = TURN_START + (1 - TURN_START) * timeAmt ** 1.35;
+    return Math.sign(turn.x) * throwGain * timeGain;
+  }
+
+  tick() {
+    if (!this.active || !this.turn?.id) return;
+    this.syncAxes();
   }
 
   syncFire() {
