@@ -112,6 +112,13 @@ export const bullets = {
   gunSep: 5.5,
 };
 
+/** Nose-ray gun lead. Phone / no-mouse only. */
+export const lead = {
+  cone: 0.35,
+  minRange: 50,
+  pip: 6,
+};
+
 export const missiles = {
   speed: 520,
   topSpeed: 1040,

@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, missiles, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, warp, world as worldConfig } from "./config.js";
+import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, lead as leadConfig, missiles, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, warp, world as worldConfig } from "./config.js";
 import { chipBurst, Debris, shatter } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -108,6 +108,11 @@ export class Game {
     this.lockMark = new Graphics();
     this.lockMark.visible = false;
     this.vectors.addChild(this.lockMark);
+    this.leadMark = new Graphics();
+    this.sightMark = new Graphics();
+    this.leadMark.visible = false;
+    this.sightMark.visible = false;
+    this.vectors.addChild(this.leadMark, this.sightMark);
 
     this.mode = TITLE;
     this.score = 0;
@@ -1202,6 +1207,124 @@ export class Game {
     this.vectors.addChild(this.lockMark);
   }
 
+  hideLead() {
+    this.leadMark.visible = false;
+    this.sightMark.visible = false;
+  }
+
+  usingMouseAim() {
+    return this.input.layout !== "phone" && this.input.hasPointer;
+  }
+
+  leadTarget(space) {
+    const nose = this.ship.nose();
+    let best = null;
+    let bestErr = leadConfig.cone;
+    let bestDist = Infinity;
+    for (const enemy of this.enemies) {
+      if (!enemy.alive) continue;
+      const dx = wrapDelta(enemy.x - nose.x, space.width);
+      const dy = wrapDelta(enemy.y - nose.y, space.height);
+      const dist = Math.hypot(dx, dy);
+      if (dist < leadConfig.minRange) continue;
+      const err = Math.abs(wrapDelta(this.ship.rotation - Math.atan2(dy, dx), Math.PI * 2));
+      if (err > leadConfig.cone) continue;
+      if (err < bestErr - 0.02 || (Math.abs(err - bestErr) <= 0.02 && dist < bestDist)) {
+        best = enemy;
+        bestErr = err;
+        bestDist = dist;
+      }
+    }
+    return best;
+  }
+
+  leadIntercept(enemy, space) {
+    const nose = this.ship.nose();
+    const dx = wrapDelta(enemy.x - nose.x, space.width);
+    const dy = wrapDelta(enemy.y - nose.y, space.height);
+    const vx = enemy.vx || 0;
+    const vy = enemy.vy || 0;
+    const speed = bullets.speed;
+    const a = vx * vx + vy * vy - speed * speed;
+    const b = 2 * (dx * vx + dy * vy);
+    const c = dx * dx + dy * dy;
+    const times = [];
+    if (Math.abs(a) < 0.001) {
+      if (Math.abs(b) > 0.001) times.push(-c / b);
+    } else {
+      const disc = b * b - 4 * a * c;
+      if (disc < 0) return null;
+      const root = Math.sqrt(disc);
+      times.push((-b - root) / (2 * a), (-b + root) / (2 * a));
+    }
+    const t = times.filter((hit) => hit > 0.04 && hit < bullets.life).sort((left, right) => left - right)[0];
+    if (!t) return null;
+    return {
+      x: enemy.x + vx * t,
+      y: enemy.y + vy * t,
+      range: speed * t,
+    };
+  }
+
+  paintPip(graphics, size, diamond) {
+    graphics.clear();
+    const glow = { width: 2.8, color: colors.cyan, alpha: 0.22, cap: "square" };
+    const core = { width: 1.15, color: colors.cyanHot, cap: "square" };
+    const draw = (look) => {
+      if (diamond) {
+        graphics.moveTo(0, -size);
+        graphics.lineTo(size, 0);
+        graphics.lineTo(0, size);
+        graphics.lineTo(-size, 0);
+        graphics.closePath();
+        graphics.stroke(look);
+      } else {
+        graphics.moveTo(-size, 0);
+        graphics.lineTo(size, 0);
+        graphics.moveTo(0, -size);
+        graphics.lineTo(0, size);
+        graphics.stroke(look);
+      }
+    };
+    draw(glow);
+    draw(core);
+  }
+
+  drawLead(mapping) {
+    if (
+      mapping ||
+      this.mode !== PLAYING ||
+      this.attractOnDemo ||
+      !this.ship.alive ||
+      this.ship.docked ||
+      this.ship.warping ||
+      this.usingMouseAim()
+    ) {
+      this.hideLead();
+      return;
+    }
+    const space = this.space();
+    const enemy = this.leadTarget(space);
+    const hit = enemy ? this.leadIntercept(enemy, space) : null;
+    if (!hit) {
+      this.hideLead();
+      return;
+    }
+    const nose = this.ship.nose();
+    const heading = this.ship.rotation;
+    const sight = {
+      x: nose.x + Math.cos(heading) * hit.range,
+      y: nose.y + Math.sin(heading) * hit.range,
+    };
+    const size = leadConfig.pip;
+    this.paintPip(this.leadMark, size, true);
+    this.paintPip(this.sightMark, size, false);
+    this.leadMark.visible = true;
+    this.sightMark.visible = true;
+    this.placeView({ view: this.leadMark, x: hit.x, y: hit.y }, space.width, space.height);
+    this.placeView({ view: this.sightMark, x: sight.x, y: sight.y }, space.width, space.height);
+  }
+
   freshLoadout() {
     this.levels = { gun: 1, missile: 1, emp: 1, shield: 1 };
     this.points = 0;
@@ -2098,6 +2221,7 @@ export class Game {
       if (!mapping) this.placeView(shard, space.width, space.height);
     }
     this.drawLock();
+    this.drawLead(mapping);
     if (this.lockMark.visible) {
       const shipLike = this.selected?.kind === "enemy" || this.selected?.kind === "raider" || this.selected?.kind === "destroyer";
       this.lockMark.scale.set(mapping && shipLike ? 14 : 1);
