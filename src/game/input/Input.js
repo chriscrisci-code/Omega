@@ -1,17 +1,4 @@
-const ROTATE_LEFT = ["ArrowLeft", "KeyQ"];
-const ROTATE_RIGHT = ["ArrowRight", "KeyE"];
-const FORWARD = ["ArrowUp", "KeyW"];
-const BACK = ["ArrowDown", "KeyS"];
-const STRAFE_LEFT = ["KeyA"];
-const STRAFE_RIGHT = ["KeyD"];
-const FIRE = ["Space"];
-const SHIELD = ["ShiftLeft", "ShiftRight"];
-const START = ["Space", "Enter"];
-const FULLSCREEN = ["KeyF"];
-const QUIT = ["Escape"];
-const MAP = ["KeyM"];
-const HOME = ["KeyH"];
-const HOLD = new Set(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+import { ACTIONS, aimMode, bindId, cleanBind, cloneBinds, normalizeBinds } from "./bindings.js";
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -21,9 +8,13 @@ function hudControl(event) {
   const node = event.target;
   if (!(node instanceof Element)) return false;
   return Boolean(
-    node.closest("button, a, input, #dock-bay, #device-pick, #wave-pick, #continue-btn, #ships-link, .touch-layer"),
+    node.closest(
+      "button, a, input, #dock-bay, #device-pick, #wave-pick, #continue-btn, #ships-link, #controls-link, #controls-page, .touch-layer",
+    ),
   );
 }
+
+const CORNER = 72;
 
 export class Input {
   constructor(target = window) {
@@ -36,14 +27,18 @@ export class Input {
     this.hasPointer = false;
     this.leftHeld = false;
     this.rightHeld = false;
+    this.mouseHeld = { 0: false, 1: false, 2: false };
     this._pointerStart = false;
     this._warpTicks = 0;
     this._empTicks = 0;
     this._missileTicks = 0;
     this._shieldTick = false;
     this._shipsClick = false;
+    this._controlsClick = false;
     this._continueClick = false;
     this.layout = "desktop";
+    this.profile = "mouse";
+    this.binds = cloneBinds("mouse");
     this.touchSurge = 0;
     this.touchStrafe = 0;
     this.touchRotate = 0;
@@ -52,9 +47,19 @@ export class Input {
     this.wheelAt = 0;
     this.wheelLock = 0;
     this.fineWheel = false;
+    this.capture = "";
+    this.onCapture = null;
+    this.tapAt = 0;
+    this.tapX = 0;
+    this.tapY = 0;
 
     this.onKeyDown = (event) => {
-      if (HOLD.has(event.code)) event.preventDefault();
+      if (this.holdCodes().has(event.code)) event.preventDefault();
+      if (this.capture) {
+        event.preventDefault();
+        this.finishCapture({ t: "key", c: event.code });
+        return;
+      }
       if (!this.keys.has(event.code)) this.pressed.add(event.code);
       this.keys.add(event.code);
     };
@@ -64,41 +69,51 @@ export class Input {
       if (this.layout === "phone") return;
       this.mouseX = event.clientX;
       this.mouseY = event.clientY;
-      this.hasPointer = true;
+      if (this.aimMode === "mouse") this.hasPointer = true;
     };
     this.onPointerDown = (event) => {
+      if (this.capture) {
+        if (hudControl(event) && !event.target.closest?.("#controls-page")) return;
+        event.preventDefault();
+        this.finishCapture({ t: "mouse", b: event.button });
+        return;
+      }
       if (this.layout === "phone") return;
       if (hudControl(event)) return;
-      this.hasPointer = true;
+      if (this.aimMode === "mouse") this.hasPointer = true;
       this.mouseX = event.clientX;
       this.mouseY = event.clientY;
+      this.mouseHeld[event.button] = true;
       if (event.button === 0) {
         this.leftHeld = true;
         this._pointerStart = true;
       }
-      if (event.button === 1) {
-        event.preventDefault();
-        this._missileTicks += 1;
-      }
-      if (event.button === 2) {
-        this.rightHeld = true;
-        this._shieldTick = true;
-      }
+      if (event.button === 1) event.preventDefault();
+      if (event.button === 2) this.rightHeld = true;
+      this.fireMouse(event.button);
+      this.fireCorner(event.clientX, event.clientY);
+      this.noteTap(event);
     };
     this.onAuxClick = (event) => {
       if (event.button !== 1) return;
       event.preventDefault();
-      this._missileTicks += 1;
+      if (this.capture) this.finishCapture({ t: "mouse", b: 1 });
     };
     this.onPointerUp = (event) => {
+      this.mouseHeld[event.button] = false;
       if (event.button === 0) this.leftHeld = false;
       if (event.button === 2) this.rightHeld = false;
     };
     this.onContextMenu = (event) => event.preventDefault();
     this.onWheel = (event) => {
-      if (this.layout === "phone") return;
+      if (this.layout === "phone" && !this.capture) return;
       event.preventDefault();
-      this.hasPointer = true;
+      const dir = event.deltaY < 0 ? -1 : 1;
+      if (this.capture) {
+        this.finishCapture({ t: "wheel", d: dir });
+        return;
+      }
+      if (this.aimMode === "mouse") this.hasPointer = true;
       const now = performance.now();
       if (now < this.wheelLock) return;
       let dy = event.deltaY;
@@ -111,11 +126,11 @@ export class Input {
       const need = this.fineWheel ? 48 : 280;
       const lock = this.fineWheel ? 70 : 520;
       if (this.wheelAcc <= -need) {
-        this._warpTicks += 1;
+        this.emitWheel(-1);
         this.wheelAcc = 0;
         this.wheelLock = now + lock;
       } else if (this.wheelAcc >= need) {
-        this._empTicks += 1;
+        this.emitWheel(1);
         this.wheelAcc = 0;
         this.wheelLock = now + lock;
       }
@@ -142,6 +157,117 @@ export class Input {
     window.addEventListener("gamepaddisconnected", () => {
       this.padConnected = navigator.getGamepads?.().some(Boolean) ?? false;
     });
+  }
+
+  setBinds(profile, binds) {
+    this.profile = profile;
+    this.binds = normalizeBinds(profile, binds);
+  }
+
+  list(id) {
+    return this.binds[id] || [];
+  }
+
+  has(id, test) {
+    return this.list(id).some(test);
+  }
+
+  get aimMode() {
+    return aimMode(this.binds);
+  }
+
+  holdCodes() {
+    const codes = new Set(["Space", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+    for (const row of ACTIONS) {
+      for (const bind of this.list(row.id)) {
+        if (bind.t === "key") codes.add(bind.c);
+      }
+    }
+    return codes;
+  }
+
+  emit(id) {
+    if (id === "warp") this._warpTicks += 1;
+    else if (id === "emp") this._empTicks += 1;
+    else if (id === "missile") this._missileTicks += 1;
+    else if (id === "shield") this._shieldTick = true;
+    else if (id === "fire") this.touchFire = true;
+    else if (id === "home") this.pressed.add("__home__");
+    else if (id === "map") this.keys.add("__map__");
+  }
+
+  emitWheel(dir) {
+    for (const row of ACTIONS) {
+      if (this.has(row.id, (bind) => bind.t === "wheel" && bind.d === dir)) this.emit(row.id);
+    }
+  }
+
+  fireMouse(button) {
+    for (const row of ACTIONS) {
+      if (!this.has(row.id, (bind) => bind.t === "mouse" && bind.b === button)) continue;
+      if (row.id === "fire") continue;
+      this.emit(row.id);
+    }
+  }
+
+  fireCorner(x, y) {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    let id = "";
+    if (x <= CORNER && y <= CORNER) id = "tl";
+    else if (x >= w - CORNER && y <= CORNER) id = "tr";
+    else if (x <= CORNER && y >= h - CORNER) id = "bl";
+    else if (x >= w - CORNER && y >= h - CORNER) id = "br";
+    if (!id) return;
+    for (const row of ACTIONS) {
+      if (this.has(row.id, (bind) => bind.t === "corner" && bind.c === id)) this.emit(row.id);
+    }
+  }
+
+  noteTap(event) {
+    if (event.button !== 0) return;
+    const now = performance.now();
+    if (now - this.tapAt < 320 && Math.hypot(event.clientX - this.tapX, event.clientY - this.tapY) < 28) {
+      this.emitGesture("doubleTap");
+      this.tapAt = 0;
+      return;
+    }
+    this.tapAt = now;
+    this.tapX = event.clientX;
+    this.tapY = event.clientY;
+  }
+
+  emitGesture(name) {
+    for (const row of ACTIONS) {
+      if (this.has(row.id, (bind) => bind.t === "gesture" && bind.g === name)) this.emit(row.id);
+    }
+  }
+
+  hasGesture(name) {
+    return ACTIONS.some((row) => this.has(row.id, (bind) => bind.t === "gesture" && bind.g === name));
+  }
+
+  finishCapture(bind) {
+    const clean = cleanBind(bind);
+    if (!clean || !this.capture) return;
+    this.onCapture?.(this.capture, clean);
+    this.capture = "";
+  }
+
+  listen(id) {
+    this.capture = id;
+  }
+
+  addBind(id, bind) {
+    const clean = cleanBind(bind);
+    if (!clean) return;
+    const list = this.list(id);
+    if (clean.t === "aim") this.binds[id] = [clean];
+    else if (!list.some((item) => bindId(item) === bindId(clean))) list.push(clean);
+  }
+
+  dropBind(id, key) {
+    this.binds[id] = this.list(id).filter((bind) => bindId(bind) !== key);
   }
 
   pad() {
@@ -175,6 +301,42 @@ export class Input {
     return codes.some((code) => this.pressed.has(code));
   }
 
+  keysDown(id) {
+    return this.list(id).some((bind) => bind.t === "key" && this.keys.has(bind.c));
+  }
+
+  keysPressed(id) {
+    return this.list(id).some((bind) => bind.t === "key" && this.pressed.has(bind.c));
+  }
+
+  mouseDown(id) {
+    return this.list(id).some((bind) => bind.t === "mouse" && this.mouseHeld[bind.b]);
+  }
+
+  padDown(id) {
+    const pad = this.pad();
+    if (!pad) return false;
+    return this.list(id).some((bind) => bind.t === "pad" && this.button(pad, bind.b));
+  }
+
+  padEdge(id) {
+    const pad = this.pad();
+    if (!pad) return false;
+    return this.list(id).some((bind) => bind.t === "pad" && this.button(pad, bind.b) && !this.prevPad[bind.b]);
+  }
+
+  axisValue(id) {
+    const pad = this.pad();
+    if (!pad) return 0;
+    let value = 0;
+    for (const bind of this.list(id)) {
+      if (bind.t !== "axis") continue;
+      const n = this.axis(pad, bind.a) * bind.s;
+      if (n > 0) value += n;
+    }
+    return value;
+  }
+
   setLayout(id) {
     this.layout = id === "phone" ? "phone" : "desktop";
     if (this.layout !== "phone") {
@@ -187,38 +349,40 @@ export class Input {
 
   get rotate() {
     let value = this.touchRotate;
-    if (this.anyDown(ROTATE_LEFT)) value -= 1;
-    if (this.anyDown(ROTATE_RIGHT)) value += 1;
-    const pad = this.pad();
-    value += this.axis(pad, 2);
-    if (this.button(pad, 4) || this.button(pad, 14)) value -= 1;
-    if (this.button(pad, 5) || this.button(pad, 15)) value += 1;
+    if (this.keysDown("turnL")) value -= 1;
+    if (this.keysDown("turnR")) value += 1;
+    if (this.padDown("turnL")) value -= 1;
+    if (this.padDown("turnR")) value += 1;
+    value -= this.axisValue("turnL");
+    value += this.axisValue("turnR");
     return clamp(value, -1, 1);
   }
 
   get surge() {
     let value = this.touchSurge;
-    if (this.anyDown(FORWARD)) value += 1;
-    if (this.anyDown(BACK)) value -= 1;
-    const pad = this.pad();
-    value -= this.axis(pad, 1);
-    if (this.button(pad, 7) || this.button(pad, 0)) value += 1;
+    if (this.keysDown("thrust")) value += 1;
+    if (this.keysDown("reverse")) value -= 1;
+    if (this.padDown("thrust")) value += 1;
+    if (this.padDown("reverse")) value -= 1;
+    value += this.axisValue("thrust");
+    value -= this.axisValue("reverse");
     return clamp(value, -1, 1);
   }
 
   get strafe() {
     let value = this.touchStrafe;
-    if (this.anyDown(STRAFE_LEFT)) value -= 1;
-    if (this.anyDown(STRAFE_RIGHT)) value += 1;
-    const pad = this.pad();
-    value += this.axis(pad, 0);
+    if (this.keysDown("strafeL")) value -= 1;
+    if (this.keysDown("strafeR")) value += 1;
+    if (this.padDown("strafeL")) value -= 1;
+    if (this.padDown("strafeR")) value += 1;
+    value -= this.axisValue("strafeL");
+    value += this.axisValue("strafeR");
     return clamp(value, -1, 1);
   }
 
   get fireHeld() {
-    if (this.layout === "phone") return this.touchFire;
-    const pad = this.pad();
-    return this.anyDown(FIRE) || (this.leftHeld && !this.mapHeld) || this.button(pad, 2) || this.button(pad, 6);
+    if (this.layout === "phone") return this.touchFire || this.keysDown("fire") || this.padDown("fire");
+    return this.keysDown("fire") || this.mouseDown("fire") || this.padDown("fire") || (this.leftHeld && this.has("fire", (bind) => bind.t === "mouse" && bind.b === 0) && !this.mapHeld);
   }
 
   get selectPressed() {
@@ -226,35 +390,29 @@ export class Input {
   }
 
   get shieldPressed() {
-    const pad = this.pad();
-    return this._shieldTick || this.anyPressed(SHIELD) || this.buttonPressed(1);
+    return this._shieldTick || this.keysPressed("shield") || this.padEdge("shield");
   }
 
   get firePressed() {
     if (this.layout === "phone") return this.touchFire;
-    const pad = this.pad();
-    return this.anyPressed(FIRE) || (this._pointerStart && !this.mapHeld) || this.buttonPressed(2) || this.buttonPressed(6);
+    return this.keysPressed("fire") || this.padEdge("fire") || (this._pointerStart && this.has("fire", (bind) => bind.t === "mouse" && bind.b === 0) && !this.mapHeld);
   }
 
   get startPressed() {
-    if (this._shipsClick) return false;
-    const pad = this.pad();
-    return (
-      this.anyPressed(START) ||
-      this.buttonPressed(0) ||
-      this.buttonPressed(2) ||
-      this.buttonPressed(9) ||
-      this._pointerStart
-    );
+    if (this._shipsClick || this._controlsClick) return false;
+    return this.keysPressed("fire") || this.anyPressed(["Space", "Enter"]) || this.padEdge("fire") || this.buttonPressed(0) || this.buttonPressed(9) || this._pointerStart;
   }
 
   get startKeyPressed() {
-    const pad = this.pad();
-    return this.anyPressed(START) || this.buttonPressed(0) || this.buttonPressed(2) || this.buttonPressed(9);
+    return this.keysPressed("fire") || this.anyPressed(["Space", "Enter"]) || this.padEdge("fire") || this.buttonPressed(0) || this.buttonPressed(9);
   }
 
   get shipsPressed() {
     return this.anyPressed(["KeyS"]) || this._shipsClick;
+  }
+
+  get controlsPressed() {
+    return this.anyPressed(["KeyC"]) || this._controlsClick;
   }
 
   get continueClick() {
@@ -262,42 +420,66 @@ export class Input {
   }
 
   get fullscreenPressed() {
-    return this.anyPressed(FULLSCREEN);
+    return this.keysPressed("fullscreen");
   }
 
   get quitPressed() {
-    return this.anyPressed(QUIT);
+    return this.keysPressed("quit") || this.anyPressed(["Escape"]);
   }
 
   get letterLeft() {
-    return this.anyPressed(ROTATE_LEFT) || this.anyPressed(STRAFE_LEFT) || this.anyPressed(["ArrowDown"]) || this._empTicks > 0;
+    return this.keysPressed("turnL") || this.keysPressed("strafeL") || this.anyPressed(["ArrowDown"]) || this._empTicks > 0;
   }
 
   get letterRight() {
-    return this.anyPressed(ROTATE_RIGHT) || this.anyPressed(STRAFE_RIGHT) || this.anyPressed(["ArrowUp"]) || this._warpTicks > 0;
+    return this.keysPressed("turnR") || this.keysPressed("strafeR") || this.anyPressed(["ArrowUp"]) || this._warpTicks > 0;
   }
 
   get warpPressed() {
-    return this._warpTicks > 0;
+    return this._warpTicks > 0 || this.keysPressed("warp") || this.padEdge("warp");
   }
 
   get empPressed() {
-    return this._empTicks > 0;
+    return this._empTicks > 0 || this.keysPressed("emp") || this.padEdge("emp");
   }
 
   get missilePressed() {
-    return this._missileTicks > 0 || this.buttonPressed(3);
+    return this._missileTicks > 0 || this.keysPressed("missile") || this.padEdge("missile");
   }
 
   get mapHeld() {
-    return this.anyDown(MAP);
+    return this.keysDown("map") || this.padDown("map") || this.keys.has("__map__");
   }
 
   get homePressed() {
-    return this.anyPressed(HOME);
+    return this.keysPressed("home") || this.padEdge("home") || this.pressed.has("__home__");
+  }
+
+  pollCapturePad() {
+    if (!this.capture) return;
+    const pad = this.pad();
+    if (!pad) return;
+    for (let i = 0; i < pad.buttons.length; i += 1) {
+      if (pad.buttons[i]?.pressed && !this.prevPad[i]) {
+        this.finishCapture({ t: "pad", b: i });
+        return;
+      }
+    }
+    for (let i = 0; i < pad.axes.length; i += 1) {
+      const n = pad.axes[i] ?? 0;
+      if (n <= -0.7) {
+        this.finishCapture({ t: "axis", a: i, s: -1 });
+        return;
+      }
+      if (n >= 0.7) {
+        this.finishCapture({ t: "axis", a: i, s: 1 });
+        return;
+      }
+    }
   }
 
   endFrame() {
+    this.pollCapturePad();
     const pad = this.pad();
     this.prevPad = pad ? pad.buttons.map((button) => button.pressed) : [];
     this.padConnected = Boolean(pad);
@@ -308,6 +490,8 @@ export class Input {
     this._missileTicks = 0;
     this._shieldTick = false;
     this._shipsClick = false;
+    this._controlsClick = false;
     this._continueClick = false;
+    this.keys.delete("__map__");
   }
 }

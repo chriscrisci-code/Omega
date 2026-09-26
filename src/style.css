@@ -784,8 +784,90 @@ body:has(.hud-center.is-wave) .version {
   display: none;
 }
 
-body:has(#ships-page:not(.is-hidden)) .version {
+body:has(#ships-page:not(.is-hidden)) .version,
+body:has(#controls-page:not(.is-hidden)) .version {
   display: none;
+}
+
+.controls-page {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: auto;
+  padding: 28px 24px 72px;
+  overflow: auto;
+}
+
+.controls-page.is-hidden {
+  display: none;
+}
+
+#controls-heading {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.controls-profiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.controls-list {
+  max-width: min(820px, 94vw);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px;
+  border: 1px solid rgba(102, 224, 255, 0.22);
+}
+
+.controls-row.is-on {
+  border-color: #c8f8ff;
+  box-shadow: 0 0 12px rgba(142, 246, 255, 0.3);
+}
+
+.controls-name {
+  width: 120px;
+  flex: 0 0 120px;
+}
+
+.controls-slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.controls-chip {
+  min-width: 56px;
+  padding: 3px 7px;
+  background: transparent;
+  border: 1px solid rgba(102, 224, 255, 0.35);
+  color: #66e0ff;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.controls-chip.is-on {
+  border-color: #c8f8ff;
+  box-shadow: 0 0 10px rgba(142, 246, 255, 0.35);
+}
+
+#controls-hint {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
 }
 
 .crt-glass {

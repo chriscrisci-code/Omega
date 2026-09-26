@@ -27,6 +27,7 @@ import { GameAudio } from "./audio/Audio.js";
 
 const TITLE = "title";
 const SHIPS = "ships";
+const CONTROLS = "controls";
 const PLAYING = "playing";
 const DYING = "dying";
 const CONTINUE = "continue";
@@ -60,6 +61,11 @@ export class Game {
       event.preventDefault();
       event.stopPropagation();
       this.input._shipsClick = true;
+    });
+    this.hud.controlsLink?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.input._controlsClick = true;
     });
 
     this.ship = new Ship();
@@ -167,10 +173,17 @@ export class Game {
       this.input._continueClick = true;
       this.acceptContinue();
     };
-    this.hud.onPickDevice = (id) => this.applyControls(id);
+    this.hud.onPickDevice = (id) => this.setControlProfile(id === "phone" ? "phone" : "mouse");
     this.hud.onPickWave = (n) => this.startRun(n);
     this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
     this.hud.onPickStart = (id) => this.confirmStart(id);
+    this.hud.controls.onProfile = (id) => this.setControlProfile(id);
+    this.hud.controls.onCapture = (id) => this.listenBind(id);
+    this.hud.controls.onRemove = (id, key) => this.dropBind(id, key);
+    this.hud.controls.onReset = () => this.resetBinds();
+    this.input.onCapture = (id, bind) => this.addBind(id, bind);
+    this.input.setBinds(this.save.settings.profile, this.save.settings.binds);
+    this.hud.setProfile(this.input.profile);
 
     this.hud.setHigh(this.save.highScore);
     this.hud.setScore(0);
@@ -795,12 +808,83 @@ export class Game {
     this.camZoom = this.playZoom();
     this.world.scale.set(this.camZoom);
     this.hud.setLayout(layout);
+    this.hud.setProfile(this.input.profile);
     this.hud.hideDevicePick();
-    this.hud.showTitle();
+    if (this.mode !== CONTROLS) this.hud.showTitle();
     if (persist) {
       this.save.settings.controls = layout;
       this.storage.save(this.save);
     }
+  }
+
+  persistBinds() {
+    this.save.settings.profile = this.input.profile;
+    this.save.settings.binds = this.input.binds;
+    this.save.settings.controls = this.input.profile === "phone" ? "phone" : "desktop";
+    this.storage.save(this.save);
+  }
+
+  refreshControls() {
+    this.hud.controls.render({
+      profile: this.input.profile,
+      binds: this.input.binds,
+      listening: this.input.capture,
+    });
+  }
+
+  setControlProfile(id) {
+    this.input.setBinds(id);
+    this.applyControls(id === "phone" ? "phone" : "desktop", false);
+    this.persistBinds();
+    this.refreshControls();
+    this.hud.setLayout(this.input.layout);
+    this.hud.setProfile(this.input.profile);
+  }
+
+  listenBind(id) {
+    if (id === "aim") {
+      const next = this.input.aimMode === "mouse" ? "heading" : "mouse";
+      this.input.binds.aim = [{ t: "aim", m: next }];
+      this.persistBinds();
+      this.refreshControls();
+      return;
+    }
+    this.input.listen(id);
+    this.refreshControls();
+  }
+
+  addBind(id, bind) {
+    this.input.addBind(id, bind);
+    this.persistBinds();
+    this.refreshControls();
+  }
+
+  dropBind(id, key) {
+    this.input.dropBind(id, key);
+    this.persistBinds();
+    this.refreshControls();
+  }
+
+  resetBinds() {
+    this.input.setBinds(this.input.profile);
+    this.persistBinds();
+    this.refreshControls();
+  }
+
+  openControls() {
+    this.stopAttract();
+    this.mode = CONTROLS;
+    this.input.capture = "";
+    this.hud.showControls();
+    this.refreshControls();
+  }
+
+  closeControls() {
+    this.input.capture = "";
+    this.mode = TITLE;
+    this.hud.hideControls();
+    this.hud.showTitle();
+    this.beginAttractLoop();
   }
 
   beginAttractLoop(page = "title", options = {}) {
@@ -1213,7 +1297,7 @@ export class Game {
   }
 
   usingMouseAim() {
-    return this.input.layout !== "phone" && this.input.hasPointer;
+    return this.input.aimMode === "mouse";
   }
 
   leadTarget(space) {
@@ -2278,9 +2362,19 @@ export class Game {
 
     if (this.mode === TITLE && this.input.shipsPressed) {
       this.openShips();
+    } else if (this.mode === TITLE && this.input.controlsPressed) {
+      this.openControls();
     } else if (this.mode === SHIPS && this.input.quitPressed) {
       this.closeShips();
     } else if (this.mode === SHIPS && this.input.startKeyPressed) {
+      this.offerStart();
+    } else if (this.mode === CONTROLS && this.input.quitPressed) {
+      if (this.input.capture) {
+        this.input.capture = "";
+        this.refreshControls();
+      } else this.closeControls();
+    } else if (this.mode === CONTROLS && this.input.startKeyPressed && !this.input.capture) {
+      this.closeControls();
       this.offerStart();
     } else if (this.mode === CONTINUE && (this.input.continueClick || this.input.startKeyPressed)) {
       this.acceptContinue();
@@ -2302,7 +2396,7 @@ export class Game {
     this.warpCool = Math.max(0, this.warpCool - t);
 
     this.input.aim =
-      this.mode === PLAYING && !this.ship.docked && !this.input.mapHeld && !this.homeOn && this.input.layout !== "phone"
+      this.mode === PLAYING && !this.ship.docked && !this.input.mapHeld && !this.homeOn && this.input.aimMode === "mouse"
         ? this.pointerAim()
         : null;
 

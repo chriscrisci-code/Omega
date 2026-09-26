@@ -110,21 +110,23 @@ export class TouchControls {
     const held = now - state.heldAt;
     if (held >= 50 && held <= FLICK_MS && Math.abs(state.x) <= FLICK_SLIP) {
       if (-state.y >= FLICK_MIN) {
-        this.input._warpTicks += 1;
+        this.input.emitGesture("flickFwd");
         this.turnTap = null;
         return;
       }
       if (state.y >= FLICK_MIN) {
-        this.input._empTicks += 1;
+        this.input.emitGesture("flickBack");
         this.turnTap = null;
         return;
       }
     }
     if (held <= TAP_MS && Math.hypot(state.x, state.y) < 0.35) {
       if (this.turnTap && now - this.turnTap.t <= DOUBLE_MS) {
-        this.firing = !this.firing;
+        if (this.input.hasGesture("stickFire")) {
+          this.firing = !this.firing;
+          this.syncFire();
+        }
         this.turnTap = null;
-        this.syncFire();
         return;
       }
       this.turnTap = { t: now };
@@ -170,7 +172,7 @@ export class TouchControls {
 
   touchStart(event) {
     if (!this.active || (event.pointerType === "mouse" && event.button !== 0)) return;
-    if (event.target?.closest?.(".stick, .device-pick, .dock-bay, .continue-btn, .ships-link, .wave-pick, .wave-btn")) return;
+    if (event.target?.closest?.(".stick, .device-pick, .dock-bay, .continue-btn, .ships-link, #controls-link, #controls-page, .wave-pick, .wave-btn")) return;
     if (this.stickIds.has(event.pointerId)) return;
     this.fingers.set(event.pointerId, {
       x: event.clientX,
@@ -199,7 +201,7 @@ export class TouchControls {
     this.fingers.delete(event.pointerId);
     if (this.twoFinger && this.fingers.size === 0) {
       const held = performance.now() - this.twoFinger.t;
-      if (!this.twoFinger.moved && held < TAP_MS + 80) this.input._missileTicks += 1;
+      if (!this.twoFinger.moved && held < TAP_MS + 80) this.input.emitGesture("twoFinger");
       this.twoFinger = null;
       this.screenTap = null;
       return;
@@ -211,7 +213,7 @@ export class TouchControls {
     if (dt >= TAP_MS || travel >= TAP_DIST) return;
     const tap = this.screenTap;
     if (tap && now - tap.t <= DOUBLE_MS && dist(tap.x, tap.y, finger.x, finger.y) < TAP_DIST * 2.5) {
-      this.input._shieldTick = true;
+      this.input.emitGesture("doubleTap");
       this.screenTap = null;
       return;
     }

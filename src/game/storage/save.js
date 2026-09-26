@@ -1,4 +1,5 @@
 import { shipLevels } from "../config.js";
+import { guessProfile, normalizeBinds } from "../input/bindings.js";
 
 const KEY = "vector-game-save";
 
@@ -54,6 +55,8 @@ const empty = {
     fullscreen: false,
     difficulty: "easy",
     controls: "",
+    profile: "",
+    binds: null,
   },
 };
 
@@ -196,11 +199,21 @@ function migrateCheckpoint(data) {
   });
 }
 
+function withControls(settings, src) {
+  const controls = settings.controls;
+  const profile = ["mouse", "gamepad", "laptop", "phone"].includes(src?.profile)
+    ? src.profile
+    : guessProfile(controls, false);
+  settings.profile = profile;
+  settings.binds = normalizeBinds(profile, src?.binds);
+  return settings;
+}
+
 function normalize(data) {
   if (!data || typeof data !== "object") {
     return {
       ...empty,
-      settings: { ...empty.settings },
+      settings: withControls({ ...empty.settings }, null),
       loadout: { ...empty.loadout },
       checkpoint: null,
       macro: [],
@@ -222,11 +235,14 @@ function normalize(data) {
     highScores,
     dailyScores,
     killStreaks,
-    settings: {
-      fullscreen: Boolean(data.settings?.fullscreen),
-      difficulty: data.settings?.difficulty === "hard" || data.settings?.difficulty === "medium" ? data.settings.difficulty : "easy",
-      controls: data.settings?.controls === "phone" || data.settings?.controls === "desktop" ? data.settings.controls : "",
-    },
+    settings: withControls(
+      {
+        fullscreen: Boolean(data.settings?.fullscreen),
+        difficulty: data.settings?.difficulty === "hard" || data.settings?.difficulty === "medium" ? data.settings.difficulty : "easy",
+        controls: data.settings?.controls === "phone" || data.settings?.controls === "desktop" ? data.settings.controls : "",
+      },
+      data.settings,
+    ),
   };
 }
 

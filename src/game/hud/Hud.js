@@ -1,4 +1,5 @@
 import { version } from "../config.js";
+import { ControlsPage } from "./ControlsPage.js";
 import { DockBay } from "./DockBay.js";
 import { shipMarksSvg, vectorTextSvg, vectorTitleSvg } from "./vectorText.js";
 
@@ -36,7 +37,10 @@ export class Hud {
     this.alertSub = document.querySelector("#alert-sub");
     this.mode = document.querySelector("#mode");
     this.shipsLink = document.querySelector("#ships-link");
+    this.controlsLink = document.querySelector("#controls-link");
     this.shipsPage = document.querySelector("#ships-page");
+    this.controlsPage = document.querySelector("#controls-page");
+    this.controls = new ControlsPage();
     this.shipsHeading = document.querySelector("#ships-heading");
     this.shipsHint = document.querySelector("#ships-hint");
     this.credit = document.querySelector("#credit");
@@ -55,6 +59,7 @@ export class Hud {
     this.onContinue = null;
     this.onPickDevice = null;
     this.layout = "desktop";
+    this.profile = "mouse";
     this.trailTimer = 0;
     this.trailBeat = 0;
     this.bay = new DockBay();
@@ -89,6 +94,7 @@ export class Hud {
       this.onPickDevice?.("phone");
     });
     this.paint(this.shipsLink, "S SHIPS", 14, DIM, CYAN, "center");
+    this.paint(this.controlsLink, "C CONTROLS", 14, DIM, CYAN, "center");
     this.shipsHeading && (this.shipsHeading.innerHTML = vectorTitleSvg("SHIPS", 36, CYAN, HOT));
     this.paint(this.shipsHint, "ESC RETURN  SPACE START", 11, DIM, CYAN, "center");
   }
@@ -181,6 +187,20 @@ export class Hud {
   }
 
   paintHelp() {
+    if (this.profile === "laptop") {
+      this.help[0] && this.paint(this.help[0], "KEYS MOVE  HEADING AIM  TAP FIRE  TWO FINGER SCROLL WARP EMP", 11, DIM, CYAN, "center");
+      this.help[1] && this.paint(this.help[1], "DOUBLE TAP SHIELD  CORNER TR MISSILE  C CONTROLS", 11, DIM, CYAN, "center");
+      this.help[2] && this.paint(this.help[2], "M MAP  H HOME  F FULLSCREEN  ESC END RUN", 10, DIM, CYAN, "center");
+      this.paint(document.querySelector("[data-label=special]"), "WHEEL", 10, DIM, CYAN, "right");
+      return;
+    }
+    if (this.profile === "gamepad") {
+      this.help[0] && this.paint(this.help[0], "LEFT STICK MOVE  RIGHT STICK TURN  X RT FIRE", 11, DIM, CYAN, "center");
+      this.help[1] && this.paint(this.help[1], "Y WARP  A EMP  B SHIELD  RB MISSILE", 11, DIM, CYAN, "center");
+      this.help[2] && this.paint(this.help[2], "VIEW MAP  C CONTROLS  ESC END RUN", 10, DIM, CYAN, "center");
+      this.paint(document.querySelector("[data-label=special]"), "PAD", 10, DIM, CYAN, "right");
+      return;
+    }
     if (this.layout === "phone") {
       this.help[0] && this.paint(this.help[0], "LEFT STICK THRUST  RIGHT STICK TURN", 11, DIM, CYAN, "center");
       this.help[1] && this.paint(this.help[1], "DOUBLE TAP STICK FIRE  FLICK FWD WARP  FLICK BACK EMP", 11, DIM, CYAN, "center");
@@ -196,6 +216,11 @@ export class Hud {
 
   setLayout(id) {
     this.layout = id === "phone" ? "phone" : "desktop";
+    this.paintHelp();
+  }
+
+  setProfile(id) {
+    this.profile = id || "mouse";
     this.paintHelp();
   }
 
@@ -401,8 +426,22 @@ export class Hud {
     this.attract(true);
     this.center.classList.add("is-hidden");
     this.shipsPage?.classList.remove("is-hidden");
+    this.hideControls();
     this.setHubAlert(null);
     this.setMode("");
+  }
+
+  showControls() {
+    this.attract(true);
+    this.center.classList.add("is-hidden");
+    this.shipsPage?.classList.add("is-hidden");
+    this.controls.show();
+    this.setHubAlert(null);
+    this.setMode("");
+  }
+
+  hideControls() {
+    this.controls.hide();
   }
 
   setHubAlert(info) {
@@ -439,6 +478,7 @@ export class Hud {
     this.attract(false);
     this.center.classList.add("is-hidden");
     this.shipsPage?.classList.add("is-hidden");
+    this.hideControls();
     this.hideDock();
     this.hideContinue();
     this.hideWavePick();
