@@ -49,6 +49,7 @@ const empty = {
     points: 0,
     bank: 0,
   },
+  checkpoint: null,
   settings: {
     fullscreen: false,
     difficulty: "easy",
@@ -151,12 +152,57 @@ export function normalizeLoadout(data) {
   };
 }
 
+const CASTLE_NAMES = new Set(["NORTH", "EAST", "SOUTH", "WEST"]);
+
+export function normalizeCheckpoint(data) {
+  if (!data || typeof data !== "object" || data.active === false) return null;
+  const lives = Math.max(0, Math.floor(Number(data.lives) || 0));
+  if (lives < 1) return null;
+  const seen = (Array.isArray(data.seen) ? data.seen : ["NORTH"])
+    .map((name) => String(name || "").toUpperCase())
+    .filter((name) => CASTLE_NAMES.has(name));
+  return {
+    active: true,
+    wave: Math.max(1, Math.floor(Number(data.wave) || 1)),
+    rest: Boolean(data.rest),
+    score: Math.max(0, Math.floor(Number(data.score) || 0)),
+    lives,
+    cargo: Math.max(0, Math.floor(Number(data.cargo) || 0)),
+    shipId: typeof data.shipId === "string" && data.shipId ? data.shipId : "WEDGE",
+    loadout: normalizeLoadout(data.loadout),
+    hubOre: Math.max(0, Math.floor(Number(data.hubOre) || 0)),
+    seen: seen.length ? seen : ["NORTH"],
+    arriveWait: Math.max(1, Number(data.arriveWait) || 180),
+    baseUnlockIn: Math.max(0, Number(data.baseUnlockIn) || 0),
+    nextLifeAt: Math.max(0, Math.floor(Number(data.nextLifeAt) || 0)),
+    castlesArmed: Boolean(data.castlesArmed),
+  };
+}
+
+function migrateCheckpoint(data) {
+  const saved = normalizeCheckpoint(data?.checkpoint);
+  if (saved) return saved;
+  const loadout = normalizeLoadout(data?.loadout);
+  const progressed =
+    loadout.gun > 1 || loadout.missile > 1 || loadout.emp > 1 || loadout.shield > 1 || loadout.points > 0;
+  if (!progressed) return null;
+  return normalizeCheckpoint({
+    active: true,
+    wave: Math.max(1, Math.floor(Number(data?.maxWave) || 1)),
+    lives: 3,
+    shipId: data?.shipId,
+    loadout,
+    seen: ["NORTH"],
+  });
+}
+
 function normalize(data) {
   if (!data || typeof data !== "object") {
     return {
       ...empty,
       settings: { ...empty.settings },
       loadout: { ...empty.loadout },
+      checkpoint: null,
       macro: [],
       highScores: normalizeHighScores(null),
       dailyScores: normalizeDailyScores(null),
@@ -171,6 +217,7 @@ function normalize(data) {
     maxWave: Math.max(1, Math.floor(Number(data.maxWave) || 1)),
     shipId: typeof data.shipId === "string" && data.shipId ? data.shipId : "WEDGE",
     loadout: normalizeLoadout(data.loadout),
+    checkpoint: migrateCheckpoint(data),
     macro: normalizeMacro(data.macro),
     highScores,
     dailyScores,

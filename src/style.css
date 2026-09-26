@@ -212,6 +212,11 @@ body.is-attract .hud-center.is-demo .score-board {
   margin: 0 auto;
 }
 
+.start-btn {
+  min-width: 168px;
+  padding: 10px 16px;
+}
+
 .wave-btn {
   min-width: 48px;
   padding: 8px 10px;

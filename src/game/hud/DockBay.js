@@ -21,7 +21,7 @@ export class DockBay {
     this.upKey = "";
 
     paint(document.querySelector("#dock-title"), "BAY", 7, CYAN, HOT, "center");
-    paint(document.querySelector("#dock-hint"), "LOADOUT BUY  THRUST LAUNCH", 6, DIM, CYAN, "center");
+    paint(document.querySelector("#dock-hint"), "LOADOUT BUY  DOCK SAVES  THRUST LAUNCH", 6, DIM, CYAN, "center");
 
     this.buildShips();
     this.setUpgrades({ points: 0, levels: { gun: 1, missile: 1, emp: 1, shield: 1 }, costs: {}, max: {} });

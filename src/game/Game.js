@@ -20,7 +20,7 @@ import { FarGrid } from "./render/FarGrid.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeCheckpoint, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, wrapCoord, wrapDelta } from "./math.js";
 import { SHIP_CATALOG, WEDGE_ID } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -32,6 +32,7 @@ const DYING = "dying";
 const CONTINUE = "continue";
 const INITIALS = "initials";
 const WAVEPICK = "wavepick";
+const STARTPICK = "startpick";
 const GAMEOVER = "gameover";
 
 export class Game {
@@ -120,7 +121,8 @@ export class Game {
     this.cooldown = 0;
     this.gun = 0;
     this.shipLevel = 1;
-    this.applySavedLoadout();
+    this.freshLoadout();
+    this.runDirty = false;
     this.burstLeft = 0;
     this.fireWasOn = false;
     this.missileCool = 0;
@@ -151,6 +153,7 @@ export class Game {
     this.attractCue = null;
     this.initials = null;
     this.wavePick = null;
+    this.startPick = null;
     this.shipId = this.save.shipId || WEDGE_ID;
     this.difficulty = "easy";
     this.lifeEvery = extraLifeEvery;
@@ -162,6 +165,7 @@ export class Game {
     this.hud.onPickDevice = (id) => this.applyControls(id);
     this.hud.onPickWave = (n) => this.startRun(n);
     this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
+    this.hud.onPickStart = (id) => this.confirmStart(id);
 
     this.hud.setHigh(this.save.highScore);
     this.hud.setScore(0);
@@ -532,7 +536,7 @@ export class Game {
     }
   }
 
-  startRun(wave = 1) {
+  startRun(wave = 1, resume = false) {
     const tune = applyDifficulty("easy");
     this.difficulty = "easy";
     this.lifeEvery = tune.extraLifeEvery;
@@ -542,15 +546,15 @@ export class Game {
     this.audio.unlock();
     this.mode = PLAYING;
     this.wavePick = null;
+    this.startPick = null;
     this.score = 0;
-    this.applySavedLoadout();
+    this.freshLoadout();
+    this.runDirty = false;
     this.killStreak = 0;
     this.bestStreak = 0;
     this.lives = shipConfig.lives;
     this.wave = 1;
     this.waveCooldown = 0;
-    const startWave = Math.max(1, Math.min(Math.floor(Number(wave) || 1), this.save.maxWave || 1));
-    this.beginAssault(startWave, true);
     this.homeOn = false;
     this.dockOpen = false;
     this.cooldown = 0;
@@ -572,13 +576,19 @@ export class Game {
     this.warpCool = 0;
     this.cargo = 0;
     for (const base of this.bases) base.resetCombat();
-    this.seedWorldForWave(startWave);
+    const resumed = resume && this.applyCheckpoint();
+    if (!resumed) {
+      const startWave = Math.max(1, Math.min(Math.floor(Number(wave) || 1), this.save.maxWave || 1));
+      this.beginAssault(startWave, true);
+      this.seedWorldForWave(startWave);
+    }
     this.ship.reset(worldConfig.width / 2, worldConfig.height / 2);
     this.applyShipSkin();
+    this.ship.setCargo(this.cargo);
     this.hub.forceDock(this.ship, 0);
     this.snapCamera();
     this.applyShieldLevel(true);
-    this.hud.setScore(0);
+    this.hud.setScore(this.score);
     this.hud.setPoints(this.points);
     this.hud.setLives(this.lives);
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
@@ -594,7 +604,7 @@ export class Game {
     this.hangar.view.visible = false;
     this.pips.view.visible = true;
     this.hud.setHubAlert(null);
-    this.hud.setOre(0, 0, "");
+    this.hud.setOre(this.cargo, this.hub.ore, this.hub.upgradeName());
     this.hud.hideCenter();
     if (this.ship.docked) this.hud.showDock(this.shipId);
     this.scatterField();
@@ -664,6 +674,36 @@ export class Game {
 
   unlockedWave() {
     return Math.max(1, Math.floor(Number(this.save.maxWave) || 1));
+  }
+
+  offerStart() {
+    if (!this.hasCheckpoint()) {
+      this.offerWavePick();
+      return;
+    }
+    this.stopAttract();
+    this.mode = STARTPICK;
+    this.startPick = "continue";
+    this.hud.showStartPick(this.checkpointLabel(), "continue");
+  }
+
+  confirmStart(id) {
+    if (id === "continue") this.startRun(1, true);
+    else this.offerWavePick();
+  }
+
+  tickStartPick() {
+    if (this.input.letterLeft || this.input.letterRight) {
+      this.startPick = this.startPick === "continue" ? "new" : "continue";
+      this.hud.showStartPick(this.checkpointLabel(), this.startPick);
+    }
+    if (this.input.startPressed || this.input.firePressed) this.confirmStart(this.startPick || "continue");
+    else if (this.input.quitPressed) {
+      this.startPick = null;
+      this.mode = TITLE;
+      this.hud.showTitle();
+      this.beginAttractLoop();
+    }
   }
 
   offerWavePick() {
@@ -1015,7 +1055,7 @@ export class Game {
     this.points += n;
     this.hud.setPoints(this.points);
     this.refreshDock();
-    this.persistLoadout();
+    this.writeCheckpoint();
   }
 
   buyUpgrade(id) {
@@ -1027,7 +1067,8 @@ export class Game {
     if (id === "shield") this.applyShieldLevel(true);
     this.hud.setPoints(this.points);
     this.refreshDock();
-    this.persistLoadout();
+    this.runDirty = true;
+    this.writeCheckpoint();
     this.sfx("up");
     this.hud.setMode(`${id === "missile" ? "MSL" : id === "shield" ? "SHD" : id.toUpperCase()}  ${this.levels[id]}`);
   }
@@ -1161,29 +1202,101 @@ export class Game {
     this.vectors.addChild(this.lockMark);
   }
 
-  applySavedLoadout() {
-    const loadout = normalizeLoadout(this.save.loadout);
-    this.save.loadout = loadout;
+  freshLoadout() {
+    this.levels = { gun: 1, missile: 1, emp: 1, shield: 1 };
+    this.points = 0;
+    this.loadoutBank = 0;
+  }
+
+  hasCheckpoint() {
+    return Boolean(normalizeCheckpoint(this.save.checkpoint));
+  }
+
+  checkpointLabel() {
+    const cp = normalizeCheckpoint(this.save.checkpoint);
+    if (!cp) return "";
+    return `WAVE  ${cp.wave}`;
+  }
+
+  writeCheckpoint() {
+    if (this.attractOnDemo || this.mode !== PLAYING || this.lives <= 0) return;
+    this.save.checkpoint = normalizeCheckpoint({
+      active: true,
+      wave: this.assaultIndex,
+      rest: this.assaultRest,
+      score: this.score,
+      lives: this.lives,
+      cargo: this.cargo,
+      shipId: this.shipId,
+      loadout: {
+        gun: this.levels?.gun,
+        missile: this.levels?.missile,
+        emp: this.levels?.emp,
+        shield: this.levels?.shield,
+        points: this.points,
+        bank: this.loadoutBank,
+      },
+      hubOre: this.hub.ore,
+      seen: [...(this.seenCastles || [])],
+      arriveWait: this.arriveWait,
+      baseUnlockIn: this.baseUnlockIn,
+      nextLifeAt: this.nextLifeAt,
+      castlesArmed: this.castlesArmed,
+    });
+    this.save.shipId = this.shipId;
+    this.storage.save(this.save);
+  }
+
+  restoreWorld(cp) {
+    this.sleepLateBases();
+    this.seenCastles = new Set();
+    this.castlesArmed = Boolean(cp.castlesArmed);
+    for (const name of cp.seen || []) {
+      const base = this.bases.find((item) => item.name === name);
+      if (!base || base.hub) continue;
+      this.pendingBases = this.pendingBases.filter((item) => item !== base);
+      if (!base.alive) base.resetCombat();
+      else {
+        base.alive = true;
+        base.view.visible = true;
+      }
+      this.seenCastles.add(name);
+    }
+    if (this.seenCastles.size >= 4 || this.castlesArmed) {
+      this.castlesArmed = true;
+      this.armCastles();
+    }
+    this.arriveWait = cp.arriveWait || castle.arriveEvery;
+    this.baseUnlockIn = this.pendingBases.length ? cp.baseUnlockIn || this.arriveWait : 0;
+    this.hub.resetCombat();
+    if (cp.hubOre) this.hub.deposit(cp.hubOre);
+  }
+
+  applyCheckpoint() {
+    const cp = normalizeCheckpoint(this.save.checkpoint);
+    if (!cp) return false;
+    this.shipId = cp.shipId;
     this.levels = {
-      gun: loadout.gun,
-      missile: loadout.missile,
-      emp: loadout.emp,
-      shield: loadout.shield,
+      gun: cp.loadout.gun,
+      missile: cp.loadout.missile,
+      emp: cp.loadout.emp,
+      shield: cp.loadout.shield,
     };
-    this.points = loadout.points;
-    this.loadoutBank = loadout.bank;
+    this.points = cp.loadout.points;
+    this.loadoutBank = cp.loadout.bank;
+    this.score = cp.score;
+    this.lives = cp.lives;
+    this.cargo = cp.cargo;
+    this.nextLifeAt = cp.nextLifeAt || this.lifeEvery;
+    this.beginAssault(cp.wave, true);
+    this.assaultRest = cp.rest;
+    this.assaultTime = cp.rest ? assault.rest : this.assaultDuration(cp.wave);
+    this.restoreWorld(cp);
+    return true;
   }
 
   persistLoadout() {
     this.save.shipId = this.shipId;
-    this.save.loadout = normalizeLoadout({
-      gun: this.levels?.gun,
-      missile: this.levels?.missile,
-      emp: this.levels?.emp,
-      shield: this.levels?.shield,
-      points: this.points,
-      bank: this.loadoutBank,
-    });
     this.storage.save(this.save);
   }
 
@@ -1769,7 +1882,7 @@ export class Game {
 
   endRun(reason = "final") {
     if (this.mode === TITLE || this.mode === GAMEOVER || this.mode === INITIALS) return;
-    this.persistLoadout();
+    if (reason === "abort" && this.lives > 0 && this.runDirty) this.writeCheckpoint();
     this.hud.hideContinue();
     if (this.ship.alive) this.ship.kill();
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
@@ -2027,12 +2140,13 @@ export class Game {
     const space = this.space();
 
     this.touch.tick();
-    this.input.fineWheel = this.mode === INITIALS || this.mode === WAVEPICK;
+    this.input.fineWheel = this.mode === INITIALS || this.mode === WAVEPICK || this.mode === STARTPICK;
     if (this.input.fullscreenPressed) this.toggleFullscreen();
     this.hud.setPad(this.input.padConnected);
     if (this.mode === TITLE || this.mode === GAMEOVER) this.tickAttract(t, space);
     if (this.mode === INITIALS) this.tickInitials();
     if (this.mode === WAVEPICK) this.tickWavePick();
+    if (this.mode === STARTPICK) this.tickStartPick();
 
     if ((this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE) && this.input.quitPressed) {
       this.endRun(this.mode === CONTINUE ? "final" : "abort");
@@ -2043,13 +2157,13 @@ export class Game {
     } else if (this.mode === SHIPS && this.input.quitPressed) {
       this.closeShips();
     } else if (this.mode === SHIPS && this.input.startKeyPressed) {
-      this.offerWavePick();
+      this.offerStart();
     } else if (this.mode === CONTINUE && (this.input.continueClick || this.input.startKeyPressed)) {
       this.acceptContinue();
     } else if (this.mode === CONTINUE && this.input.selectPressed) {
       this.endRun("final");
     } else if (!this.pickingDevice && (this.mode === TITLE || this.mode === GAMEOVER) && this.mode !== INITIALS && this.input.startPressed) {
-      this.offerWavePick();
+      this.offerStart();
     } else if (this.mode === PLAYING && !this.ship.docked) {
       this.shoot();
     }
@@ -2091,10 +2205,12 @@ export class Game {
           this.depositOre();
           this.refreshDock();
           this.hud.showDock(this.shipId);
+          if (this.runDirty) this.writeCheckpoint();
         }
         this.ship.dockHold = Math.max(0, this.ship.dockHold - t);
         if (this.ship.dockHold <= 0 && (Math.abs(this.input.surge) > 0.2 || Math.abs(this.input.strafe) > 0.2)) {
           this.dockOpen = false;
+          this.runDirty = true;
           this.hud.hideDock();
           this.ship.release(this.input);
           this.sfx("launch");

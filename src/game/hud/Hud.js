@@ -45,6 +45,7 @@ export class Hud {
     this.wavePick = document.querySelector("#wave-pick");
     this.waveRow = document.querySelector("#wave-row");
     this.onPickWave = null;
+    this.onPickStart = null;
     this.scoreBoard = document.querySelector("#score-board");
     this.continueBtn = document.querySelector("#continue-btn");
     this.devicePick = document.querySelector("#device-pick");
@@ -264,6 +265,47 @@ export class Hud {
   hideWavePick() {
     this.center?.classList.remove("is-wave");
     this.wavePick?.classList.add("is-hidden");
+  }
+
+  showStartPick(label, selected) {
+    this.attract(true);
+    this.setAttractDemo(false);
+    this.center.classList.remove("is-hidden", "is-scores", "is-initials");
+    this.center.classList.add("is-wave");
+    this.title.innerHTML = "";
+    this.paint(this.tag, label || "SAVE", 18, MAGENTA, PINK, "center");
+    this.paintStartPick(selected);
+    this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP TO START" : "FIRE START", 18, CYAN, HOT);
+    this.paint(this.credit, this.layout === "phone" ? "TAP A CHOICE" : "WHEEL OR ARROWS   ESC", 8, DIM, CYAN, "center");
+    this.shipsPage?.classList.add("is-hidden");
+    this.hideScores();
+    this.hideContinue();
+    this.setHubAlert(null);
+    this.setMode("");
+  }
+
+  paintStartPick(selected) {
+    if (!this.waveRow) return;
+    const on = selected === "new" ? "new" : "continue";
+    const rows = [
+      { id: "continue", name: "CONTINUE" },
+      { id: "new", name: "NEW GAME" },
+    ];
+    this.waveRow.innerHTML = "";
+    for (const row of rows) {
+      const lit = row.id === on;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `wave-btn start-btn${lit ? " is-on" : ""}`;
+      btn.innerHTML = vectorTextSvg(row.name, lit ? 16 : 13, lit ? CYAN : DIM, lit ? HOT : CYAN, "center");
+      btn.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.onPickStart?.(row.id);
+      });
+      this.waveRow.appendChild(btn);
+    }
+    this.wavePick?.classList.remove("is-hidden");
   }
 
   showScores(rows, heading = "ALL TIME") {
