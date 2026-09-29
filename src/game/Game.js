@@ -20,7 +20,7 @@ import { FarGrid } from "./render/FarGrid.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeCheckpoint, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeCheckpoint, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, wrapCoord, wrapDelta } from "./math.js";
 import { SHIP_CATALOG, WEDGE_ID } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -565,12 +565,9 @@ export class Game {
     this.mode = PLAYING;
     this.wavePick = null;
     this.startPick = null;
-    this.score = 0;
-    this.freshLoadout();
     this.runDirty = false;
     this.killStreak = 0;
     this.bestStreak = 0;
-    this.lives = shipConfig.lives;
     this.wave = 1;
     this.waveCooldown = 0;
     this.homeOn = false;
@@ -581,7 +578,6 @@ export class Game {
     this.fireWasOn = false;
     this.timer = 0;
     this.shake = 0;
-    this.nextLifeAt = this.lifeEvery;
     this.clearRocks();
     this.clearEnemies();
     this.shots.forEach((shot) => shot.kill());
@@ -592,10 +588,15 @@ export class Game {
     this.emp.kill();
     this.empCool = 0;
     this.warpCool = 0;
-    this.cargo = 0;
     for (const base of this.bases) base.resetCombat();
     const resumed = resume && this.applyCheckpoint();
     if (!resumed) {
+      this.score = 0;
+      this.freshLoadout();
+      this.lives = shipConfig.lives;
+      this.cargo = 0;
+      this.nextLifeAt = this.lifeEvery;
+      this.save.checkpoint = null;
       const startWave = Math.max(1, Math.min(Math.floor(Number(wave) || 1), this.save.maxWave || 1));
       this.beginAssault(startWave, true);
       this.seedWorldForWave(startWave);
@@ -1070,6 +1071,7 @@ export class Game {
     if (this.attractOnDemo) return;
     this.score += amount;
     this.hud.setScore(this.score);
+    this.stampCheckpoint();
     if (this.score > this.save.highScore) {
       this.save.highScore = this.score;
       this.storage.save(this.save);
@@ -1425,31 +1427,49 @@ export class Game {
     return `WAVE  ${cp.wave}`;
   }
 
-  writeCheckpoint() {
-    if (this.attractOnDemo || this.mode !== PLAYING || this.lives <= 0) return;
-    this.save.checkpoint = normalizeCheckpoint({
+  stampCheckpoint() {
+    if (!this.save.checkpoint?.active) return;
+    this.save.checkpoint.score = Math.max(0, Math.floor(Number(this.score) || 0));
+    this.save.checkpoint.lives = Math.max(1, Math.floor(Number(this.lives) || 0) || shipConfig.lives);
+    this.save.checkpoint.cargo = Math.max(0, Math.floor(Number(this.cargo) || 0));
+    this.save.checkpoint.nextLifeAt = Math.max(0, Math.floor(Number(this.nextLifeAt) || 0));
+    if (this.save.checkpoint.loadout) {
+      this.save.checkpoint.loadout.points = Math.max(0, Math.floor(Number(this.points) || 0));
+      this.save.checkpoint.loadout.bank = Math.max(0, Math.floor(Number(this.loadoutBank) || 0) % 3);
+    }
+  }
+
+  writeCheckpoint(options = {}) {
+    if (this.attractOnDemo) return;
+    const force = Boolean(options.force);
+    if (!force && (this.mode !== PLAYING || this.lives <= 0)) return;
+    const loadout = {
+      gun: this.levels?.gun,
+      missile: this.levels?.missile,
+      emp: this.levels?.emp,
+      shield: this.levels?.shield,
+      points: this.points,
+      bank: this.loadoutBank,
+    };
+    const cp = normalizeCheckpoint({
       active: true,
       wave: this.assaultIndex,
       rest: this.assaultRest,
       score: this.score,
-      lives: this.lives,
+      lives: this.lives > 0 ? this.lives : shipConfig.lives,
       cargo: this.cargo,
       shipId: this.shipId,
-      loadout: {
-        gun: this.levels?.gun,
-        missile: this.levels?.missile,
-        emp: this.levels?.emp,
-        shield: this.levels?.shield,
-        points: this.points,
-        bank: this.loadoutBank,
-      },
-      hubOre: this.hub.ore,
+      loadout,
+      hubOre: this.hub?.ore,
       seen: [...(this.seenCastles || [])],
       arriveWait: this.arriveWait,
       baseUnlockIn: this.baseUnlockIn,
       nextLifeAt: this.nextLifeAt,
       castlesArmed: this.castlesArmed,
     });
+    if (!cp) return;
+    this.save.checkpoint = cp;
+    this.save.loadout = normalizeLoadout(loadout);
     this.save.shipId = this.shipId;
     this.storage.save(this.save);
   }
@@ -1489,12 +1509,13 @@ export class Game {
       emp: cp.loadout.emp,
       shield: cp.loadout.shield,
     };
-    this.points = cp.loadout.points;
-    this.loadoutBank = cp.loadout.bank;
-    this.score = cp.score;
-    this.lives = cp.lives;
-    this.cargo = cp.cargo;
-    this.nextLifeAt = cp.nextLifeAt || this.lifeEvery;
+    this.points = Math.max(0, Math.floor(Number(cp.loadout.points) || 0));
+    this.loadoutBank = Math.max(0, Math.floor(Number(cp.loadout.bank) || 0));
+    this.score = 0;
+    this.lives = Math.max(1, Math.floor(Number(cp.lives) || 0) || shipConfig.lives);
+    this.cargo = Math.max(0, Math.floor(Number(cp.cargo) || 0));
+    this.nextLifeAt = this.lifeEvery;
+    this.save.loadout = normalizeLoadout(cp.loadout);
     this.beginAssault(cp.wave, true);
     this.assaultRest = cp.rest;
     this.assaultTime = cp.rest ? assault.rest : this.assaultDuration(cp.wave);
@@ -2073,23 +2094,30 @@ export class Game {
     this.lockMark.visible = false;
     this.hud.hideDock();
     this.hud.setMode("");
+    this.writeCheckpoint({ force: true });
+    this.hud.setPoints(this.points);
     this.hud.showContinue();
   }
 
   acceptContinue() {
     if (this.mode !== CONTINUE) return;
+    this.score = 0;
+    this.nextLifeAt = this.lifeEvery;
     this.lives = shipConfig.lives;
     this.hud.setLives(this.lives);
+    this.hud.setScore(0);
+    this.hud.setPoints(this.points);
     this.hud.hideContinue();
     this.mode = PLAYING;
     this.ship.reset(this.ship.x, this.ship.y);
     this.applyShipSkin();
     this.snapCamera();
+    this.writeCheckpoint({ force: true });
   }
 
   endRun(reason = "final") {
     if (this.mode === TITLE || this.mode === GAMEOVER || this.mode === INITIALS) return;
-    if (reason === "abort" && this.lives > 0 && this.runDirty) this.writeCheckpoint();
+    if (this.runDirty || this.score > 0 || this.points > 0) this.writeCheckpoint({ force: true });
     this.hud.hideContinue();
     if (this.ship.alive) this.ship.kill();
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
