@@ -236,11 +236,11 @@ export class Hud {
     this.attract(true);
     this.setAttractDemo(false);
     this.center.classList.remove("is-hidden");
-    this.title.innerHTML = vectorTitleSvg("OMEGA", 64, CYAN, HOT, { motion: true });
+    this.title.innerHTML = vectorTitleSvg("2DSG", 64, CYAN, HOT, { motion: true });
     this.applyTrailState();
     this.paint(this.tag, "THE VOID IS LISTENING", 12, MAGENTA, PINK, "center");
     this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP TO START" : "PRESS FIRE", 20, CYAN, HOT);
-    this.paint(this.credit, "C 1984  OMEGA", 9, DIM, CYAN, "center");
+    this.paint(this.credit, "C 1984  2DSG", 9, DIM, CYAN, "center");
     this.paintHelp();
     this.shipsPage?.classList.add("is-hidden");
     this.hideWavePick();
@@ -341,7 +341,7 @@ export class Hud {
     document.body.classList.add("is-scoreboard");
     this.paintScoreBoard(rows, heading);
     this.cta.innerHTML = vectorTitleSvg("PRESS FIRE", 20, CYAN, HOT);
-    this.paint(this.credit, "C 1984  OMEGA", 9, DIM, CYAN, "center");
+    this.paint(this.credit, "C 1984  2DSG", 9, DIM, CYAN, "center");
     this.shipsPage?.classList.add("is-hidden");
     this.hideWavePick();
     this.hideContinue();
@@ -407,13 +407,13 @@ export class Hud {
     this.attract(true);
     this.setAttractDemo(false);
     this.center.classList.remove("is-hidden");
-    this.title.innerHTML = vectorTitleSvg("OMEGA", 64, CYAN, HOT, { motion: true });
+    this.title.innerHTML = vectorTitleSvg("2DSG", 64, CYAN, HOT, { motion: true });
     this.applyTrailState();
     const line =
       reason === "hub" ? `HUB LOST  ${score}` : reason === "abort" ? `RUN ABORTED  ${score}` : `FINAL  ${score}`;
     this.paint(this.tag, line, 14, MAGENTA, PINK, "center");
     this.cta.innerHTML = vectorTitleSvg("PRESS FIRE", 20, CYAN, HOT);
-    this.paint(this.credit, "C 1984  OMEGA", 9, DIM, CYAN, "center");
+    this.paint(this.credit, "C 1984  2DSG", 9, DIM, CYAN, "center");
     this.shipsPage?.classList.add("is-hidden");
     this.hideWavePick();
     this.hideScores();
