@@ -139,14 +139,90 @@ const DISPLAY = {
 const DISPLAY_H = 10;
 const DISPLAY_STEP = 10.4;
 
-function displayStrokes(text, size, slant = 0.26) {
+/** Outline block caps for the title wordmark. Closed paths, even bar weight. */
+const BLOCK = {
+  " ": [],
+  2: [
+    [
+      [0.3, 0.3],
+      [7.7, 0.3],
+      [7.7, 6.0],
+      [2.1, 6.0],
+      [2.1, 7.8],
+      [7.7, 7.8],
+      [7.7, 9.7],
+      [0.3, 9.7],
+      [0.3, 4.2],
+      [5.9, 4.2],
+      [5.9, 2.2],
+      [0.3, 2.2],
+      [0.3, 0.3],
+    ],
+  ],
+  D: [
+    [
+      [0.3, 0.3],
+      [5.0, 0.3],
+      [7.7, 2.6],
+      [7.7, 7.4],
+      [5.0, 9.7],
+      [0.3, 9.7],
+      [0.3, 0.3],
+    ],
+    [
+      [1.9, 2.0],
+      [4.4, 2.0],
+      [6.0, 3.4],
+      [6.0, 6.6],
+      [4.4, 8.0],
+      [1.9, 8.0],
+      [1.9, 2.0],
+    ],
+  ],
+  S: [
+    [
+      [0.3, 0.3],
+      [7.7, 0.3],
+      [7.7, 2.2],
+      [2.1, 2.2],
+      [2.1, 4.2],
+      [7.7, 4.2],
+      [7.7, 9.7],
+      [0.3, 9.7],
+      [0.3, 7.8],
+      [5.9, 7.8],
+      [5.9, 6.0],
+      [0.3, 6.0],
+      [0.3, 0.3],
+    ],
+  ],
+  G: [
+    [
+      [0.3, 0.3],
+      [7.7, 0.3],
+      [7.7, 2.2],
+      [2.1, 2.2],
+      [2.1, 7.8],
+      [5.9, 7.8],
+      [5.9, 6.4],
+      [3.8, 6.4],
+      [3.8, 4.8],
+      [7.7, 4.8],
+      [7.7, 9.7],
+      [0.3, 9.7],
+      [0.3, 0.3],
+    ],
+  ],
+};
+
+function displayStrokes(text, size, slant = 0.26, glyphs = DISPLAY) {
   const scale = size / DISPLAY_H;
   const source = normalize(text);
   const strokes = [];
   let x = 0;
   const map = (px, py) => [x + px * scale + (DISPLAY_H - py) * scale * slant, py * scale];
   for (const ch of source) {
-    const glyph = DISPLAY[ch] ?? FONT[ch] ?? FONT["-"];
+    const glyph = glyphs[ch] ?? DISPLAY[ch] ?? FONT[ch] ?? FONT["-"];
     for (const line of glyph) {
       strokes.push(line.map(([px, py]) => map(px, py)));
     }
@@ -157,7 +233,8 @@ function displayStrokes(text, size, slant = 0.26) {
 
 export function vectorTitleSvg(text, size, color = "#66e0ff", hot = "#c8f8ff", options = {}) {
   const motion = Boolean(options.motion);
-  const { strokes, width, height } = displayStrokes(text, size);
+  const block = Boolean(options.block);
+  const { strokes, width, height } = displayStrokes(text, size, block ? 0.1 : 0.26, block ? BLOCK : DISPLAY);
   const layers = motion ? 9 : 12;
   const echoes = motion ? 4 : 0;
   const dx = size * 0.052;
@@ -170,26 +247,27 @@ export function vectorTitleSvg(text, size, color = "#66e0ff", hot = "#c8f8ff", o
   const pathAt = (ox, oy) => live.map((line) => pathFrom(line.map(([px, py]) => [px + ox, py + oy]))).join(" ");
   const front = pathAt(0, 0);
   const parts = [];
-  const rib = Math.max(0.65, size / 46);
+  const rib = Math.max(0.65, size / (block ? 38 : 46));
+  const join = `fill="none" stroke-linejoin="miter" stroke-miterlimit="${block ? 2.2 : 4}"`;
   for (let k = echoes; k >= 1; k -= 1) {
     const ox = (layers + k * 2.1) * dx;
     const oy = (layers + k * 2.1) * dy;
     parts.push(
-      `<path class="title-echo" style="--k:${k}" d="${pathAt(ox, oy)}" stroke="${color}" stroke-width="${(rib * 0.85).toFixed(2)}" stroke-linejoin="miter"/>`,
+      `<path class="title-echo" style="--k:${k}" d="${pathAt(ox, oy)}" stroke="${color}" stroke-width="${(rib * 0.85).toFixed(2)}" ${join}/>`,
     );
   }
   for (let i = layers; i >= 1; i -= 1) {
     const alpha = (0.05 + ((layers - i) / layers) * 0.2).toFixed(2);
     parts.push(
-      `<path class="title-rib" style="--i:${i}" d="${pathAt(i * dx, i * dy)}" stroke="${color}" stroke-width="${rib.toFixed(2)}" stroke-opacity="${alpha}" stroke-linejoin="miter"/>`,
+      `<path class="title-rib" style="--i:${i}" d="${pathAt(i * dx, i * dy)}" stroke="${color}" stroke-width="${rib.toFixed(2)}" stroke-opacity="${alpha}" ${join}/>`,
     );
   }
   const split = Math.max(1.1, size * 0.02);
-  parts.push(`<path d="${pathAt(-split, 0)}" stroke="#ff4d9a" stroke-width="${(rib * 1.15).toFixed(2)}" stroke-opacity="0.42" stroke-linejoin="miter"/>`);
-  parts.push(`<path d="${pathAt(split, 0.4)}" stroke="#3cffc0" stroke-width="${(rib * 1.15).toFixed(2)}" stroke-opacity="0.32" stroke-linejoin="miter"/>`);
-  const sw = Math.max(1.1, size / 28);
-  parts.push(`<path class="vector-glow" d="${front}" stroke="${color}" stroke-width="${(sw * 4.2).toFixed(2)}" stroke-linejoin="miter"/>`);
-  parts.push(`<path class="vector-core" d="${front}" stroke="${hot}" stroke-width="${sw.toFixed(2)}" stroke-linejoin="miter"/>`);
+  parts.push(`<path d="${pathAt(-split, 0)}" stroke="#ff4d9a" stroke-width="${(rib * 1.15).toFixed(2)}" stroke-opacity="0.42" ${join}/>`);
+  parts.push(`<path d="${pathAt(split, 0.4)}" stroke="#3cffc0" stroke-width="${(rib * 1.15).toFixed(2)}" stroke-opacity="0.32" ${join}/>`);
+  const sw = Math.max(1.1, size / (block ? 22 : 28));
+  parts.push(`<path class="vector-glow" d="${front}" stroke="${color}" stroke-width="${(sw * 4.2).toFixed(2)}" ${join}/>`);
+  parts.push(`<path class="vector-core" d="${front}" stroke="${hot}" stroke-width="${sw.toFixed(2)}" ${join}/>`);
   const cls = motion ? "vector-text vector-title is-show" : "vector-text vector-title";
   return `<svg class="${cls}" width="${vbW.toFixed(1)}" height="${vbH.toFixed(1)}" viewBox="${-pad} ${-pad} ${vbW} ${vbH}" aria-label="${normalize(text)}" style="margin:0 auto;">${parts.join("")}</svg>`;
 }

@@ -236,7 +236,7 @@ export class Hud {
     this.attract(true);
     this.setAttractDemo(false);
     this.center.classList.remove("is-hidden");
-    this.title.innerHTML = vectorTitleSvg("2DSG", 64, CYAN, HOT, { motion: true });
+    this.title.innerHTML = vectorTitleSvg("2DSG", 64, CYAN, HOT, { motion: true, block: true });
     this.applyTrailState();
     this.paint(this.tag, "THE VOID IS LISTENING", 12, MAGENTA, PINK, "center");
     this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP TO START" : "PRESS FIRE", 20, CYAN, HOT);
@@ -407,7 +407,7 @@ export class Hud {
     this.attract(true);
     this.setAttractDemo(false);
     this.center.classList.remove("is-hidden");
-    this.title.innerHTML = vectorTitleSvg("2DSG", 64, CYAN, HOT, { motion: true });
+    this.title.innerHTML = vectorTitleSvg("2DSG", 64, CYAN, HOT, { motion: true, block: true });
     this.applyTrailState();
     const line =
       reason === "hub" ? `HUB LOST  ${score}` : reason === "abort" ? `RUN ABORTED  ${score}` : `FINAL  ${score}`;
