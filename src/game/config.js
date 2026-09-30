@@ -118,6 +118,8 @@ export const hubGunner = {
   laserRange: 920,
   laserTick: 0.14,
   laserWidth: 14,
+  laserHold: 3,
+  laserRest: 1,
 };
 
 /** Nose-ray gun lead. Phone / no-mouse only. */

@@ -156,6 +156,8 @@ export class Game {
     this.hubGunAngle = 0;
     this.hubLaserCool = 0;
     this.hubLaserOn = false;
+    this.hubLaserLife = 0;
+    this.hubLaserWait = 0;
     this.attractOnDemo = false;
     this.attractPage = "title";
     this.attractBoard = 0;
@@ -582,6 +584,8 @@ export class Game {
     this.hubGunAngle = 0;
     this.hubLaserCool = 0;
     this.hubLaserOn = false;
+    this.hubLaserLife = 0;
+    this.hubLaserWait = 0;
     this.cooldown = 0;
     this.gun = 0;
     this.burstLeft = 0;
@@ -1192,21 +1196,29 @@ export class Game {
   enterHubSeat(id) {
     if (this.mode !== PLAYING || !this.ship.docked || this.attractOnDemo || !this.hub.alive) return;
     if (id !== "gun0" && id !== "gun1" && id !== "laser") return;
-    this.hub.paintLaserBeam(0);
+    this.stopHubLaser();
     this.hubSeat = id;
     this.hubGunAngle = this.ship.rotation;
-    this.hubLaserOn = false;
     this.hud.bay.setSeat(id);
     this.hud.setMode(id === "laser" ? "LASER" : id === "gun1" ? "GUN 2" : "GUN 1");
     this.sfx("on");
   }
 
   leaveHubSeat() {
-    if (this.hubSeat) this.sfx("off");
+    if (this.hubSeat && !this.hubLaserOn) this.sfx("off");
+    this.stopHubLaser();
     this.hubSeat = null;
-    this.hubLaserOn = false;
-    this.hub.paintLaserBeam(0);
     this.hud.bay.setSeat(null);
+  }
+
+  stopHubLaser() {
+    if (this.hubLaserOn) {
+      this.sfx("off");
+      this.hubLaserWait = hubGunner.laserRest;
+    }
+    this.hubLaserOn = false;
+    this.hubLaserLife = 0;
+    this.hub.paintLaserBeam(0);
   }
 
   gunnerOrigin() {
@@ -1250,15 +1262,15 @@ export class Game {
   }
 
   tickHubLaser(t, space) {
-    const held = this.input.fireHeld;
-    if (!held) {
-      if (this.hubLaserOn) this.sfx("off");
-      this.hubLaserOn = false;
-      this.hub.paintLaserBeam(0);
-      return;
+    if (this.hubLaserOn) {
+      this.hubLaserLife -= t;
+      if (!this.input.fireHeld || this.hubLaserLife <= 0) this.stopHubLaser();
     }
     if (!this.hubLaserOn) {
+      this.hub.paintLaserBeam(0);
+      if (!this.input.fireHeld || this.hubLaserWait > 0) return;
       this.hubLaserOn = true;
+      this.hubLaserLife = hubGunner.laserHold;
       this.sfx("on");
     }
     const origin = this.gunnerOrigin();
@@ -2588,6 +2600,7 @@ export class Game {
           this.sfx("launch");
         } else {
           this.ship.dockedTo.hold(this.ship);
+          if (!this.hubLaserOn) this.hubLaserWait = Math.max(0, this.hubLaserWait - t);
           if (this.hubSeat) this.tickHubGunner(t, space);
         }
       } else if (this.homeOn && this.hub.alive) {

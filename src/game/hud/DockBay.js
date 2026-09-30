@@ -120,7 +120,7 @@ export class DockBay {
     const line = kind === "gun"
       ? "FIRE GUN  BAY  THRUST LAUNCH"
       : kind === "laser"
-        ? "HOLD LASER  BAY  THRUST LAUNCH"
+        ? "HOLD LASER 3s  BAY  THRUST LAUNCH"
         : "LOADOUT BUY  GUN LASER  THRUST LAUNCH";
     paint(document.querySelector("#dock-hint"), line, 6, DIM, CYAN, "center");
   }
