@@ -16,6 +16,7 @@ export class GameAudio {
       this.master.gain.value = 0.52;
       this.master.connect(this.ctx.destination);
       this.ensureGunFlange();
+      this.ensureMusic();
     }
     if (this.ctx.state !== "running") await this.ctx.resume();
     return this.ctx;
@@ -257,6 +258,74 @@ export class GameAudio {
     this.engines.humGain.gain.setTargetAtTime(shieldAmt * 0.045, t, 0.1);
     this.engines.warp.gain.gain.setTargetAtTime(warpOn * 0.2, t, warpOn ? 0.05 : 0.12);
     this.engines.warp.filter.frequency.setTargetAtTime(380 + u * 1500, t, 0.08);
+  }
+
+  ensureMusic() {
+    if (this.music || !this.ctx) return;
+    const bus = this.ctx.createGain();
+    bus.gain.value = 0;
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 180;
+    filter.Q.value = 0.65;
+    bus.connect(filter);
+    filter.connect(this.master);
+
+    const tone = (freq, type = "sine") => {
+      const osc = this.ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.value = freq;
+      const gain = this.ctx.createGain();
+      gain.gain.value = 0;
+      osc.connect(gain);
+      gain.connect(bus);
+      osc.start();
+      return { osc, gain };
+    };
+
+    const low = tone(43.65);
+    const fifth = tone(51.91);
+    const minor = tone(65.41);
+    const air = tone(110, "triangle");
+
+    const hiss = this.noiseSource();
+    const hissFilter = this.ctx.createBiquadFilter();
+    hissFilter.type = "lowpass";
+    hissFilter.frequency.value = 160;
+    hissFilter.Q.value = 0.35;
+    const hissGain = this.ctx.createGain();
+    hissGain.gain.value = 0;
+    hiss.connect(hissFilter);
+    hissFilter.connect(hissGain);
+    hissGain.connect(bus);
+    hiss.start();
+
+    const lfo = this.ctx.createOscillator();
+    lfo.type = "sine";
+    lfo.frequency.value = 0.045;
+    const lfoDepth = this.ctx.createGain();
+    lfoDepth.gain.value = 36;
+    lfo.connect(lfoDepth);
+    lfoDepth.connect(filter.frequency);
+    lfo.start();
+
+    this.music = { bus, filter, low, fifth, minor, air, hissGain, hissFilter };
+  }
+
+  tickMusic({ bed = 0, dark = 0, heat = 0, hiss = 0 } = {}) {
+    if (!this.ctx || this.ctx.state !== "running") return;
+    this.ensureMusic();
+    const t = this.now();
+    const tau = 2.1;
+    const level = Math.max(0, Math.min(1, bed)) * 0.1;
+    this.music.bus.gain.gain.setTargetAtTime(level, t, tau);
+    this.music.low.gain.gain.setTargetAtTime(0.78 + dark * 0.2, t, tau);
+    this.music.fifth.gain.gain.setTargetAtTime(0.26 + heat * 0.18, t, tau);
+    this.music.minor.gain.gain.setTargetAtTime(0.2 + dark * 0.22, t, tau);
+    this.music.air.gain.gain.setTargetAtTime(0.05 + heat * 0.07, t, tau);
+    this.music.hissGain.gain.gain.setTargetAtTime(Math.max(0, hiss) * 0.32, t, tau);
+    this.music.hissFilter.frequency.setTargetAtTime(140 + heat * 90, t, 2.4);
+    this.music.filter.frequency.setTargetAtTime(150 + (1 - dark) * 50 + heat * 210, t, 2.4);
   }
 }
 

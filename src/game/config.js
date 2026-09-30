@@ -48,6 +48,14 @@ export const emp = {
   cooldown: 8,
 };
 
+/** Sample-free ambient bed. Levels stay under guns. */
+export const music = {
+  title: 0.2,
+  fly: 0.4,
+  dock: 0.24,
+  dead: 0.1,
+};
+
 /** Gun hold-fire: 1 slow / 2 / 3 / 4 original stream / 5 twin. Missiles = level-1, cap 6. EMP 1 off / 2 stun / 3 long / 4 kill. Shield 4 = 2x time. */
 export const shipLevels = {
   gun: 5,

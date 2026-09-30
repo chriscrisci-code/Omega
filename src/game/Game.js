@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, warp, world as worldConfig } from "./config.js";
+import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, warp, world as worldConfig } from "./config.js";
 import { chipBurst, Debris, shatter } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -2672,6 +2672,21 @@ export class Game {
           else enemy.stun(emp.stun * (this.empTier() >= 3 ? 2 : 1));
         }
       }
+      for (const dart of [...this.missiles, ...this.hubMissiles, ...this.castleStars]) {
+        if (!dart.alive || dart.blind || this.emp.hit.has(dart)) continue;
+        if (!hits(this.emp, dart, space.width, space.height)) continue;
+        this.emp.hit.add(dart);
+        dart.loseLock();
+        this.fx.emit(5, {
+          x: dart.x,
+          y: dart.y,
+          color: colors.cyanHot,
+          speed: 50,
+          speedVar: 30,
+          life: 0.18,
+          size: 5,
+        });
+      }
     }
 
     for (const rock of this.asteroids) rock.update(t, space);
@@ -2957,7 +2972,24 @@ export class Game {
       this.audio.tickEngine(0, 0, 0, 0);
     }
     this.tickMissileAudio(t, space);
+    this.audio.tickMusic(this.musicState());
 
     this.input.endFrame();
+  }
+
+  musicState() {
+    if (this.mode === DYING || this.mode === CONTINUE) {
+      return { bed: music.dead, dark: 0.75, heat: 0, hiss: 0.06 };
+    }
+    if (this.mode === PLAYING && this.ship.docked) {
+      const heat = this.hubThreatClose ? 0.55 : this.hubThreat > 0 ? 0.28 : 0;
+      return { bed: music.dock, dark: 0.5, heat, hiss: 0.07 };
+    }
+    if (this.mode === PLAYING && this.ship.alive) {
+      const wave = this.assaultRest ? 0 : Math.min(0.55, 0.08 * (this.assaultIndex || 1));
+      const threat = this.hubThreatClose ? 0.7 : this.hubThreat > 0 ? 0.35 : 0;
+      return { bed: music.fly, dark: 0.18, heat: Math.max(wave, threat), hiss: 0.14 };
+    }
+    return { bed: music.title, dark: 0.4, heat: 0, hiss: 0.1 };
   }
 }

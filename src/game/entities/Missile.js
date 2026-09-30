@@ -17,6 +17,7 @@ export class Missile {
     this.clock = 0;
     this.points = [];
     this.star = false;
+    this.blind = false;
     this.tint = colors.orange;
     this.tintHot = colors.amber;
     this.view.visible = false;
@@ -98,6 +99,7 @@ export class Missile {
     this.vx = Math.cos(angle) * this.speed;
     this.vy = Math.sin(angle) * this.speed;
     this.target = target;
+    this.blind = false;
     this.life = options.life ?? missiles.life;
     this.clock = 0;
     this.radius = this.star ? (options.radius ?? 7) : missiles.radius;
@@ -120,8 +122,8 @@ export class Missile {
       if (this.life <= 0) {
         this.kill();
       } else {
-        if (this.target && !this.target.alive) this.target = null;
-        if (this.target) {
+        if (this.blind || (this.target && !this.target.alive)) this.target = null;
+        if (this.target && !this.blind) {
           const dx = wrapDelta(this.target.x - this.x, space.width);
           const dy = wrapDelta(this.target.y - this.y, space.height);
           this.angle = turnToward(this.angle, Math.atan2(dy, dx), (this.turnRate ?? missiles.turn) * dt);
@@ -139,7 +141,8 @@ export class Missile {
         const gap = Math.hypot(wrapDelta(this.x - last.x, space.width), wrapDelta(this.y - last.y, space.height));
         if (gap >= missiles.trailGap) this.points.push({ x: this.x, y: this.y, t: this.clock });
         this.body.rotation = this.star ? 0 : this.angle;
-        this.body.alpha = this.life < 0.35 ? this.life / 0.35 : 1;
+        const fade = this.life < 0.35 ? this.life / 0.35 : 1;
+        this.body.alpha = this.blind ? fade * (0.32 + 0.4 * (0.5 + 0.5 * Math.sin(this.clock * 14))) : fade;
         this.paintBody();
       }
     }
@@ -149,9 +152,15 @@ export class Missile {
     this.view.visible = this.alive || this.points.length > 0;
   }
 
+  loseLock() {
+    this.target = null;
+    this.blind = true;
+  }
+
   kill(hard = false) {
     this.alive = false;
     this.target = null;
+    this.blind = false;
     this.body.visible = false;
     this.body.clear();
     if (hard) {
