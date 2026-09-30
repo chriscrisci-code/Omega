@@ -318,14 +318,26 @@ export class GameAudio {
     const t = this.now();
     const tau = 2.1;
     const level = Math.max(0, Math.min(1, bed)) * 0.1;
-    this.music.bus.gain.gain.setTargetAtTime(level, t, tau);
-    this.music.low.gain.gain.setTargetAtTime(0.78 + dark * 0.2, t, tau);
-    this.music.fifth.gain.gain.setTargetAtTime(0.26 + heat * 0.18, t, tau);
-    this.music.minor.gain.gain.setTargetAtTime(0.2 + dark * 0.22, t, tau);
-    this.music.air.gain.gain.setTargetAtTime(0.05 + heat * 0.07, t, tau);
-    this.music.hissGain.gain.gain.setTargetAtTime(Math.max(0, hiss) * 0.32, t, tau);
-    this.music.hissFilter.frequency.setTargetAtTime(140 + heat * 90, t, 2.4);
-    this.music.filter.frequency.setTargetAtTime(150 + (1 - dark) * 50 + heat * 210, t, 2.4);
+    const next = {
+      level,
+      low: 0.78 + dark * 0.2,
+      fifth: 0.26 + heat * 0.18,
+      minor: 0.2 + dark * 0.22,
+      air: 0.05 + heat * 0.07,
+      hiss: Math.max(0, hiss) * 0.32,
+      hissCut: 140 + heat * 90,
+      cut: 150 + (1 - dark) * 50 + heat * 210,
+    };
+    if (this._musicAt && Object.keys(next).every((key) => this._musicAt[key] === next[key])) return;
+    this._musicAt = next;
+    this.music.bus.gain.setTargetAtTime(next.level, t, tau);
+    this.music.low.gain.gain.setTargetAtTime(next.low, t, tau);
+    this.music.fifth.gain.gain.setTargetAtTime(next.fifth, t, tau);
+    this.music.minor.gain.gain.setTargetAtTime(next.minor, t, tau);
+    this.music.air.gain.gain.setTargetAtTime(next.air, t, tau);
+    this.music.hissGain.gain.setTargetAtTime(next.hiss, t, tau);
+    this.music.hissFilter.frequency.setTargetAtTime(next.hissCut, t, 2.4);
+    this.music.filter.frequency.setTargetAtTime(next.cut, t, 2.4);
   }
 }
 
