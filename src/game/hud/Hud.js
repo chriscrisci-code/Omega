@@ -45,7 +45,24 @@ export class Hud {
     this.shipsHint = document.querySelector("#ships-hint");
     this.credit = document.querySelector("#credit");
     this.version = document.querySelector("#version");
+    this.musicLabel = document.querySelector("#music-label");
+    this.musicDown = document.querySelector("#music-down");
+    this.musicUp = document.querySelector("#music-up");
+    this.onMusic = null;
     this.paint(this.version, `V ${version}`, 8, DIM, CYAN, "right");
+    this.paint(this.musicDown, "-", 14, DIM, CYAN, "center");
+    this.paint(this.musicUp, "+", 14, DIM, CYAN, "center");
+    this.setMusic(0.8);
+    this.musicDown?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onMusic?.(-0.1);
+    });
+    this.musicUp?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onMusic?.(0.1);
+    });
     this.wavePick = document.querySelector("#wave-pick");
     this.waveRow = document.querySelector("#wave-row");
     this.onPickWave = null;
@@ -119,6 +136,11 @@ export class Hud {
   }
 
   setHigh() {}
+
+  setMusic(value) {
+    const pct = Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100);
+    this.paint(this.musicLabel, `MUSIC ${pct}`, 10, DIM, CYAN, "center");
+  }
 
   setMode(label) {
     if (!this.mode) return;

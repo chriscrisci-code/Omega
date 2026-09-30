@@ -6,6 +6,15 @@ export class GameAudio {
     this.master = null;
     this._noise = null;
     this.engines = null;
+    this.musicVol = 0.8;
+  }
+
+  setMusicVol(value) {
+    this.musicVol = Math.max(0, Math.min(1, Number(value) || 0));
+    if (!this.music?.out || !this.ctx) return;
+    const t = this.now();
+    this.music.out.gain.cancelScheduledValues(t);
+    this.music.out.gain.setTargetAtTime(this.musicVol, t, 0.05);
   }
 
   async unlock() {
@@ -266,10 +275,13 @@ export class GameAudio {
     bus.gain.value = 0;
     const filter = this.ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = 180;
-    filter.Q.value = 0.65;
+    filter.frequency.value = 520;
+    filter.Q.value = 0.55;
+    const out = this.ctx.createGain();
+    out.gain.value = this.musicVol;
     bus.connect(filter);
-    filter.connect(this.master);
+    filter.connect(out);
+    out.connect(this.master);
 
     const tone = (freq, type = "sine") => {
       const osc = this.ctx.createOscillator();
@@ -283,16 +295,17 @@ export class GameAudio {
       return { osc, gain };
     };
 
-    const low = tone(43.65);
-    const fifth = tone(51.91);
-    const minor = tone(65.41);
-    const air = tone(110, "triangle");
+    const low = tone(110);
+    const fifth = tone(164.81);
+    const minor = tone(130.81);
+    const air = tone(220, "triangle");
+    const sub = tone(55);
 
     const hiss = this.noiseSource();
     const hissFilter = this.ctx.createBiquadFilter();
     hissFilter.type = "lowpass";
-    hissFilter.frequency.value = 160;
-    hissFilter.Q.value = 0.35;
+    hissFilter.frequency.value = 420;
+    hissFilter.Q.value = 0.4;
     const hissGain = this.ctx.createGain();
     hissGain.gain.value = 0;
     hiss.connect(hissFilter);
@@ -304,40 +317,51 @@ export class GameAudio {
     lfo.type = "sine";
     lfo.frequency.value = 0.045;
     const lfoDepth = this.ctx.createGain();
-    lfoDepth.gain.value = 36;
+    lfoDepth.gain.value = 55;
     lfo.connect(lfoDepth);
     lfoDepth.connect(filter.frequency);
     lfo.start();
 
-    this.music = { bus, filter, low, fifth, minor, air, hissGain, hissFilter };
+    this.music = { bus, filter, out, low, fifth, minor, air, sub, hissGain, hissFilter };
   }
 
   tickMusic({ bed = 0, dark = 0, heat = 0, hiss = 0 } = {}) {
     if (!this.ctx || this.ctx.state !== "running") return;
+    if (!this.music?.sub || !this.music?.out) {
+      this.music = null;
+      this._musicAt = null;
+    }
     this.ensureMusic();
     const t = this.now();
-    const tau = 2.1;
-    const level = Math.max(0, Math.min(1, bed)) * 0.1;
+    const tau = 0.7;
+    const level = Math.max(0, Math.min(1, bed)) * 0.42;
     const next = {
       level,
-      low: 0.78 + dark * 0.2,
-      fifth: 0.26 + heat * 0.18,
-      minor: 0.2 + dark * 0.22,
-      air: 0.05 + heat * 0.07,
-      hiss: Math.max(0, hiss) * 0.32,
-      hissCut: 140 + heat * 90,
-      cut: 150 + (1 - dark) * 50 + heat * 210,
+      low: 0.72 + dark * 0.12,
+      fifth: 0.34 + heat * 0.16,
+      minor: 0.38 + dark * 0.18,
+      air: 0.16 + heat * 0.1,
+      sub: 0.28 + dark * 0.12,
+      hiss: 0.08 + Math.max(0, hiss) * 0.22,
+      hissCut: 360 + heat * 160,
+      cut: 480 + (1 - dark) * 80 + heat * 280,
     };
-    if (this._musicAt && Object.keys(next).every((key) => this._musicAt[key] === next[key])) return;
+    const first = !this._musicAt;
+    if (!first && Object.keys(next).every((key) => this._musicAt[key] === next[key])) return;
     this._musicAt = next;
-    this.music.bus.gain.setTargetAtTime(next.level, t, tau);
-    this.music.low.gain.gain.setTargetAtTime(next.low, t, tau);
-    this.music.fifth.gain.gain.setTargetAtTime(next.fifth, t, tau);
-    this.music.minor.gain.gain.setTargetAtTime(next.minor, t, tau);
-    this.music.air.gain.gain.setTargetAtTime(next.air, t, tau);
-    this.music.hissGain.gain.setTargetAtTime(next.hiss, t, tau);
-    this.music.hissFilter.frequency.setTargetAtTime(next.hissCut, t, 2.4);
-    this.music.filter.frequency.setTargetAtTime(next.cut, t, 2.4);
+    const set = (param, value) => {
+      if (first) param.setValueAtTime(value * 0.45, t);
+      param.setTargetAtTime(value, t, tau);
+    };
+    set(this.music.bus.gain, next.level);
+    set(this.music.low.gain.gain, next.low);
+    set(this.music.fifth.gain.gain, next.fifth);
+    set(this.music.minor.gain.gain, next.minor);
+    set(this.music.air.gain.gain, next.air);
+    set(this.music.sub.gain.gain, next.sub);
+    set(this.music.hissGain.gain, next.hiss);
+    this.music.hissFilter.frequency.setTargetAtTime(next.hissCut, t, 1.2);
+    this.music.filter.frequency.setTargetAtTime(next.cut, t, 1.2);
   }
 }
 

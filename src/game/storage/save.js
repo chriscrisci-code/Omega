@@ -57,6 +57,7 @@ const empty = {
     controls: "",
     profile: "",
     binds: null,
+    music: 0.8,
   },
 };
 
@@ -74,6 +75,13 @@ function cleanName(name) {
     .slice(0, 3)
     .padEnd(3, "A");
   return letters;
+}
+
+function clampMusic(value) {
+  if (value == null || value === "") return 0.8;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0.8;
+  return Math.max(0, Math.min(1, n));
 }
 
 export function todayKey() {
@@ -240,6 +248,7 @@ function normalize(data) {
         fullscreen: Boolean(data.settings?.fullscreen),
         difficulty: data.settings?.difficulty === "hard" || data.settings?.difficulty === "medium" ? data.settings.difficulty : "easy",
         controls: data.settings?.controls === "phone" || data.settings?.controls === "desktop" ? data.settings.controls : "",
+        music: clampMusic(data.settings?.music),
       },
       data.settings,
     ),

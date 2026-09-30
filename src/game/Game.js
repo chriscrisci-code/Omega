@@ -189,7 +189,9 @@ export class Game {
     this.hud.controls.onCapture = (id) => this.listenBind(id);
     this.hud.controls.onRemove = (id, key) => this.dropBind(id, key);
     this.hud.controls.onReset = () => this.resetBinds();
+    this.hud.onMusic = (delta) => this.nudgeMusic(delta);
     this.input.onCapture = (id, bind) => this.addBind(id, bind);
+    this.applyMusicVol(this.save.settings.music);
     this.input.setBinds(this.save.settings.profile, this.save.settings.binds);
     this.hud.setProfile(this.input.profile);
 
@@ -2975,6 +2977,19 @@ export class Game {
     this.audio.tickMusic(this.musicState());
 
     this.input.endFrame();
+  }
+
+  applyMusicVol(value) {
+    const vol = Math.max(0, Math.min(1, Math.round((Number(value) || 0) * 10) / 10));
+    this.save.settings.music = vol;
+    this.audio.setMusicVol(vol);
+    this.hud.setMusic(vol);
+  }
+
+  nudgeMusic(delta) {
+    this.applyMusicVol((this.save.settings.music ?? 0.8) + delta);
+    this.storage.save(this.save);
+    this.audio.unlock();
   }
 
   musicState() {
