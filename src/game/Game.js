@@ -215,7 +215,7 @@ export class Game {
   tickMissileAudio(t, space) {
     this.audio.tickFly(0, 1);
 
-    if (this.attractOnDemo || (this.mode !== PLAYING && this.mode !== DYING) || !this.ship.alive) {
+    if (this.attractOnDemo || (this.mode !== PLAYING && this.mode !== DYING) || !this.ship.alive || this.ship.docked) {
       this.starBeepWait = 0;
       return;
     }
@@ -1266,24 +1266,25 @@ export class Game {
     let best = range;
     let hit = null;
     let kind = "";
-    for (const enemy of this.enemies) {
-      if (!enemy.alive) continue;
-      const along = rayAlong(origin.x, origin.y, this.hubGunAngle, range, enemy, space.width, space.height, hubGunner.laserWidth);
+    const consider = (body, next) => {
+      if (!body || body.alive === false) return;
+      const along = rayAlong(origin.x, origin.y, this.hubGunAngle, range, body, space.width, space.height, hubGunner.laserWidth);
       if (along != null && along < best) {
         best = along;
-        hit = enemy;
-        kind = "enemy";
+        hit = body;
+        kind = next;
       }
-    }
-    for (const rock of this.asteroids) {
-      const along = rayAlong(origin.x, origin.y, this.hubGunAngle, range, rock, space.width, space.height, hubGunner.laserWidth);
-      if (along != null && along < best) {
-        best = along;
-        hit = rock;
-        kind = "rock";
-      }
-    }
+    };
+    for (const enemy of this.enemies) consider(enemy, "enemy");
+    for (const rock of this.asteroids) consider(rock, "rock");
+    for (const missile of this.missiles) consider(missile, "dart");
+    for (const missile of this.hubMissiles) consider(missile, "dart");
+    for (const star of this.castleStars) consider(star, "dart");
     this.hub.paintLaserBeam(best, Boolean(hit));
+    if (kind === "dart") {
+      this.detonateMissile(hit, hit);
+      return;
+    }
     this.hubLaserCool = Math.max(0, this.hubLaserCool - t);
     if (!hit || this.hubLaserCool > 0) return;
     this.hubLaserCool = hubGunner.laserTick;
