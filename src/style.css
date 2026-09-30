@@ -998,9 +998,31 @@ body:has(#controls-page:not(.is-hidden)) .version {
   margin: 2px 0 4px;
 }
 
-.dock-ups {
+.dock-seats {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin: 6px 0 8px;
+  justify-content: center;
+  align-items: center;
+  margin: 4px 0 6px;
+}
+
+.dock-seat {
+  min-width: 120px;
+}
+
+.dock-bay-back {
+  display: none;
+  margin: 4px auto 6px;
+}
+
+.dock-bay.is-gunning .dock-ships,
+.dock-bay.is-gunning .dock-ups {
+  display: none;
+}
+
+.dock-bay.is-gunning .dock-bay-back {
+  display: block;
 }
 
 .dock-up {

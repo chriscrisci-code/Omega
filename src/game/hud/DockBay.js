@@ -17,17 +17,33 @@ export class DockBay {
     this.ups = document.querySelector("#dock-ups");
     this.onPickShip = null;
     this.onBuy = null;
+    this.onSeat = null;
+    this.onBay = null;
     this.shipId = WEDGE_ID;
     this.upKey = "";
+    this.seat = null;
+    this.seats = document.querySelector("#dock-seats");
+    this.bayBack = document.querySelector("#dock-bay-back");
 
     paint(document.querySelector("#dock-title"), "BAY", 7, CYAN, HOT, "center");
-    paint(document.querySelector("#dock-hint"), "LOADOUT BUY  DOCK SAVES  THRUST LAUNCH", 6, DIM, CYAN, "center");
+    this.setHint("bay");
+    paint(this.bayBack, "BAY", 12, CYAN, HOT, "center");
+    this.buildSeats();
 
     this.buildShips();
     this.setUpgrades({ points: 0, levels: { gun: 1, missile: 1, emp: 1, shield: 1 }, costs: {}, max: {} });
     this.root?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      const seat = event.target instanceof Element ? event.target.closest(".dock-seat") : null;
+      if (seat?.dataset.id) {
+        this.onSeat?.(seat.dataset.id);
+        return;
+      }
+      if (event.target instanceof Element && event.target.closest("#dock-bay-back")) {
+        this.onBay?.();
+        return;
+      }
       const up = event.target instanceof Element ? event.target.closest(".dock-up") : null;
       if (up?.dataset.id) this.onBuy?.(up.dataset.id);
       const ship = event.target instanceof Element ? event.target.closest(".dock-ship") : null;
@@ -82,6 +98,42 @@ export class DockBay {
     }
   }
 
+  buildSeats() {
+    if (!this.seats) return;
+    this.seats.innerHTML = "";
+    const rows = [
+      { id: "gun0", name: "GUN 1" },
+      { id: "gun1", name: "GUN 2" },
+      { id: "laser", name: "LASER" },
+    ];
+    for (const row of rows) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dock-up dock-seat";
+      btn.dataset.id = row.id;
+      btn.innerHTML = vectorTextSvg(row.name, 12, CYAN, HOT, "center");
+      this.seats.appendChild(btn);
+    }
+  }
+
+  setHint(kind) {
+    const line = kind === "gun"
+      ? "FIRE GUN  BAY  THRUST LAUNCH"
+      : kind === "laser"
+        ? "HOLD LASER  BAY  THRUST LAUNCH"
+        : "LOADOUT BUY  GUN LASER  THRUST LAUNCH";
+    paint(document.querySelector("#dock-hint"), line, 6, DIM, CYAN, "center");
+  }
+
+  setSeat(id) {
+    this.seat = id || null;
+    this.root?.classList.toggle("is-gunning", Boolean(this.seat));
+    this.seats?.querySelectorAll(".dock-seat").forEach((node) => {
+      node.classList.toggle("is-on", node.dataset.id === this.seat);
+    });
+    this.setHint(this.seat === "laser" ? "laser" : this.seat ? "gun" : "bay");
+  }
+
   setState(shipId) {
     this.shipId = shipId;
     this.ships?.querySelectorAll(".dock-ship").forEach((node) => {
@@ -95,6 +147,7 @@ export class DockBay {
   }
 
   hide() {
+    this.setSeat(null);
     this.root?.classList.add("is-hidden");
   }
 }

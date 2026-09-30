@@ -112,6 +112,14 @@ export const bullets = {
   gunSep: 5.5,
 };
 
+/** Hub seats: two stock guns plus one hold-beam laser. */
+export const hubGunner = {
+  gunCool: 0.2,
+  laserRange: 920,
+  laserTick: 0.14,
+  laserWidth: 14,
+};
+
 /** Nose-ray gun lead. Phone / no-mouse only. */
 export const lead = {
   cone: 0.35,

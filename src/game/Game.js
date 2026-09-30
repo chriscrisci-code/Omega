@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, lead as leadConfig, missiles, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, warp, world as worldConfig } from "./config.js";
+import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, warp, world as worldConfig } from "./config.js";
 import { chipBurst, Debris, shatter } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -21,7 +21,7 @@ import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
 import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeCheckpoint, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
-import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, wrapCoord, wrapDelta } from "./math.js";
+import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, wrapCoord, wrapDelta } from "./math.js";
 import { SHIP_CATALOG, WEDGE_ID } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
 
@@ -152,6 +152,10 @@ export class Game {
     this.starBeepWait = 0;
     this.homeOn = false;
     this.dockOpen = false;
+    this.hubSeat = null;
+    this.hubGunAngle = 0;
+    this.hubLaserCool = 0;
+    this.hubLaserOn = false;
     this.attractOnDemo = false;
     this.attractPage = "title";
     this.attractBoard = 0;
@@ -176,6 +180,8 @@ export class Game {
     this.hud.onPickDevice = (id) => this.setControlProfile(id === "phone" ? "phone" : "mouse");
     this.hud.onPickWave = (n) => this.startRun(n);
     this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
+    this.hud.bay.onSeat = (id) => this.enterHubSeat(id);
+    this.hud.bay.onBay = () => this.leaveHubSeat();
     this.hud.onPickStart = (id) => this.confirmStart(id);
     this.hud.controls.onProfile = (id) => this.setControlProfile(id);
     this.hud.controls.onCapture = (id) => this.listenBind(id);
@@ -572,6 +578,10 @@ export class Game {
     this.waveCooldown = 0;
     this.homeOn = false;
     this.dockOpen = false;
+    this.hubSeat = null;
+    this.hubGunAngle = 0;
+    this.hubLaserCool = 0;
+    this.hubLaserOn = false;
     this.cooldown = 0;
     this.gun = 0;
     this.burstLeft = 0;
@@ -1179,6 +1189,114 @@ export class Game {
     this.sfx("thud");
   }
 
+  enterHubSeat(id) {
+    if (this.mode !== PLAYING || !this.ship.docked || this.attractOnDemo || !this.hub.alive) return;
+    if (id !== "gun0" && id !== "gun1" && id !== "laser") return;
+    this.hub.paintLaserBeam(0);
+    this.hubSeat = id;
+    this.hubGunAngle = this.ship.rotation;
+    this.hubLaserOn = false;
+    this.hud.bay.setSeat(id);
+    this.hud.setMode(id === "laser" ? "LASER" : id === "gun1" ? "GUN 2" : "GUN 1");
+    this.sfx("on");
+  }
+
+  leaveHubSeat() {
+    if (this.hubSeat) this.sfx("off");
+    this.hubSeat = null;
+    this.hubLaserOn = false;
+    this.hub.paintLaserBeam(0);
+    this.hud.bay.setSeat(null);
+  }
+
+  gunnerOrigin() {
+    if (!this.hubSeat || !this.hub) return this.ship.nose();
+    const mount = this.hub.mountWorld(this.hubSeat);
+    const reach = this.hubSeat === "laser" ? 18 : 14;
+    return {
+      x: mount.x + Math.cos(this.hubGunAngle) * reach,
+      y: mount.y + Math.sin(this.hubGunAngle) * reach,
+    };
+  }
+
+  tickHubGunner(t, space) {
+    if (!this.hubSeat || !this.hub.alive || this.input.mapHeld) {
+      this.hub.paintLaserBeam(0);
+      return;
+    }
+    if (this.usingMouseAim() && this.input.hasPointer) {
+      const at = this.pointerWorld();
+      const mount = this.hub.mountWorld(this.hubSeat);
+      this.hubGunAngle = Math.atan2(wrapDelta(at.y - mount.y, space.height), wrapDelta(at.x - mount.x, space.width));
+    } else {
+      this.hubGunAngle += this.input.rotate * shipConfig.turnSpeed * t;
+    }
+    this.hub.aimTurret(this.hubSeat, this.hubGunAngle);
+    if (this.hubSeat === "laser") this.tickHubLaser(t, space);
+    else {
+      this.hub.paintLaserBeam(0);
+      this.shootHubGun();
+    }
+  }
+
+  shootHubGun() {
+    if (!this.input.fireHeld || this.cooldown > 0) return;
+    const bullet = this.shots.find((shot) => !shot.alive);
+    if (!bullet) return;
+    const muzzle = this.gunnerOrigin();
+    bullet.fire(muzzle.x, muzzle.y, this.hubGunAngle);
+    this.cooldown = hubGunner.gunCool;
+    this.sfx("thud");
+  }
+
+  tickHubLaser(t, space) {
+    const held = this.input.fireHeld;
+    if (!held) {
+      if (this.hubLaserOn) this.sfx("off");
+      this.hubLaserOn = false;
+      this.hub.paintLaserBeam(0);
+      return;
+    }
+    if (!this.hubLaserOn) {
+      this.hubLaserOn = true;
+      this.sfx("on");
+    }
+    const origin = this.gunnerOrigin();
+    const range = hubGunner.laserRange;
+    let best = range;
+    let hit = null;
+    let kind = "";
+    for (const enemy of this.enemies) {
+      if (!enemy.alive) continue;
+      const along = rayAlong(origin.x, origin.y, this.hubGunAngle, range, enemy, space.width, space.height, hubGunner.laserWidth);
+      if (along != null && along < best) {
+        best = along;
+        hit = enemy;
+        kind = "enemy";
+      }
+    }
+    for (const rock of this.asteroids) {
+      const along = rayAlong(origin.x, origin.y, this.hubGunAngle, range, rock, space.width, space.height, hubGunner.laserWidth);
+      if (along != null && along < best) {
+        best = along;
+        hit = rock;
+        kind = "rock";
+      }
+    }
+    this.hub.paintLaserBeam(best, Boolean(hit));
+    this.hubLaserCool = Math.max(0, this.hubLaserCool - t);
+    if (!hit || this.hubLaserCool > 0) return;
+    this.hubLaserCool = hubGunner.laserTick;
+    const impact = {
+      x: origin.x + Math.cos(this.hubGunAngle) * best,
+      y: origin.y + Math.sin(this.hubGunAngle) * best,
+      vx: Math.cos(this.hubGunAngle) * 220,
+      vy: Math.sin(this.hubGunAngle) * 220,
+    };
+    if (kind === "enemy") this.chipEnemy(hit, impact);
+    else this.chipRock(hit, impact);
+  }
+
   lockTarget(space) {
     return this.missileTargets(space, 1)[0] || null;
   }
@@ -1303,7 +1421,8 @@ export class Game {
   }
 
   leadTarget(space) {
-    const nose = this.ship.nose();
+    const nose = this.gunnerOrigin();
+    const heading = this.hubSeat && this.ship.docked ? this.hubGunAngle : this.ship.rotation;
     let best = null;
     let bestErr = leadConfig.cone;
     let bestDist = Infinity;
@@ -1313,7 +1432,7 @@ export class Game {
       const dy = wrapDelta(enemy.y - nose.y, space.height);
       const dist = Math.hypot(dx, dy);
       if (dist < leadConfig.minRange) continue;
-      const err = Math.abs(wrapDelta(this.ship.rotation - Math.atan2(dy, dx), Math.PI * 2));
+      const err = Math.abs(wrapDelta(heading - Math.atan2(dy, dx), Math.PI * 2));
       if (err > leadConfig.cone) continue;
       if (err < bestErr - 0.02 || (Math.abs(err - bestErr) <= 0.02 && dist < bestDist)) {
         best = enemy;
@@ -1325,7 +1444,7 @@ export class Game {
   }
 
   leadIntercept(enemy, space) {
-    const nose = this.ship.nose();
+    const nose = this.gunnerOrigin();
     const dx = wrapDelta(enemy.x - nose.x, space.width);
     const dy = wrapDelta(enemy.y - nose.y, space.height);
     const vx = enemy.vx || 0;
@@ -1377,12 +1496,14 @@ export class Game {
   }
 
   drawLead(mapping) {
+    const gunning = Boolean(this.hubSeat && this.ship.docked);
     if (
       mapping ||
       this.mode !== PLAYING ||
       this.attractOnDemo ||
       !this.ship.alive ||
-      this.ship.docked ||
+      (this.ship.docked && !gunning) ||
+      this.hubSeat === "laser" ||
       this.ship.warping ||
       this.usingMouseAim()
     ) {
@@ -1396,8 +1517,8 @@ export class Game {
       this.hideLead();
       return;
     }
-    const nose = this.ship.nose();
-    const heading = this.ship.rotation;
+    const nose = this.gunnerOrigin();
+    const heading = gunning ? this.hubGunAngle : this.ship.rotation;
     const sight = {
       x: nose.x + Math.cos(heading) * hit.range,
       y: nose.y + Math.sin(heading) * hit.range,
@@ -1985,7 +2106,8 @@ export class Game {
       target,
     );
     this.hub.missileCool = this.hub.missileEvery;
-    this.hub.aimTurrets(angle);
+    if (this.hubSeat !== "gun0") this.hub.aimTurret("gun0", angle);
+    if (this.hubSeat !== "gun1") this.hub.aimTurret("gun1", angle);
   }
 
   fireCastleStar(base, space) {
@@ -2124,6 +2246,7 @@ export class Game {
     this.selected = null;
     this.lockMark.visible = false;
     this.hud.setHubAlert(null);
+    this.leaveHubSeat();
     this.hud.hideDock();
     const rank = this.rankEntry();
     if (rank.all || rank.daily || rank.streak) {
@@ -2257,6 +2380,7 @@ export class Game {
   }
 
   headingUp() {
+    if (this.hubSeat && this.ship.docked) return -Math.PI / 2 - this.hubGunAngle;
     return -Math.PI / 2 - this.ship.rotation;
   }
 
@@ -2455,6 +2579,7 @@ export class Game {
         }
         this.ship.dockHold = Math.max(0, this.ship.dockHold - t);
         if (this.ship.dockHold <= 0 && (Math.abs(this.input.surge) > 0.2 || Math.abs(this.input.strafe) > 0.2)) {
+          this.leaveHubSeat();
           this.dockOpen = false;
           this.runDirty = true;
           this.hud.hideDock();
@@ -2462,6 +2587,7 @@ export class Game {
           this.sfx("launch");
         } else {
           this.ship.dockedTo.hold(this.ship);
+          if (this.hubSeat) this.tickHubGunner(t, space);
         }
       } else if (this.homeOn && this.hub.alive) {
         this.input.aim = null;
@@ -2480,13 +2606,20 @@ export class Game {
       else if (shieldWas && !this.ship.shieldOn) this.sfx("off");
       if (this.cargo > 0) this.ship.setCargo(this.cargo);
       if (!this.ship.docked) {
+        this.leaveHubSeat();
         this.dockOpen = false;
         this.hud.hideDock();
       }
       this.hud.setShield(this.ship.shieldEnergy, this.ship.shieldOn, this.shieldPool());
       const modeLabel = this.input.mapHeld
         ? "MAP"
-        : this.homeOn && !this.ship.docked && this.hub.alive
+        : this.hubSeat === "laser"
+          ? "LASER"
+          : this.hubSeat === "gun1"
+            ? "GUN 2"
+            : this.hubSeat === "gun0"
+              ? "GUN 1"
+              : this.homeOn && !this.ship.docked && this.hub.alive
           ? "AUTOPILOT HOME"
           : this.selected?.alive
             ? `LOCK  ${this.selected.name || this.selected.kind}`
@@ -2495,6 +2628,7 @@ export class Game {
               : `WAVE  ${this.assaultIndex}`;
       this.hud.setMode(modeLabel);
     } else if (this.mode === DYING) {
+      this.leaveHubSeat();
       this.hud.hideDock();
       this.timer -= t;
       if (this.timer <= 0) this.respawnOrEnd();
@@ -2581,10 +2715,12 @@ export class Game {
         this.hub.missileCool = Math.max(0, this.hub.missileCool - t);
         const prey = this.hubPrey(space);
         if (prey) {
-          this.hub.aimTurrets(Math.atan2(
+          const angle = Math.atan2(
             wrapDelta(prey.y - this.hub.y, space.height),
             wrapDelta(prey.x - this.hub.x, space.width),
-          ));
+          );
+          if (this.hubSeat !== "gun0") this.hub.aimTurret("gun0", angle);
+          if (this.hubSeat !== "gun1") this.hub.aimTurret("gun1", angle);
           if (this.hub.missileCool <= 0) this.fireHubMissile(prey, space);
         }
       }

@@ -36,6 +36,20 @@ export function hits(a, b, width, height) {
   return dx * dx + dy * dy < r * r;
 }
 
+export function rayAlong(ox, oy, angle, range, body, width, height, fat = 0) {
+  const dx = wrapDelta(body.x - ox, width);
+  const dy = wrapDelta(body.y - oy, height);
+  const nx = Math.cos(angle);
+  const ny = Math.sin(angle);
+  const along = dx * nx + dy * ny;
+  if (along < 8 || along > range) return null;
+  const px = dx - along * nx;
+  const py = dy - along * ny;
+  const rad = (body.radius || 0) + fat;
+  if (px * px + py * py > rad * rad) return null;
+  return along;
+}
+
 export function hitsBeam(shot, rock, length) {
   const nx = Math.cos(shot.angle);
   const ny = Math.sin(shot.angle);

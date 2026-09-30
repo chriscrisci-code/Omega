@@ -54,14 +54,17 @@ export class Base {
     this.portG = new Graphics();
     this.turretL = new Graphics();
     this.turretR = new Graphics();
+    this.turretLaser = new Graphics();
+    this.laserBeam = new Graphics();
     this.armorG = new Graphics();
     this.skin.visible = false;
     this.ringPlus.visible = false;
     this.portG.visible = false;
     this.turretL.visible = false;
     this.turretR.visible = false;
+    this.turretLaser.visible = false;
     this.armorG.visible = false;
-    this.view.addChild(this.skin, this.padLayer, this.outer, this.mid, this.inner, this.core, this.ringPlus, this.portG, this.armorG, this.turretL, this.turretR);
+    this.view.addChild(this.skin, this.padLayer, this.outer, this.mid, this.inner, this.core, this.ringPlus, this.portG, this.armorG, this.turretL, this.turretR, this.turretLaser, this.laserBeam);
 
     if (this.hub) {
       strokeGlow(this.outer, ring(16, 86), color, this.hotColor, 1.6);
@@ -142,10 +145,14 @@ export class Base {
       this.portG.stroke({ width: 1.2, color: this.hotColor });
     }
     const gun = [10, 0, -6, 5, -3, 0, -6, -5];
+    const beam = [16, 0, -8, 4, -5, 0, -8, -4];
     strokeGlow(this.turretL, gun, this.color, this.hotColor, 1.25);
     strokeGlow(this.turretR, gun, this.color, this.hotColor, 1.25);
+    strokeGlow(this.turretLaser, beam, colors.white, colors.cyanHot, 1.35);
     this.turretL.position.set(62, 62);
     this.turretR.position.set(-62, -62);
+    this.turretLaser.position.set(0, -78);
+    this.showSeats();
     this.armorG.clear();
     for (const a of [0.35, 1.2, 2.0, 2.85, 3.7, 4.55]) {
       const x = Math.cos(a) * 24;
@@ -213,8 +220,7 @@ export class Base {
     if (step.id === "turrets") {
       this.armed = true;
       this.missileEvery = 4;
-      this.turretL.visible = true;
-      this.turretR.visible = true;
+      this.showSeats();
     }
     if (step.id === "armor") {
       const gain = 8;
@@ -233,10 +239,55 @@ export class Base {
     this.flash = 0.28;
   }
 
+  showSeats() {
+    if (!this.hub) return;
+    this.turretL.visible = true;
+    this.turretR.visible = true;
+    this.turretLaser.visible = true;
+  }
+
+  seatLocal(id) {
+    if (id === "gun1") return { x: -62, y: -62, kind: "gun" };
+    if (id === "laser") return { x: 0, y: -78, kind: "laser" };
+    return { x: 62, y: 62, kind: "gun" };
+  }
+
+  mountWorld(id) {
+    const local = this.seatLocal(id);
+    const c = Math.cos(this.rotation);
+    const s = Math.sin(this.rotation);
+    return {
+      x: this.x + local.x * c - local.y * s,
+      y: this.y + local.x * s + local.y * c,
+      kind: local.kind,
+    };
+  }
+
+  aimTurret(id, angle) {
+    const gun = id === "gun1" ? this.turretR : id === "laser" ? this.turretLaser : this.turretL;
+    if (!gun) return;
+    gun.rotation = angle - this.rotation;
+  }
+
   aimTurrets(angle) {
-    if (!this.armed) return;
-    this.turretL.rotation = angle - this.rotation;
-    this.turretR.rotation = angle - this.rotation;
+    this.aimTurret("gun0", angle);
+    this.aimTurret("gun1", angle);
+  }
+
+  paintLaserBeam(length = 0, hot = false) {
+    this.laserBeam.clear();
+    if (length <= 8) return;
+    const t = this.turretLaser;
+    const x2 = t.x + Math.cos(t.rotation) * length;
+    const y2 = t.y + Math.sin(t.rotation) * length;
+    const color = hot ? colors.magenta : colors.cyan;
+    const core = hot ? colors.magentaHot : colors.cyanHot;
+    this.laserBeam.moveTo(t.x, t.y);
+    this.laserBeam.lineTo(x2, y2);
+    this.laserBeam.stroke({ width: 7.2, color, alpha: 0.22, cap: "round" });
+    this.laserBeam.moveTo(t.x, t.y);
+    this.laserBeam.lineTo(x2, y2);
+    this.laserBeam.stroke({ width: 2.2, color: core, alpha: 0.95, cap: "round" });
   }
 
   hitBy(x, y, worldW, worldH) {
@@ -323,7 +374,10 @@ export class Base {
     this.portG.visible = false;
     this.turretL.visible = false;
     this.turretR.visible = false;
+    this.turretLaser.visible = false;
+    this.laserBeam?.clear();
     this.armorG.visible = false;
+    if (this.hub) this.showSeats();
     this.shields = this.hub
       ? this.baseShields.map((layer, i) => {
           layer.maxHp = raid.hubShieldHits[i] ?? layer.maxHp;
