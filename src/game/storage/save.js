@@ -337,6 +337,10 @@ export const localStorageAdapter = {
     }
   },
   save(data) {
-    localStorage.setItem(KEY, JSON.stringify(normalize(data)));
+    try {
+      localStorage.setItem(KEY, JSON.stringify(normalize(data)));
+    } catch {
+      /* quota / private mode — do not kill the frame */
+    }
   },
 };

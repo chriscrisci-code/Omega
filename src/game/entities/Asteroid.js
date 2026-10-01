@@ -50,6 +50,11 @@ export class Asteroid {
     this.sync();
   }
 
+  kick(nx, ny, amount) {
+    this.vx += nx * amount;
+    this.vy += ny * amount;
+  }
+
   applySave(data) {
     if (!data) return;
     this.x = Number(data.x) || 0;

@@ -6,15 +6,30 @@ export class GameAudio {
     this.master = null;
     this._noise = null;
     this.engines = null;
+    this.music = null;
     this.musicVol = 0.8;
+    this._unlocking = null;
+    this._eng = { main: 0, man: 0, shield: 0, warp: 0, warpU: 0, fly: 0 };
+    this._engLive = false;
   }
 
   setMusicVol(value) {
     this.musicVol = Math.max(0, Math.min(1, Number(value) || 0));
-    if (this.music?.out) this.music.out.gain.value = this.musicVol;
+    if (this.music?.out) this.music.out.gain.value = 0;
   }
 
   async unlock() {
+    if (this.ctx?.state === "running") return this.ctx;
+    if (this._unlocking) return this._unlocking;
+    this._unlocking = this.openCtx();
+    try {
+      return await this._unlocking;
+    } finally {
+      this._unlocking = null;
+    }
+  }
+
+  async openCtx() {
     if (!this.ctx) {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       this.ctx = new Ctx();
@@ -23,16 +38,26 @@ export class GameAudio {
       this.master.connect(this.ctx.destination);
       this.ensureGunFlange();
     }
-    if (this.ctx.state !== "running") await this.ctx.resume();
-    this.ensureMusic();
+    if (this.ctx.state !== "running") {
+      try {
+        await this.ctx.resume();
+      } catch {
+        return this.ctx;
+      }
+    }
     return this.ctx;
   }
 
   async play(id) {
     const patch = SFX[id];
     if (!patch) return;
-    await this.unlock();
-    patch.fire(this);
+    if (!this.ctx || this.ctx.state !== "running") await this.unlock();
+    if (!this.ctx || this.ctx.state !== "running") return;
+    try {
+      patch.fire(this);
+    } catch {
+      /* ignore a broken voice */
+    }
   }
 
   playBullet(id) {
@@ -238,71 +263,70 @@ export class GameAudio {
     this.tone({ type: "square", freq: 620 + u * 80, dur: 0.09, peak: peak * 0.92, attack: 0.004, at: t + 0.085 });
   }
 
-  tickFly(amount = 0, recede = 1) {
+  setParam(param, value, t, tau) {
+    if (!param) return;
+    try {
+      if (typeof param.cancelAndHoldAtTime === "function") param.cancelAndHoldAtTime(t);
+      else if (typeof param.cancelScheduledValues === "function") param.cancelScheduledValues(t);
+      param.setTargetAtTime(value, t, tau);
+    } catch {
+      try {
+        param.value = value;
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  tickFly(amount = 0) {
     if (!this.ctx || this.ctx.state !== "running") return;
+    const fly = Math.min(1, Math.max(0, amount));
+    if (fly === 0 && this._eng.fly === 0) return;
+    this._eng.fly = fly;
+    if (fly === 0 && !this.engines) return;
     this.ensureEngine();
-    const t = this.now();
-    this.engines.fly.gain.gain.setTargetAtTime(0, t, 0.08);
+    this.setParam(this.engines.fly.gain.gain, 0, this.now(), 0.08);
   }
 
   tickEngine(main = 0, man = 0, shield = 0, warpAmt = 0, warpU = 0) {
     if (!this.ctx || this.ctx.state !== "running") return;
+    const snap = (value) => Math.round(Math.min(1, Math.max(0, value)) * 20) / 20;
+    const mainAmt = snap(main);
+    const manAmt = snap(man);
+    const shieldAmt = snap(shield);
+    const warpOn = snap(warpAmt);
+    const u = snap(warpU);
+    const silent = mainAmt + manAmt + shieldAmt + warpOn === 0;
+    const same =
+      mainAmt === this._eng.main &&
+      manAmt === this._eng.man &&
+      shieldAmt === this._eng.shield &&
+      warpOn === this._eng.warp &&
+      u === this._eng.warpU;
+    if (silent && !this._engLive) return;
+    if (same && this.engines) return;
+    this._eng.main = mainAmt;
+    this._eng.man = manAmt;
+    this._eng.shield = shieldAmt;
+    this._eng.warp = warpOn;
+    this._eng.warpU = u;
+    this._engLive = !silent;
+    if (silent && !this.engines) return;
     this.ensureEngine();
     const t = this.now();
-    const mainAmt = Math.min(1, Math.max(0, main));
-    const manAmt = Math.min(1, Math.max(0, man));
-    const shieldAmt = Math.min(1, Math.max(0, shield));
-    const warpOn = Math.min(1, Math.max(0, warpAmt));
-    const u = Math.min(1, Math.max(0, warpU));
-    this.engines.main.gain.gain.setTargetAtTime(mainAmt * 0.065, t, 0.07);
-    this.engines.main.filter.frequency.setTargetAtTime(340 + mainAmt * 380, t, 0.08);
-    this.engines.man.gain.gain.setTargetAtTime(manAmt * 0.02, t, 0.05);
-    this.engines.man.filter.frequency.setTargetAtTime(1100 + manAmt * 700, t, 0.06);
-    this.engines.rumbleGain.gain.setTargetAtTime(mainAmt * 0.027, t, 0.09);
-    this.engines.shield.gain.gain.setTargetAtTime(shieldAmt * 0.09, t, 0.08);
-    this.engines.shield.filter.frequency.setTargetAtTime(820 + shieldAmt * 420, t, 0.12);
-    this.engines.humGain.gain.setTargetAtTime(shieldAmt * 0.045, t, 0.1);
-    this.engines.warp.gain.gain.setTargetAtTime(warpOn * 0.2, t, warpOn ? 0.05 : 0.12);
-    this.engines.warp.filter.frequency.setTargetAtTime(380 + u * 1500, t, 0.08);
+    this.setParam(this.engines.main.gain.gain, mainAmt * 0.065, t, 0.07);
+    this.setParam(this.engines.main.filter.frequency, 340 + mainAmt * 380, t, 0.08);
+    this.setParam(this.engines.man.gain.gain, manAmt * 0.02, t, 0.05);
+    this.setParam(this.engines.man.filter.frequency, 1100 + manAmt * 700, t, 0.06);
+    this.setParam(this.engines.rumbleGain.gain, mainAmt * 0.027, t, 0.09);
+    this.setParam(this.engines.shield.gain.gain, shieldAmt * 0.09, t, 0.08);
+    this.setParam(this.engines.shield.filter.frequency, 820 + shieldAmt * 420, t, 0.12);
+    this.setParam(this.engines.humGain.gain, shieldAmt * 0.045, t, 0.1);
+    this.setParam(this.engines.warp.gain.gain, warpOn * 0.2, t, warpOn ? 0.05 : 0.12);
+    this.setParam(this.engines.warp.filter.frequency, 380 + u * 1500, t, 0.08);
   }
 
-  ensureMusic() {
-    if (this.music || !this.ctx || this.ctx.state !== "running") return;
-    const out = this.ctx.createGain();
-    out.gain.value = this.musicVol;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 720;
-    filter.Q.value = 0.4;
-    const bus = this.ctx.createGain();
-    bus.gain.value = 0.0001;
-    bus.connect(filter);
-    filter.connect(out);
-    out.connect(this.master);
-
-    const tone = (freq, type = "sine") => {
-      const osc = this.ctx.createOscillator();
-      osc.type = type;
-      osc.frequency.value = freq;
-      const gain = this.ctx.createGain();
-      gain.gain.value = 0.0001;
-      osc.connect(gain);
-      gain.connect(bus);
-      osc.start();
-      return { osc, gain };
-    };
-
-    this.music = {
-      bus,
-      filter,
-      out,
-      low: tone(110),
-      fifth: tone(164.81),
-      minor: tone(130.81),
-      air: tone(196),
-      sub: tone(55),
-    };
-  }
+  ensureMusic() {}
 
   tickMusic() {
     if (this.music) {
