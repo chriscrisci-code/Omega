@@ -57,9 +57,17 @@ export class Ore {
     this.sync();
   }
 
-  pull(nx, ny, force) {
-    this.vx += nx * force;
-    this.vy += ny * force;
+  applySave(data) {
+    if (!data) return;
+    this.x = Number(data.x) || 0;
+    this.y = Number(data.y) || 0;
+    this.vx = Number(data.vx) || 0;
+    this.vy = Number(data.vy) || 0;
+    this.rotation = Number(data.rotation) || 0;
+    this.spin = Number(data.spin) || 0;
+    this.life = Math.max(0.2, Number(data.life) || ore.life);
+    this.alive = true;
+    this.sync();
   }
 
   kill() {

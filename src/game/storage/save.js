@@ -51,6 +51,7 @@ const empty = {
     bank: 0,
   },
   checkpoint: null,
+  run: null,
   settings: {
     fullscreen: false,
     difficulty: "easy",
@@ -190,6 +191,75 @@ export function normalizeCheckpoint(data) {
   };
 }
 
+function packNum(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function packList(list, cap, map) {
+  if (!Array.isArray(list)) return [];
+  return list.slice(0, cap).map(map).filter(Boolean);
+}
+
+export function normalizeRun(data) {
+  if (!data || typeof data !== "object") return null;
+  const ship = data.ship;
+  if (!ship || typeof ship !== "object") return null;
+  if (!Number.isFinite(Number(ship.x)) || !Number.isFinite(Number(ship.y))) return null;
+  return {
+    v: 1,
+    wave: Math.max(1, Math.floor(packNum(data.wave, 1))),
+    rest: Boolean(data.rest),
+    assaultTime: Math.max(0, packNum(data.assaultTime, 0)),
+    raiderTimer: Math.max(0, packNum(data.raiderTimer, 0)),
+    rockWave: Math.max(1, Math.floor(packNum(data.rockWave, 1))),
+    waveCooldown: Math.max(0, packNum(data.waveCooldown, 0)),
+    score: Math.max(0, Math.floor(packNum(data.score, 0))),
+    lives: Math.max(1, Math.floor(packNum(data.lives, 1))),
+    cargo: Math.max(0, Math.floor(packNum(data.cargo, 0))),
+    points: Math.max(0, Math.floor(packNum(data.points, 0))),
+    bank: Math.max(0, Math.floor(packNum(data.bank, 0)) % 3),
+    nextLifeAt: Math.max(0, Math.floor(packNum(data.nextLifeAt, 0))),
+    killStreak: Math.max(0, Math.floor(packNum(data.killStreak, 0))),
+    bestStreak: Math.max(0, Math.floor(packNum(data.bestStreak, 0))),
+    shipId: typeof data.shipId === "string" && data.shipId ? data.shipId : "WEDGE",
+    loadout: normalizeLoadout(data.loadout),
+    seen: Array.isArray(data.seen) ? data.seen.map((name) => String(name || "").toUpperCase()).filter((name) => CASTLE_NAMES.has(name)) : ["NORTH"],
+    arriveWait: Math.max(1, packNum(data.arriveWait, 180)),
+    baseUnlockIn: Math.max(0, packNum(data.baseUnlockIn, 0)),
+    castlesArmed: Boolean(data.castlesArmed),
+    hubSeat: data.hubSeat === "gun0" || data.hubSeat === "gun1" || data.hubSeat === "laser" ? data.hubSeat : null,
+    hubGunAngle: packNum(data.hubGunAngle, 0),
+    cooldown: Math.max(0, packNum(data.cooldown, 0)),
+    missileCool: Math.max(0, packNum(data.missileCool, 0)),
+    empCool: Math.max(0, packNum(data.empCool, 0)),
+    warpCool: Math.max(0, packNum(data.warpCool, 0)),
+    homeOn: Boolean(data.homeOn),
+    camX: packNum(data.camX, 0),
+    camY: packNum(data.camY, 0),
+    camRot: packNum(data.camRot, 0),
+    ship: {
+      x: packNum(ship.x),
+      y: packNum(ship.y),
+      vx: packNum(ship.vx),
+      vy: packNum(ship.vy),
+      rotation: packNum(ship.rotation, -Math.PI / 2),
+      invuln: Math.max(0, packNum(ship.invuln)),
+      docked: Boolean(ship.docked),
+      dockPad: Math.max(0, Math.floor(packNum(ship.dockPad, 0))),
+      shieldEnergy: Math.max(0, packNum(ship.shieldEnergy)),
+      shieldOn: Boolean(ship.shieldOn),
+      cargo: Math.max(0, Math.floor(packNum(ship.cargo))),
+      undockLock: Math.max(0, packNum(ship.undockLock)),
+    },
+    bases: packList(data.bases, 8, (row) => (row && typeof row === "object" ? row : null)),
+    station: data.station && typeof data.station === "object" ? data.station : null,
+    rocks: packList(data.rocks, 80, (row) => (row && typeof row === "object" ? row : null)),
+    enemies: packList(data.enemies, 48, (row) => (row && typeof row === "object" ? row : null)),
+    ores: packList(data.ores, 80, (row) => (row && typeof row === "object" ? row : null)),
+  };
+}
+
 function migrateCheckpoint(data) {
   const saved = normalizeCheckpoint(data?.checkpoint);
   if (saved) return saved;
@@ -224,6 +294,7 @@ function normalize(data) {
       settings: withControls({ ...empty.settings }, null),
       loadout: { ...empty.loadout },
       checkpoint: null,
+      run: null,
       macro: [],
       highScores: normalizeHighScores(null),
       dailyScores: normalizeDailyScores(null),
@@ -239,6 +310,7 @@ function normalize(data) {
     shipId: typeof data.shipId === "string" && data.shipId ? data.shipId : "WEDGE",
     loadout: normalizeLoadout(data.loadout),
     checkpoint: migrateCheckpoint(data),
+    run: normalizeRun(data.run),
     macro: normalizeMacro(data.macro),
     highScores,
     dailyScores,

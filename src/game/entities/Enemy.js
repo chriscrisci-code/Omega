@@ -74,6 +74,25 @@ export class Enemy {
     this.paintHull();
   }
 
+  applySave(data) {
+    if (!data) return;
+    this.x = Number(data.x) || 0;
+    this.y = Number(data.y) || 0;
+    this.vx = Number(data.vx) || 0;
+    this.vy = Number(data.vy) || 0;
+    this.rotation = Number(data.rotation) || 0;
+    this.hp = Math.max(0, Math.floor(Number(data.hp) || this.hp));
+    this.shieldHp = Math.max(0, Math.floor(Number(data.shieldHp) || 0));
+    this.cooldown = Math.max(0, Number(data.cooldown) || 0);
+    this.ramCool = Math.max(0, Number(data.ramCool) || 0);
+    this.stunned = Math.max(0, Number(data.stunned) || 0);
+    this.laserCharge = Math.max(0, Number(data.laserCharge) || 0);
+    this.laserOn = Boolean(data.laserOn);
+    this.laserCool = Math.max(0, Number(data.laserCool) || 0);
+    this.gunSign = data.gunSign < 0 ? -1 : 1;
+    this.alive = true;
+  }
+
   turretLocal(side = 1) {
     return side > 0 ? { x: 28, y: 0 } : { x: -54, y: 0 };
   }
