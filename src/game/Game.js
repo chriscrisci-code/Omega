@@ -21,7 +21,7 @@ import { FarGrid } from "./render/FarGrid.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeCheckpoint, normalizeLoadout, normalizeRun, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeCheckpoint, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, wrapCoord, wrapDelta } from "./math.js";
 import { SHIP_CATALOG, WEDGE_ID } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -42,8 +42,6 @@ export class Game {
     this.app = app;
     this.storage = storage;
     this.save = storage.load();
-    this.runSaveAt = 0;
-    this.bindSaveHooks();
     this.input = new Input();
     this.touch = new TouchControls(this.input);
     this.hud = new Hud();
@@ -185,7 +183,7 @@ export class Game {
       this.acceptContinue();
     };
     this.hud.onPickDevice = (id) => this.setControlProfile(id === "phone" ? "phone" : "mouse");
-    this.hud.onPickWave = (n) => this.pickWave(n);
+    this.hud.onPickWave = (n) => this.startRun(n);
     this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
     this.hud.bay.onSeat = (id) => this.enterHubSeat(id);
     this.hud.bay.onBay = () => this.leaveHubSeat();
@@ -622,7 +620,6 @@ export class Game {
     this.wavePick = null;
     this.startPick = null;
     this.runDirty = false;
-    this.protectSave = !resume && this.hasCheckpoint();
     this.killStreak = 0;
     this.bestStreak = 0;
     this.wave = 1;
@@ -652,35 +649,28 @@ export class Game {
     this.empCool = 0;
     this.warpCool = 0;
     for (const base of this.bases) base.resetCombat();
-    const restored = resume && this.applyRun();
-    if (!restored) {
-      const resumed = resume && this.applyCheckpoint();
-      if (!resumed) {
-        this.score = 0;
-        this.freshLoadout();
-        this.lives = shipConfig.lives;
-        this.cargo = 0;
-        this.nextLifeAt = this.lifeEvery;
-        const startWave = Math.max(1, Math.min(Math.floor(Number(wave) || 1), this.save.maxWave || 1));
-        this.beginAssault(startWave, true);
-        this.seedWorldForWave(startWave);
-      }
+    const resumed = resume && this.applyCheckpoint();
+    if (!resumed) {
+      this.score = 0;
+      this.freshLoadout();
+      this.lives = shipConfig.lives;
+      this.cargo = 0;
+      this.nextLifeAt = this.lifeEvery;
+      this.save.checkpoint = null;
+      const startWave = Math.max(1, Math.min(Math.floor(Number(wave) || 1), this.save.maxWave || 1));
+      this.beginAssault(startWave, true);
+      this.seedWorldForWave(startWave);
     }
+    this.ship.reset(worldConfig.width / 2, worldConfig.height / 2);
     this.applyShipSkin();
-    if (!restored) {
-      this.ship.reset(worldConfig.width / 2, worldConfig.height / 2);
-      this.ship.setCargo(this.cargo);
-      this.hub.forceDock(this.ship, 0);
-      this.snapCamera();
-      this.applyShieldLevel(true);
-    } else {
-      this.ship.setCargo(this.cargo);
-      this.applyShieldLevel(false);
-    }
+    this.ship.setCargo(this.cargo);
+    this.hub.forceDock(this.ship, 0);
+    this.snapCamera();
+    this.applyShieldLevel(true);
     this.hud.setScore(this.score);
     this.hud.setPoints(this.points);
     this.hud.setLives(this.lives);
-    this.hud.setShield(this.ship.shieldEnergy, this.ship.shieldOn, this.shieldPool());
+    this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
     this.refreshDock();
     this.hud.setSpecial("WARP EMP MSL");
     this.hubThreat = 0;
@@ -692,20 +682,14 @@ export class Game {
     this.lockMark.visible = false;
     this.hangar.view.visible = false;
     this.pips.view.visible = true;
-    if (!restored) this.station.reset();
+    this.station.reset();
     this.syncStation();
     this.hud.setHubAlert(null);
     this.hud.setOre(this.cargo, this.hub.ore, this.hub.upgradeName());
     this.hud.hideCenter();
     if (this.ship.docked) this.hud.showDock(this.shipId);
-    if (restored && this._resumeSeat) {
-      this.enterHubSeat(this._resumeSeat);
-      this._resumeSeat = null;
-    }
-    if (!restored) {
-      this.scatterField();
-      this.spawnWave();
-    }
+    this.scatterField();
+    this.spawnWave();
   }
 
   sleepLateBases() {
@@ -774,17 +758,19 @@ export class Game {
   }
 
   offerStart() {
-    this.offerWavePick();
+    if (!this.hasCheckpoint()) {
+      this.offerWavePick();
+      return;
+    }
+    this.stopAttract();
+    this.mode = STARTPICK;
+    this.startPick = "continue";
+    this.hud.showStartPick(this.checkpointLabel(), "continue");
   }
 
   confirmStart(id) {
     if (id === "continue") this.startRun(1, true);
     else this.offerWavePick();
-  }
-
-  pickWave(n) {
-    if (n === "load") this.startRun(1, true);
-    else this.startRun(n);
   }
 
   tickStartPick() {
@@ -803,39 +789,28 @@ export class Game {
 
   offerWavePick() {
     const max = this.unlockedWave();
-    const load = this.hasCheckpoint();
-    if (max <= 1 && !load) {
+    if (max <= 1) {
       this.startRun(1);
       return;
     }
     this.stopAttract();
     this.mode = WAVEPICK;
-    this.wavePick = { max, selected: load ? "load" : max, load };
-    this.hud.showWavePick(max, this.wavePick.selected, load);
-  }
-
-  waveChoices() {
-    const max = this.wavePick?.max || 1;
-    const list = [];
-    if (this.wavePick?.load) list.push("load");
-    for (let n = 1; n <= max; n += 1) list.push(n);
-    return list;
+    this.wavePick = { max, selected: max };
+    this.hud.showWavePick(max, max);
   }
 
   nudgeWave(dir) {
     if (!this.wavePick) return;
-    const list = this.waveChoices();
-    const at = list.findIndex((item) => item === this.wavePick.selected);
-    const next = list[Math.max(0, Math.min(list.length - 1, (at < 0 ? 0 : at) + dir))];
+    const next = Math.max(1, Math.min(this.wavePick.max, this.wavePick.selected + dir));
     if (next === this.wavePick.selected) return;
     this.wavePick.selected = next;
-    this.hud.paintWavePick(this.wavePick.max, next, this.wavePick.load);
+    this.hud.paintWavePick(this.wavePick.max, next);
   }
 
   tickWavePick() {
     if (this.input.letterLeft) this.nudgeWave(-1);
     if (this.input.letterRight) this.nudgeWave(1);
-    if (this.input.startPressed || this.input.firePressed) this.pickWave(this.wavePick?.selected ?? 1);
+    if (this.input.startPressed || this.input.firePressed) this.startRun(this.wavePick?.selected || 1);
     else if (this.input.quitPressed) {
       this.wavePick = null;
       this.mode = TITLE;
@@ -1629,27 +1604,16 @@ export class Game {
   }
 
   hasCheckpoint() {
-    return Boolean(normalizeRun(this.save.run) || normalizeCheckpoint(this.save.checkpoint));
+    return Boolean(normalizeCheckpoint(this.save.checkpoint));
   }
 
   checkpointLabel() {
-    const run = normalizeRun(this.save.run);
-    if (run) return `WAVE  ${run.wave}`;
     const cp = normalizeCheckpoint(this.save.checkpoint);
     if (!cp) return "";
     return `WAVE  ${cp.wave}`;
   }
 
   stampCheckpoint() {
-    if (this.protectSave && !this.runDirty) return;
-    if (this.save.run) {
-      this.save.run.score = Math.max(0, Math.floor(Number(this.score) || 0));
-      this.save.run.lives = Math.max(1, Math.floor(Number(this.lives) || 0) || shipConfig.lives);
-      this.save.run.cargo = Math.max(0, Math.floor(Number(this.cargo) || 0));
-      this.save.run.nextLifeAt = Math.max(0, Math.floor(Number(this.nextLifeAt) || 0));
-      this.save.run.points = Math.max(0, Math.floor(Number(this.points) || 0));
-      this.save.run.bank = Math.max(0, Math.floor(Number(this.loadoutBank) || 0) % 3);
-    }
     if (!this.save.checkpoint?.active) return;
     this.save.checkpoint.score = Math.max(0, Math.floor(Number(this.score) || 0));
     this.save.checkpoint.lives = Math.max(1, Math.floor(Number(this.lives) || 0) || shipConfig.lives);
@@ -1661,235 +1625,9 @@ export class Game {
     }
   }
 
-  bindSaveHooks() {
-    if (this._saveHooks) return;
-    this._saveHooks = true;
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) this.writeRun({ force: true });
-    });
-    window.addEventListener("pagehide", () => this.writeRun({ force: true }));
-  }
-
-  captureRun() {
-    const pad = this.ship.docked ? Math.max(0, this.hub.pads.indexOf(this.ship.dockPad)) : 0;
-    return normalizeRun({
-      v: 1,
-      wave: this.assaultIndex,
-      rest: this.assaultRest,
-      assaultTime: this.assaultTime,
-      raiderTimer: this.raiderTimer,
-      rockWave: this.wave,
-      waveCooldown: this.waveCooldown,
-      score: this.score,
-      lives: this.lives,
-      cargo: this.cargo,
-      points: this.points,
-      bank: this.loadoutBank,
-      nextLifeAt: this.nextLifeAt,
-      killStreak: this.killStreak,
-      bestStreak: this.bestStreak,
-      shipId: this.shipId,
-      loadout: {
-        gun: this.levels?.gun,
-        missile: this.levels?.missile,
-        emp: this.levels?.emp,
-        shield: this.levels?.shield,
-        points: this.points,
-        bank: this.loadoutBank,
-      },
-      seen: [...(this.seenCastles || [])],
-      arriveWait: this.arriveWait,
-      baseUnlockIn: this.baseUnlockIn,
-      castlesArmed: this.castlesArmed,
-      hubSeat: this.hubSeat,
-      hubGunAngle: this.hubGunAngle,
-      cooldown: this.cooldown,
-      missileCool: this.missileCool,
-      empCool: this.empCool,
-      warpCool: this.warpCool,
-      homeOn: this.homeOn,
-      camX: this.camX,
-      camY: this.camY,
-      camRot: this.camRot,
-      ship: {
-        x: this.ship.x,
-        y: this.ship.y,
-        vx: this.ship.vx,
-        vy: this.ship.vy,
-        rotation: this.ship.rotation,
-        invuln: this.ship.invuln,
-        docked: this.ship.docked,
-        dockPad: pad,
-        shieldEnergy: this.ship.shieldEnergy,
-        shieldOn: this.ship.shieldOn,
-        cargo: this.cargo,
-        undockLock: this.ship.undockLock,
-      },
-      bases: this.bases.map((base) => base.dump()),
-      station: this.station.dump(),
-      rocks: this.asteroids.map((rock) => ({
-        x: rock.x,
-        y: rock.y,
-        vx: rock.vx,
-        vy: rock.vy,
-        rotation: rock.rotation,
-        spin: rock.spin,
-        size: rock.size,
-        color: rock.color,
-        hp: rock.hp,
-        points: rock.points,
-      })),
-      enemies: this.enemies.filter((enemy) => enemy.alive).map((enemy) => ({
-        x: enemy.x,
-        y: enemy.y,
-        vx: enemy.vx,
-        vy: enemy.vy,
-        rotation: enemy.rotation,
-        role: enemy.role,
-        home: enemy.home?.name || "NORTH",
-        hp: enemy.hp,
-        shieldHp: enemy.shieldHp,
-        cooldown: enemy.cooldown,
-        ramCool: enemy.ramCool,
-        stunned: enemy.stunned,
-        laserCharge: enemy.laserCharge,
-        laserOn: enemy.laserOn,
-        laserCool: enemy.laserCool,
-        gunSign: enemy.gunSign,
-      })),
-      ores: this.ores.filter((flake) => flake.alive).map((flake) => ({
-        x: flake.x,
-        y: flake.y,
-        vx: flake.vx,
-        vy: flake.vy,
-        rotation: flake.rotation,
-        spin: flake.spin,
-        life: flake.life,
-      })),
-    });
-  }
-
-  writeRun(options = {}) {
-    if (this.attractOnDemo) return;
-    if (this.protectSave && !this.runDirty) return;
-    const force = Boolean(options.force);
-    if (!this.ship?.alive) return;
-    if (!force && this.mode !== PLAYING) return;
-    const now = performance.now();
-    if (!force && now - this.runSaveAt < 1600) return;
-    const run = this.captureRun();
-    if (!run) return;
-    this.runSaveAt = now;
-    this.save.run = run;
-    this.save.loadout = normalizeLoadout(run.loadout);
-    this.save.shipId = run.shipId;
-    this.save.checkpoint = normalizeCheckpoint({
-      active: true,
-      wave: run.wave,
-      rest: run.rest,
-      score: run.score,
-      lives: run.lives,
-      cargo: run.cargo,
-      shipId: run.shipId,
-      loadout: run.loadout,
-      hubOre: this.hub?.ore,
-      seen: run.seen,
-      arriveWait: run.arriveWait,
-      baseUnlockIn: run.baseUnlockIn,
-      nextLifeAt: run.nextLifeAt,
-      castlesArmed: run.castlesArmed,
-    });
-    this.storage.save(this.save);
-  }
-
-  applyRun() {
-    const run = normalizeRun(this.save.run);
-    if (!run) return false;
-    this.shipId = run.shipId;
-    this.levels = {
-      gun: run.loadout.gun,
-      missile: run.loadout.missile,
-      emp: run.loadout.emp,
-      shield: run.loadout.shield,
-    };
-    this.points = run.points;
-    this.loadoutBank = run.bank;
-    this.score = run.score;
-    this.lives = run.lives;
-    this.cargo = run.cargo;
-    this.nextLifeAt = run.nextLifeAt || this.lifeEvery;
-    this.killStreak = run.killStreak;
-    this.bestStreak = run.bestStreak;
-    this.wave = run.rockWave || 1;
-    this.waveCooldown = run.waveCooldown || 0;
-    this.assaultIndex = run.wave;
-    this.assaultRest = run.rest;
-    this.assaultTime = run.assaultTime;
-    this.raiderTimer = run.raiderTimer;
-    this.markWaveReached(run.wave);
-    this.seenCastles = new Set(run.seen?.length ? run.seen : ["NORTH"]);
-    this.castlesArmed = Boolean(run.castlesArmed);
-    this.arriveWait = run.arriveWait;
-    this.baseUnlockIn = run.baseUnlockIn;
-    this.cooldown = run.cooldown;
-    this.missileCool = run.missileCool;
-    this.empCool = run.empCool;
-    this.warpCool = run.warpCool;
-    this.homeOn = Boolean(run.homeOn);
-    this.dockOpen = Boolean(run.ship.docked);
-    this._resumeSeat = run.hubSeat;
-    this.hubSeat = null;
-    this.hubGunAngle = run.hubGunAngle;
-    for (const row of run.bases || []) {
-      const base = this.bases.find((item) => item.name === row.name);
-      if (base) base.restore(row);
-    }
-    this.pendingBases = this.bases.filter((base) => !base.hub && !base.view.visible);
-    if (this.castlesArmed) this.armCastles();
-    this.syncStation();
-    if (this.station.awake) this.station.restore(run.station);
-    this.clearRocks();
-    this.clearEnemies();
-    for (const row of run.rocks || []) {
-      const size = Math.max(1, Math.min(3, Math.floor(Number(row.size) || 3)));
-      const rock = this.addRock(row.x, row.y, size, row.color);
-      rock.applySave(row);
-    }
-    for (const row of run.enemies || []) {
-      const home = this.bases.find((base) => base.name === row.home) || this.bases.find((base) => !base.hub) || this.hub;
-      const enemy = new Enemy(row.x, row.y, home, home.color, { role: row.role });
-      enemy.applySave(row);
-      this.enemies.push(enemy);
-      this.vectors.addChild(enemy.view);
-    }
-    this.clearOres();
-    for (const row of run.ores || []) {
-      const flake = new Ore(row.x, row.y);
-      flake.applySave(row);
-      this.ores.push(flake);
-      this.vectors.addChild(flake.view);
-    }
-    this.applyShipSkin();
-    this.ship.applySave(run.ship);
-    if (run.ship.docked && this.hub.alive) this.hub.forceDock(this.ship, run.ship.dockPad);
-    this.camOn = true;
-    this.camX = run.camX || this.ship.x;
-    this.camY = run.camY || this.ship.y;
-    this.camRot = run.camRot || this.headingUp();
-    this.camZoom = this.playZoom();
-    this.save.loadout = normalizeLoadout(run.loadout);
-    this.save.shipId = this.shipId;
-    this.storage.save(this.save);
-    return true;
-  }
-
   writeCheckpoint(options = {}) {
     if (this.attractOnDemo) return;
     const force = Boolean(options.force);
-    if (this.ship?.alive && (force || this.mode === PLAYING)) {
-      this.writeRun({ force: true });
-      return;
-    }
     if (!force && (this.mode !== PLAYING || this.lives <= 0)) return;
     const loadout = {
       gun: this.levels?.gun,
@@ -3349,7 +3087,6 @@ export class Game {
     }
     this.tickMissileAudio(t, space);
     this.audio.tickMusic({ bed: 0, dark: 0, heat: 0, hiss: 0 });
-    if (this.mode === PLAYING && this.ship.alive) this.writeRun();
 
     this.input.endFrame();
   }

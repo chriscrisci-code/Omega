@@ -411,67 +411,6 @@ export class Base {
     this.view.visible = false;
   }
 
-  dump() {
-    return {
-      name: this.name,
-      alive: this.alive,
-      visible: this.view.visible,
-      ore: this.ore,
-      coreHp: this.coreHp,
-      maxCoreHp: this.maxCoreHp,
-      armed: this.armed,
-      regenEvery: this.regenEvery,
-      spawnTimer: this.spawnTimer,
-      screenSpawnTimer: this.screenSpawnTimer,
-      screenDestroyerTimer: this.screenDestroyerTimer,
-      missileCool: this.missileCool,
-      missileEvery: this.missileEvery,
-      hitRadius: this.hitRadius,
-      regenLock: this.regenLock,
-      regenClock: this.regenClock,
-      shields: this.shields.map((layer) => ({ hp: layer.hp, maxHp: layer.maxHp })),
-    };
-  }
-
-  restore(data) {
-    if (!data) return;
-    if (!data.alive && !data.visible) {
-      this.sleep();
-      return;
-    }
-    this.resetCombat();
-    if (this.hub) {
-      this.ore = 0;
-      this.tier = 0;
-      if (data.ore > 0) this.deposit(data.ore);
-    }
-    this.alive = data.alive !== false;
-    this.view.visible = data.visible !== false;
-    this.coreHp = data.coreHp ?? this.coreHp;
-    this.maxCoreHp = data.maxCoreHp ?? this.maxCoreHp;
-    this.armed = Boolean(data.armed);
-    if (data.regenEvery) this.regenEvery = data.regenEvery;
-    this.spawnTimer = data.spawnTimer ?? this.spawnTimer;
-    this.screenSpawnTimer = data.screenSpawnTimer ?? this.screenSpawnTimer;
-    this.screenDestroyerTimer = data.screenDestroyerTimer ?? this.screenDestroyerTimer;
-    this.missileCool = data.missileCool ?? 0;
-    if (data.missileEvery) this.missileEvery = data.missileEvery;
-    if (data.hitRadius) this.hitRadius = data.hitRadius;
-    this.regenLock = data.regenLock ?? 0;
-    this.regenClock = data.regenClock ?? 0;
-    if (Array.isArray(data.shields)) {
-      data.shields.forEach((row, i) => {
-        const layer = this.shields[i];
-        if (!layer) return;
-        if (row.maxHp != null) layer.maxHp = row.maxHp;
-        layer.hp = Math.max(0, Math.floor(Number(row.hp) || 0));
-        layer.graphic.visible = layer.hp > 0 && (layer.graphic !== this.skin || this.skin.visible);
-        layer.graphic.alpha = layer.maxHp ? Math.max(0.18, layer.hp / layer.maxHp) : 1;
-      });
-    }
-    if (this.hub) this.showSeats();
-  }
-
   padWorld(pad) {
     const c = Math.cos(this.rotation);
     const s = Math.sin(this.rotation);

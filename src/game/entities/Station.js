@@ -329,41 +329,6 @@ export class Station {
     this.rotation = 0;
   }
 
-  dump() {
-    return {
-      rotation: this.rotation,
-      guns: this.guns.map((gun) => ({ alive: gun.alive, hp: gun.hp, cool: gun.cool })),
-      modules: this.modules.map((mod) => ({ alive: mod.alive, hp: mod.hp })),
-    };
-  }
-
-  restore(data) {
-    if (!data) {
-      this.reset();
-      return;
-    }
-    this.rotation = Number(data.rotation) || 0;
-    this.view.rotation = this.rotation;
-    (data.guns || []).forEach((row, i) => {
-      const gun = this.guns[i];
-      if (!gun) return;
-      gun.alive = row.alive !== false;
-      gun.hp = Math.max(0, Math.floor(Number(row.hp) || 0));
-      gun.cool = Math.max(0, Number(row.cool) || 0);
-      gun.graphic.visible = gun.alive;
-      gun.graphic.alpha = 1;
-    });
-    (data.modules || []).forEach((row, i) => {
-      const mod = this.modules[i];
-      if (!mod) return;
-      mod.alive = row.alive !== false;
-      mod.hp = Math.max(0, Math.floor(Number(row.hp) || 0));
-      mod.graphic.visible = mod.alive;
-      mod.graphic.alpha = 1;
-    });
-    this.syncParts();
-  }
-
   tickParallax(camX, camY, space, frozen = false) {
     if (frozen) {
       this.depth1.position.set(cfg.shift[0], cfg.shift[1]);

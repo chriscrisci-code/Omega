@@ -50,21 +50,9 @@ export class Asteroid {
     this.sync();
   }
 
-  applySave(data) {
-    if (!data) return;
-    this.x = Number(data.x) || 0;
-    this.y = Number(data.y) || 0;
-    this.vx = Number(data.vx) || 0;
-    this.vy = Number(data.vy) || 0;
-    this.rotation = Number(data.rotation) || 0;
-    this.spin = Number(data.spin) || 0;
-    this.hp = Math.max(0, Math.floor(Number(data.hp) || this.hp));
-    if (Array.isArray(data.points) && data.points.length >= 6) {
-      this.points = data.points.map((n) => Number(n) || 0);
-      this.g.clear();
-      strokeGlow(this.g, this.points, this.color, this.hotColor, 1.5);
-    }
-    this.sync();
+  kick(nx, ny, amount) {
+    this.vx += nx * amount;
+    this.vy += ny * amount;
   }
 
   destroy() {

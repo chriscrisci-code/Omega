@@ -272,16 +272,16 @@ export class Hud {
     this.setMode("");
   }
 
-  showWavePick(maxWave, selected, load = false) {
+  showWavePick(maxWave, selected) {
     this.attract(true);
     this.setAttractDemo(false);
     this.center.classList.remove("is-hidden", "is-scores", "is-initials");
     this.center.classList.add("is-wave");
     this.title.innerHTML = "";
     this.paint(this.tag, "WAVE", 18, MAGENTA, PINK, "center");
-    this.paintWavePick(maxWave, selected, load);
-    this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP TO START" : "FIRE START", 18, CYAN, HOT);
-    this.paint(this.credit, this.layout === "phone" ? "TAP A CHOICE" : "WHEEL OR ARROWS   ESC", 8, DIM, CYAN, "center");
+    this.paintWavePick(maxWave, selected);
+    this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP WAVE" : "FIRE START", 18, CYAN, HOT);
+    this.paint(this.credit, this.layout === "phone" ? "TAP TO START" : "WHEEL OR ARROWS   ESC", 8, DIM, CYAN, "center");
     this.shipsPage?.classList.add("is-hidden");
     this.hideScores();
     this.hideContinue();
@@ -289,29 +289,16 @@ export class Hud {
     this.setMode("");
   }
 
-  paintWavePick(maxWave, selected, load = false) {
+  paintWavePick(maxWave, selected) {
     if (!this.waveRow) return;
     const max = Math.max(1, Math.floor(Number(maxWave) || 1));
+    const on = Math.max(1, Math.min(max, Math.floor(Number(selected) || 1)));
     this.waveRow.innerHTML = "";
-    if (load) {
-      const on = selected === "load";
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = `wave-btn start-btn${on ? " is-on" : ""}`;
-      btn.innerHTML = vectorTextSvg("LOAD GAME", on ? 16 : 13, on ? CYAN : DIM, on ? HOT : CYAN, "center");
-      btn.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        this.onPickWave?.("load");
-      });
-      this.waveRow.appendChild(btn);
-    }
     for (let n = 1; n <= max; n += 1) {
-      const on = selected === n;
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = `wave-btn${on ? " is-on" : ""}`;
-      btn.innerHTML = vectorTextSvg(String(n), on ? 16 : 13, on ? CYAN : DIM, on ? HOT : CYAN, "center");
+      btn.className = `wave-btn${n === on ? " is-on" : ""}`;
+      btn.innerHTML = vectorTextSvg(String(n), n === on ? 16 : 13, n === on ? CYAN : DIM, n === on ? HOT : CYAN, "center");
       btn.addEventListener("pointerdown", (event) => {
         event.preventDefault();
         event.stopPropagation();

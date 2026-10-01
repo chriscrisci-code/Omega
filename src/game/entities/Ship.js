@@ -105,31 +105,6 @@ export class Ship {
     this.setCargo(0);
   }
 
-  applySave(data) {
-    if (!data) return;
-    this.alive = true;
-    this.x = Number(data.x) || 0;
-    this.y = Number(data.y) || 0;
-    this.vx = Number(data.vx) || 0;
-    this.vy = Number(data.vy) || 0;
-    this.rotation = Number.isFinite(Number(data.rotation)) ? Number(data.rotation) : -Math.PI / 2;
-    this.invuln = Math.max(0, Number(data.invuln) || 0);
-    this.surge = 0;
-    this.strafe = 0;
-    this.docked = false;
-    this.dockedTo = null;
-    this.dockPad = null;
-    this.undockLock = Math.max(0, Number(data.undockLock) || 0);
-    this.dockHold = 0;
-    this.warping = false;
-    this.shieldEnergy = Math.max(0, Number(data.shieldEnergy) || 0);
-    this.shieldOn = Boolean(data.shieldOn) && !data.docked;
-    this.view.visible = true;
-    this.setCargo(Math.max(0, Math.floor(Number(data.cargo) || 0)));
-    this.draw();
-    this.drawShield();
-  }
-
   dock(base, pad) {
     this.docked = true;
     this.dockedTo = base;
