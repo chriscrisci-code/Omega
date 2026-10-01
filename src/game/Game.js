@@ -1775,36 +1775,31 @@ export class Game {
     const force = Boolean(options.force);
     if (!this.ship?.alive) return;
     if (!force && this.mode !== PLAYING) return;
-    if (!force && this.ship.docked) return;
     const now = performance.now();
     if (!force && now - this.runSaveAt < 1600) return;
-    try {
-      const run = this.captureRun();
-      if (!run) return;
-      this.runSaveAt = now;
-      this.save.run = run;
-      this.save.loadout = normalizeLoadout(run.loadout);
-      this.save.shipId = run.shipId;
-      this.save.checkpoint = normalizeCheckpoint({
-        active: true,
-        wave: run.wave,
-        rest: run.rest,
-        score: run.score,
-        lives: run.lives,
-        cargo: run.cargo,
-        shipId: run.shipId,
-        loadout: run.loadout,
-        hubOre: this.hub?.ore,
-        seen: run.seen,
-        arriveWait: run.arriveWait,
-        baseUnlockIn: run.baseUnlockIn,
-        nextLifeAt: run.nextLifeAt,
-        castlesArmed: run.castlesArmed,
-      });
-      this.storage.save(this.save);
-    } catch (err) {
-      console.error("writeRun failed", err);
-    }
+    const run = this.captureRun();
+    if (!run) return;
+    this.runSaveAt = now;
+    this.save.run = run;
+    this.save.loadout = normalizeLoadout(run.loadout);
+    this.save.shipId = run.shipId;
+    this.save.checkpoint = normalizeCheckpoint({
+      active: true,
+      wave: run.wave,
+      rest: run.rest,
+      score: run.score,
+      lives: run.lives,
+      cargo: run.cargo,
+      shipId: run.shipId,
+      loadout: run.loadout,
+      hubOre: this.hub?.ore,
+      seen: run.seen,
+      arriveWait: run.arriveWait,
+      baseUnlockIn: run.baseUnlockIn,
+      nextLifeAt: run.nextLifeAt,
+      castlesArmed: run.castlesArmed,
+    });
+    this.storage.save(this.save);
   }
 
   applyRun() {
@@ -2101,13 +2096,7 @@ export class Game {
     });
     if (impact) {
       const mag = Math.hypot(impact.vx, impact.vy) || 1;
-      const nx = impact.vx / mag;
-      const ny = impact.vy / mag;
-      if (rock.kick) rock.kick(nx, ny, 18);
-      else {
-        rock.vx += nx * 18;
-        rock.vy += ny * 18;
-      }
+      rock.kick(impact.vx / mag, impact.vy / mag, 18);
     }
     rock.spin += rand(-0.8, 0.8);
     if (rock.hp <= 0) this.killRock(rock, impact);
