@@ -22,73 +22,130 @@ function gunPts() {
   return [16, 0, -8, 7, -3.5, 0, -8, -7];
 }
 
-function paintLattice(g, color, hot, width) {
+function boxAt(g, x, y, angle, w, h) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  const px = -s;
+  const py = c;
+  const hw = w * 0.5;
+  const hh = h * 0.5;
+  const corners = [
+    [x + px * hw + c * hh, y + py * hw + s * hh],
+    [x - px * hw + c * hh, y - py * hw + s * hh],
+    [x - px * hw - c * hh, y - py * hw - s * hh],
+    [x + px * hw - c * hh, y + py * hw - s * hh],
+  ];
+  g.moveTo(corners[0][0], corners[0][1]);
+  g.lineTo(corners[1][0], corners[1][1]);
+  g.lineTo(corners[2][0], corners[2][1]);
+  g.lineTo(corners[3][0], corners[3][1]);
+  g.closePath();
+}
+
+function octAt(g, x, y, radius, turn = 0) {
+  const pts = ringPts(8, radius, turn);
+  g.moveTo(x + pts[0], y + pts[1]);
+  for (let i = 2; i < pts.length; i += 2) g.lineTo(x + pts[i], y + pts[i + 1]);
+  g.closePath();
+}
+
+function hangarAt(g, x, y, angle, scale) {
+  const c = Math.cos(angle);
+  const s = Math.sin(angle);
+  const px = -s;
+  const py = c;
+  boxAt(g, x, y, angle, 168 * scale, 96 * scale);
+  boxAt(g, x, y, angle, 118 * scale, 58 * scale);
+  boxAt(g, x + px * 92 * scale, y + py * 92 * scale, angle, 48 * scale, 78 * scale);
+  boxAt(g, x - px * 92 * scale, y - py * 92 * scale, angle, 48 * scale, 78 * scale);
+  octAt(g, x + c * 8 * scale, y + s * 8 * scale, 28 * scale, angle);
+  g.moveTo(x + px * 40 * scale - c * 18 * scale, y + py * 40 * scale - s * 18 * scale);
+  g.lineTo(x - px * 40 * scale - c * 18 * scale, y - py * 40 * scale - s * 18 * scale);
+  g.moveTo(x + px * 40 * scale + c * 18 * scale, y + py * 40 * scale + s * 18 * scale);
+  g.lineTo(x - px * 40 * scale + c * 18 * scale, y - py * 40 * scale + s * 18 * scale);
+}
+
+function paintHub(g, hub) {
+  for (let i = 0; i < 16; i += 1) {
+    const a = (i / 16) * Math.PI * 2 + 0.18;
+    g.moveTo(Math.cos(a) * (hub - 10), Math.sin(a) * (hub - 10));
+    g.lineTo(Math.cos(a) * (hub + 36), Math.sin(a) * (hub + 36));
+  }
+  g.moveTo(0, -hub);
+  g.lineTo(0, -hub - 86);
+  g.moveTo(-8, -hub - 86);
+  g.lineTo(8, -hub - 86);
+  g.lineTo(0, -hub - 104);
+  g.closePath();
+}
+
+function paintSpokes(g, hub, ring, spokes, end = ring - 16) {
+  const inner = hub + 18;
+  for (let s = 0; s < spokes; s += 1) {
+    const a = (s / spokes) * Math.PI * 2;
+    const nx = Math.cos(a);
+    const ny = Math.sin(a);
+    const px = -ny;
+    const py = nx;
+    for (const side of [-11, 0, 11]) {
+      g.moveTo(nx * inner + px * side, ny * inner + py * side);
+      g.lineTo(nx * end + px * side, ny * end + py * side);
+    }
+    for (let d = inner + 40; d < end - 20; d += 64) {
+      g.moveTo(nx * d + px * 14, ny * d + py * 14);
+      g.lineTo(nx * d - px * 14, ny * d - py * 14);
+      g.moveTo(nx * (d - 16) + px * 10, ny * (d - 16) + py * 10);
+      g.lineTo(nx * (d + 16) - px * 10, ny * (d + 16) - py * 10);
+    }
+  }
+}
+
+function paintRing(g, ring) {
+  for (const r of [ring - 44, ring - 22, ring, ring + 22]) {
+    g.moveTo(r, 0);
+    for (let i = 1; i <= 56; i += 1) {
+      const a = (i / 56) * Math.PI * 2;
+      g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    }
+  }
+  for (let i = 0; i < 56; i += 1) {
+    const a = (i / 56) * Math.PI * 2;
+    const c = Math.cos(a);
+    const s = Math.sin(a);
+    g.moveTo(c * (ring - 44), s * (ring - 44));
+    g.lineTo(c * (ring + 22), s * (ring + 22));
+  }
+}
+
+function paintDeck(g, color, hot, width, kind) {
   g.clear();
   const hub = cfg.hub;
   const ring = cfg.ring;
-  const inner = hub + 18;
   const spokes = cfg.spokes;
   const draw = () => {
-    for (let s = 0; s < spokes; s += 1) {
-      const a = (s / spokes) * Math.PI * 2;
-      const nx = Math.cos(a);
-      const ny = Math.sin(a);
-      const px = -ny;
-      const py = nx;
-      for (const side of [-11, 0, 11]) {
-        g.moveTo(nx * inner + px * side, ny * inner + py * side);
-        g.lineTo(nx * (ring - 16) + px * side, ny * (ring - 16) + py * side);
+    paintHub(g, hub);
+    if (kind === "mid") {
+      paintSpokes(g, hub, ring, 4, ring * 0.72);
+      for (let i = 0; i < 4; i += 1) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        hangarAt(g, Math.cos(a) * ring * 0.78, Math.sin(a) * ring * 0.78, a, 1.35);
       }
-      for (let d = inner + 40; d < ring - 36; d += 64) {
-        g.moveTo(nx * d + px * 14, ny * d + py * 14);
-        g.lineTo(nx * d - px * 14, ny * d - py * 14);
-        g.moveTo(nx * (d - 16) + px * 10, ny * (d - 16) + py * 10);
-        g.lineTo(nx * (d + 16) - px * 10, ny * (d + 16) - py * 10);
+      return;
+    }
+    paintSpokes(g, hub, ring, spokes);
+    paintRing(g, ring);
+    if (kind === "top") {
+      for (let i = 0; i < spokes; i += 1) {
+        const a = (i / spokes) * Math.PI * 2 + Math.PI / spokes;
+        const dist = ring + (i % 2 === 0 ? 58 : 34);
+        hangarAt(g, Math.cos(a) * dist, Math.sin(a) * dist, a, i % 2 === 0 ? 1 : 0.52);
       }
-    }
-    for (const r of [ring - 44, ring - 22, ring, ring + 22]) {
-      g.moveTo(r, 0);
-      for (let i = 1; i <= 56; i += 1) {
-        const a = (i / 56) * Math.PI * 2;
-        g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-      }
-    }
-    for (let i = 0; i < 56; i += 1) {
-      const a = (i / 56) * Math.PI * 2;
-      const c = Math.cos(a);
-      const s = Math.sin(a);
-      g.moveTo(c * (ring - 44), s * (ring - 44));
-      g.lineTo(c * (ring + 22), s * (ring + 22));
-    }
-    for (let i = 0; i < 24; i += 1) {
-      const a = (i / 24) * Math.PI * 2 + 0.07;
-      const c = Math.cos(a);
-      const s = Math.sin(a);
-      const px = -s;
-      const py = c;
-      const ox = c * (ring + 36);
-      const oy = s * (ring + 36);
-      const w = i % 3 === 0 ? 22 : 14;
-      const h = i % 3 === 0 ? 12 : 8;
-      g.moveTo(ox + px * w + c * h, oy + py * w + s * h);
-      g.lineTo(ox - px * w + c * h, oy - py * w + s * h);
-      g.lineTo(ox - px * w - c * h, oy - py * w - s * h);
-      g.lineTo(ox + px * w - c * h, oy + py * w - s * h);
-      g.closePath();
+      return;
     }
     for (let i = 0; i < 16; i += 1) {
-      const a = (i / 16) * Math.PI * 2 + 0.18;
-      const c = Math.cos(a);
-      const s = Math.sin(a);
-      g.moveTo(c * (hub - 10), s * (hub - 10));
-      g.lineTo(c * (hub + 36), s * (hub + 36));
+      const a = (i / 16) * Math.PI * 2 + 0.07;
+      boxAt(g, Math.cos(a) * (ring + 36), Math.sin(a) * (ring + 36), a, 18, 10);
     }
-    g.moveTo(0, -hub);
-    g.lineTo(0, -hub - 86);
-    g.moveTo(-8, -hub - 86);
-    g.lineTo(8, -hub - 86);
-    g.lineTo(0, -hub - 104);
-    g.closePath();
   };
   draw();
   g.stroke({ width: width * 3, color, alpha: 0.16, cap: "round", join: "round" });
@@ -107,7 +164,7 @@ export class Station {
     this.name = "STATION";
     this.color = colors.magenta;
     this.hotColor = colors.magentaHot;
-    this.radius = cfg.ring + 48;
+    this.radius = cfg.ring + 140;
     this.rotation = 0;
     this.alive = true;
     this.awake = false;
@@ -119,9 +176,9 @@ export class Station {
     this.lattice = new Graphics();
     this.deck2 = new Graphics();
     this.deck1 = new Graphics();
-    paintLattice(this.deck2, this.color, this.hotColor, 0.8);
-    paintLattice(this.deck1, this.color, this.hotColor, 0.95);
-    paintLattice(this.lattice, this.color, this.hotColor, 1.15);
+    paintDeck(this.deck2, this.color, this.hotColor, 0.8, "low");
+    paintDeck(this.deck1, this.color, this.hotColor, 0.95, "mid");
+    paintDeck(this.lattice, this.color, this.hotColor, 1.15, "top");
     this.depth2.addChild(this.deck2);
     this.depth1.addChild(this.deck1);
     this.depth2.alpha = cfg.alpha[1];
@@ -147,9 +204,13 @@ export class Station {
         this.addGun(Math.cos(angle) * (cfg.hub + 10), Math.sin(angle) * (cfg.hub + 10), angle, "hub");
       }
       const bay = angle + Math.PI / cfg.spokes;
-      this.addModule(Math.cos(bay) * (ring - 4), Math.sin(bay) * (ring - 4), bay, 30, 18);
+      if (i % 2 === 0) {
+        this.addModule(Math.cos(bay) * (ring + 58), Math.sin(bay) * (ring + 58), bay, 108, 64);
+        this.addModule(Math.cos(bay) * (ring + 8), Math.sin(bay) * (ring + 8), bay, 52, 30);
+      } else {
+        this.addModule(Math.cos(bay) * (ring + 28), Math.sin(bay) * (ring + 28), bay, 58, 28);
+      }
       this.addModule(Math.cos(angle) * mid, Math.sin(angle) * mid, angle, 22, 14);
-      this.addModule(Math.cos(bay) * (ring + 40), Math.sin(bay) * (ring + 40), bay, 44, 12);
     }
   }
 
