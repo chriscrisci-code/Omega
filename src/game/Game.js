@@ -1,8 +1,9 @@
 import { Container, Graphics } from "pixi.js";
-import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, warp, world as worldConfig } from "./config.js";
+import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig } from "./config.js";
 import { chipBurst, Debris, shatter } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
+import { Station } from "./entities/Station.js";
 import { Bullet } from "./entities/Bullet.js";
 import { EmpPulse } from "./entities/EmpPulse.js";
 import { Enemy, HUNTER } from "./entities/Enemy.js";
@@ -72,6 +73,8 @@ export class Game {
     this.vectors.addChild(this.ship.view);
     this.bases = createBases(worldConfig.width, worldConfig.height);
     this.hub = this.bases[0];
+    this.station = new Station(worldConfig.width * 0.5 + 3900, worldConfig.height * 0.5 + 3600);
+    this.vectors.addChildAt(this.station.view, 0);
     for (const base of this.bases) this.vectors.addChild(base.view);
     this.pendingBases = [];
     this.baseUnlockIn = castle.arriveEvery;
@@ -81,7 +84,7 @@ export class Game {
       this.vectors.addChild(bullet.view);
       return bullet;
     });
-    this.hostileShots = Array.from({ length: 28 }, () => {
+    this.hostileShots = Array.from({ length: 48 }, () => {
       const bullet = new Bullet();
       this.vectors.addChild(bullet.view);
       return bullet;
@@ -356,6 +359,14 @@ export class Game {
       base.screenDestroyerTimer = destroyers > 0 ? 3.5 + Math.random() * 2.5 : 8;
     }
     if (!silent) this.sfx("warn");
+    this.syncStation();
+  }
+
+  syncStation() {
+    if (!this.station) return;
+    const show = (this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE) && !this.attractOnDemo && this.assaultIndex >= stationCfg.fromWave;
+    if (show) this.station.wake();
+    else this.station.sleep();
   }
 
   beginRest() {
@@ -555,6 +566,39 @@ export class Game {
     this.sfx("enemy");
   }
 
+  fireStationGun(gun) {
+    const bullet = this.hostileShots.find((shot) => !shot.alive);
+    if (!bullet || !this.ship.alive) return;
+    const dx = wrapDelta(this.ship.x - gun.x, worldConfig.width);
+    const dy = wrapDelta(this.ship.y - gun.y, worldConfig.height);
+    bullet.fire(gun.x, gun.y, Math.atan2(dy, dx), {
+      hostile: true,
+      color: this.station.color,
+      hot: this.station.hotColor,
+      speed: stationCfg.gunSpeed,
+      life: stationCfg.gunLife,
+    });
+    gun.cool = stationCfg.gunCool;
+    this.sfx("enemy");
+  }
+
+  stationTargets() {
+    return this.station?.awake ? this.station.parts() : [];
+  }
+
+  tickStation(t, space) {
+    if (!this.station?.awake) return;
+    this.station.update(t, this.ship, space);
+    if (this.mode !== PLAYING || this.attractOnDemo || this.assaultRest) return;
+    if (!this.ship.alive || this.ship.docked) return;
+    let fired = 0;
+    for (const gun of this.station.readyGuns(this.ship, space)) {
+      if (fired >= stationCfg.fireMax) break;
+      this.fireStationGun(gun);
+      fired += 1;
+    }
+  }
+
   spawnShards(points, body, options) {
     const specs = options.chips ? chipBurst(body, options, options.chips) : shatter(points, body, options);
     for (const spec of specs) {
@@ -638,6 +682,8 @@ export class Game {
     this.lockMark.visible = false;
     this.hangar.view.visible = false;
     this.pips.view.visible = true;
+    this.station.reset();
+    this.syncStation();
     this.hud.setHubAlert(null);
     this.hud.setOre(this.cargo, this.hub.ore, this.hub.upgradeName());
     this.hud.hideCenter();
@@ -906,6 +952,7 @@ export class Game {
 
   beginAttractLoop(page = "title", options = {}) {
     this.attractOnDemo = false;
+    this.syncStation();
     this.attractPage = page;
     this.attractBoard = 0;
     this.attractThenTitle = Boolean(options.thenTitle);
@@ -1290,6 +1337,7 @@ export class Game {
       }
     };
     for (const enemy of this.enemies) consider(enemy, "enemy");
+    for (const part of this.stationTargets()) consider(part, "station");
     for (const rock of this.asteroids) consider(rock, "rock");
     for (const missile of this.missiles) consider(missile, "dart");
     for (const missile of this.hubMissiles) consider(missile, "dart");
@@ -1309,6 +1357,7 @@ export class Game {
       vy: Math.sin(this.hubGunAngle) * 220,
     };
     if (kind === "enemy") this.chipEnemy(hit, impact);
+    else if (kind === "station") this.chipStationPart(hit, impact);
     else this.chipRock(hit, impact);
   }
 
@@ -1319,12 +1368,12 @@ export class Game {
   missileTargets(space, count) {
     const picks = [];
     const used = new Set();
-    if (this.selected?.alive && this.enemies.includes(this.selected)) {
+    if (this.selected?.alive && (this.enemies.includes(this.selected) || this.selected.kind === "station")) {
       picks.push(this.selected);
       used.add(this.selected);
     }
     const ranked = [];
-    for (const enemy of this.enemies) {
+    for (const enemy of [...this.enemies, ...this.stationTargets()]) {
       if (!enemy.alive || used.has(enemy)) continue;
       const dx = wrapDelta(enemy.x - this.ship.x, space.width);
       const dy = wrapDelta(enemy.y - this.ship.y, space.height);
@@ -1363,6 +1412,7 @@ export class Game {
   pickables() {
     return [
       ...this.enemies.filter((enemy) => enemy.alive),
+      ...this.stationTargets(),
       ...this.bases.filter((base) => base.alive && !base.hub),
     ];
   }
@@ -1441,7 +1491,7 @@ export class Game {
     let best = null;
     let bestErr = leadConfig.cone;
     let bestDist = Infinity;
-    for (const enemy of this.enemies) {
+    for (const enemy of [...this.enemies, ...this.stationTargets()]) {
       if (!enemy.alive) continue;
       const dx = wrapDelta(enemy.x - nose.x, space.width);
       const dy = wrapDelta(enemy.y - nose.y, space.height);
@@ -1864,6 +1914,43 @@ export class Game {
     }
     if (enemy.hp <= 0) this.killEnemy(enemy);
     else this.sfx("hit");
+  }
+
+  chipStationPart(part, impact, amount = 1) {
+    if (!part?.alive) return;
+    const x = impact?.x ?? part.x;
+    const y = impact?.y ?? part.y;
+    part.hp -= amount;
+    this.spawnShards(null, { x, y, vx: 0, vy: 0, rotation: this.station.rotation, radius: part.radius }, {
+      color: this.station.color,
+      hotColor: this.station.hotColor,
+      kick: debrisConfig.rockKick * 0.7,
+      life: 0.5,
+      chips: 4,
+    });
+    this.fx.emit(6, {
+      x,
+      y,
+      color: this.station.hotColor,
+      speed: 90,
+      speedVar: 40,
+      life: 0.2,
+      size: 5,
+    });
+    if (part.hp > 0) {
+      this.sfx("hit");
+      return;
+    }
+    part.alive = false;
+    part.graphic.visible = false;
+    this.addScore(part.part === "gun" ? stationCfg.scoreGun : stationCfg.scoreModule);
+    this.fx.burst(part.x, part.y, this.station.color, 14, 160);
+    this.shake = Math.max(this.shake, 5);
+    this.sfx("pop");
+    if (this.selected === part) {
+      this.selected = null;
+      this.lockMark.visible = false;
+    }
   }
 
   bounceShot(shot, enemy, space) {
@@ -2449,6 +2536,10 @@ export class Game {
       if (!mapping) this.placeView(rock, space.width, space.height);
     }
     for (const base of this.bases) this.placeView(base, space.width, space.height);
+    if (this.station.awake) {
+      this.placeView(this.station, space.width, space.height);
+      this.station.tickParallax(this.camX, this.camY, space, mapping);
+    }
     for (const enemy of this.enemies) {
       enemy.view.scale.set(foeBoost);
       this.placeView(enemy, space.width, space.height);
@@ -2489,6 +2580,7 @@ export class Game {
       ...this.bases.filter((base) => base.alive),
       ...this.enemies.filter((enemy) => enemy.alive),
     ];
+    if (this.station.awake) marks.push(this.station);
     this.pips.update(marks, { x: this.camX, y: this.camY }, this.camRot, screen, this.camZoom, space, this.viewRadius(), {
       hubAlert: this.hubThreat > 0,
       hubClose: this.hubThreatClose,
@@ -2741,6 +2833,7 @@ export class Game {
         enemy.update(t, prey, space, this.aimedAt(enemy, space));
         if (enemy.wantsShot(prey, space)) this.fireHostile(enemy);
       }
+      this.tickStation(t, space);
       this.tickDestroyerLasers(t, space);
       if (this.hub.alive && this.hub.armed) {
         this.hub.missileCool = Math.max(0, this.hub.missileCool - t);
@@ -2811,6 +2904,16 @@ export class Game {
         }
       }
 
+      for (const part of this.stationTargets()) {
+        for (const shot of this.shots) {
+          if (!shot.alive) continue;
+          if (!hitsBeam(shot, part, bullets.streak)) continue;
+          shot.kill();
+          this.chipStationPart(part, shot);
+          break;
+        }
+      }
+
       for (const star of this.castleStars) {
         if (!star.alive) continue;
         for (const shot of this.shots) {
@@ -2829,6 +2932,15 @@ export class Game {
           if (hits(missile, enemy, space.width, space.height)) {
             this.detonateMissile(missile, enemy);
             this.chipEnemy(enemy, missile, missiles.damage, "missile");
+            struck = true;
+            break;
+          }
+        }
+        if (struck) continue;
+        for (const part of this.stationTargets()) {
+          if (hits(missile, part, space.width, space.height)) {
+            this.detonateMissile(missile, part);
+            this.chipStationPart(part, missile, missiles.damage);
             struck = true;
             break;
           }
@@ -2974,7 +3086,7 @@ export class Game {
       this.audio.tickEngine(0, 0, 0, 0);
     }
     this.tickMissileAudio(t, space);
-    this.audio.tickMusic(this.musicState());
+    this.audio.tickMusic({ bed: 0, dark: 0, heat: 0, hiss: 0 });
 
     this.input.endFrame();
   }

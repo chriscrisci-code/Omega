@@ -304,19 +304,11 @@ export class GameAudio {
     };
   }
 
-  tickMusic({ bed = 0, dark = 0, heat = 0, hiss = 0 } = {}) {
-    if (!this.ctx || this.ctx.state !== "running") return;
-    this.ensureMusic();
-    if (!this.music) return;
-    const level = Math.max(0, Math.min(1, bed));
-    this.music.out.gain.value = this.musicVol;
-    this.music.bus.gain.value = 0.18 + level * 0.22;
-    this.music.low.gain.gain.value = 0.55 + dark * 0.12;
-    this.music.fifth.gain.gain.value = 0.28 + heat * 0.18;
-    this.music.minor.gain.gain.value = 0.32 + dark * 0.16;
-    this.music.air.gain.gain.value = 0.22 + heat * 0.12;
-    this.music.sub.gain.gain.value = 0.2 + dark * 0.1;
-    this.music.filter.frequency.value = 640 + (1 - dark) * 80 + heat * 260;
+  tickMusic() {
+    if (this.music) {
+      this.music.out.gain.value = 0;
+      this.music.bus.gain.value = 0;
+    }
   }
 }
 

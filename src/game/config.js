@@ -48,7 +48,7 @@ export const emp = {
   cooldown: 8,
 };
 
-/** Sample-free ambient bed. Levels stay under guns. */
+/** Sample-free ambient bed. Suspended for now (single-tone issue). */
 export const music = {
   title: 0.35,
   fly: 0.55,
@@ -95,6 +95,7 @@ export const hudFilters = {
   enemy: true,
   raider: true,
   destroyer: true,
+  station: true,
 };
 
 /** 16000² torus. Hub at center. Cardinal castles sit 5120 out. Warp hops 2560 in 1s. */
@@ -215,6 +216,28 @@ export const assault = {
   w1RaidMax: 12,
   w1RaidEvery: 5.2,
   w2PerCastle: 2,
+};
+
+/** Wave 5 enemy station. Hull stays; guns and ring modules can die. */
+export const station = {
+  fromWave: 5,
+  hub: 220,
+  ring: 980,
+  spokes: 8,
+  spin: 0.016,
+  gunHits: 4,
+  moduleHits: 5,
+  gunCool: 1.45,
+  gunRange: 1180,
+  gunSpeed: 680,
+  gunLife: 1.45,
+  fireMax: 2,
+  scoreGun: 80,
+  scoreModule: 55,
+  alpha: [0.38, 0.16],
+  scale: [0.86, 0.7],
+  parallax: [0.84, 0.68],
+  shift: [70, 95],
 };
 
 export const ore = {

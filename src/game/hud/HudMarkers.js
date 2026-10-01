@@ -10,12 +10,12 @@ function formatRange(dist) {
 
 function rangeT(kind, dist, viewRadius) {
   const near = viewRadius * 1.2;
-  const far = kind === "enemy" ? viewRadius * 3.5 : kind === "raider" ? viewRadius * 6 : kind === "destroyer" ? viewRadius * 4.2 : viewRadius * 5;
+  const far = kind === "enemy" ? viewRadius * 3.5 : kind === "raider" ? viewRadius * 6 : kind === "destroyer" ? viewRadius * 4.2 : kind === "station" ? viewRadius * 5.6 : viewRadius * 5;
   return Math.min(1, Math.max(0, (dist - near) / Math.max(1, far - near)));
 }
 
 function rangeAlpha(kind, t) {
-  const floor = kind === "hub" ? 0.5 : kind === "raider" ? 0.48 : kind === "destroyer" ? 0.4 : kind === "enemy" ? 0.28 : 0.35;
+  const floor = kind === "hub" ? 0.5 : kind === "raider" ? 0.48 : kind === "destroyer" ? 0.4 : kind === "station" ? 0.42 : kind === "enemy" ? 0.28 : 0.35;
   return 1 - t * (1 - floor);
 }
 
@@ -97,6 +97,20 @@ function drawGlyph(g, kind, color, hot, extras = {}) {
     g.stroke({ width: 0.9, color });
     g.circle(-8, 0, 1.2);
     g.stroke({ width: 0.9, color });
+    return;
+  }
+
+  if (kind === "station") {
+    g.circle(0, 0, 7);
+    g.stroke({ width: 1.15, color: hot });
+    g.circle(0, 0, 3);
+    g.stroke({ width: 1, color });
+    for (let i = 0; i < 6; i += 1) {
+      const a = (i / 6) * Math.PI * 2;
+      g.moveTo(Math.cos(a) * 3.4, Math.sin(a) * 3.4);
+      g.lineTo(Math.cos(a) * 10, Math.sin(a) * 10);
+    }
+    g.stroke({ width: 1.05, color: hot, cap: "round" });
     return;
   }
 
