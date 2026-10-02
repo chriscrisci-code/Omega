@@ -18,8 +18,13 @@ function boxPts(w, h) {
   return [-x, -y, x, -y, x, y, -x, y];
 }
 
-function gunPts() {
-  return [16, 0, -8, 7, -3.5, 0, -8, -7];
+function paintTurret(g) {
+  const white = colors.white;
+  strokeGlow(g, ringPts(8, 15), white, white, 1.4);
+  strokeGlow(g, ringPts(6, 8.5, Math.PI / 6), white, white, 1.15);
+  strokeGlow(g, [12, 5.4, -8, 6.4, -8, -6.4, 12, -5.4], white, white, 1.15);
+  strokeGlow(g, [28, 3.4, 11, 3.4, 11, -3.4, 28, -3.4], white, white, 1.25);
+  strokeGlow(g, ringPts(4, 3.2, Math.PI / 4), white, white, 0.95);
 }
 
 function boxAt(g, x, y, angle, w, h) {
@@ -197,6 +202,7 @@ export class Station {
   buildParts() {
     const ring = cfg.ring - 6;
     const mid = (cfg.hub + cfg.ring) * 0.52;
+    const inner = cfg.hub + 52;
     for (let i = 0; i < cfg.spokes; i += 1) {
       const angle = (i / cfg.spokes) * Math.PI * 2;
       this.addGun(Math.cos(angle) * ring, Math.sin(angle) * ring, angle, "ring");
@@ -204,13 +210,19 @@ export class Station {
         this.addGun(Math.cos(angle) * (cfg.hub + 10), Math.sin(angle) * (cfg.hub + 10), angle, "hub");
       }
       const bay = angle + Math.PI / cfg.spokes;
+      this.addModule(Math.cos(bay) * (ring + 58), Math.sin(bay) * (ring + 58), bay, 108, 64);
+      this.addModule(Math.cos(bay) * (ring + 8), Math.sin(bay) * (ring + 8), bay, 56, 32);
+      this.addModule(Math.cos(bay) * (ring - 78), Math.sin(bay) * (ring - 78), bay, 48, 28);
+      this.addModule(Math.cos(angle) * mid, Math.sin(angle) * mid, angle, 38, 22);
+      this.addModule(Math.cos(angle) * (mid + 150), Math.sin(angle) * (mid + 150), angle, 30, 18);
+      this.addModule(Math.cos(angle) * inner, Math.sin(angle) * inner, angle, 28, 18);
       if (i % 2 === 0) {
-        this.addModule(Math.cos(bay) * (ring + 58), Math.sin(bay) * (ring + 58), bay, 108, 64);
-        this.addModule(Math.cos(bay) * (ring + 8), Math.sin(bay) * (ring + 8), bay, 52, 30);
+        this.addModule(Math.cos(bay) * (ring + 118), Math.sin(bay) * (ring + 118), bay, 76, 42);
+        this.addModule(Math.cos(bay + 0.14) * (ring + 74), Math.sin(bay + 0.14) * (ring + 74), bay, 40, 24);
+        this.addModule(Math.cos(bay - 0.14) * (ring + 74), Math.sin(bay - 0.14) * (ring + 74), bay, 40, 24);
       } else {
-        this.addModule(Math.cos(bay) * (ring + 28), Math.sin(bay) * (ring + 28), bay, 58, 28);
+        this.addModule(Math.cos(bay) * (ring + 96), Math.sin(bay) * (ring + 96), bay, 62, 34);
       }
-      this.addModule(Math.cos(angle) * mid, Math.sin(angle) * mid, angle, 22, 14);
     }
   }
 
@@ -231,7 +243,7 @@ export class Station {
 
   addGun(lx, ly, angle, seat) {
     const g = new Graphics();
-    strokeGlow(g, gunPts(), this.color, this.hotColor, 1.25);
+    paintTurret(g);
     g.position.set(lx, ly);
     g.rotation = angle;
     this.combat.addChild(g);
@@ -243,7 +255,7 @@ export class Station {
           angle,
           seat,
           graphic: g,
-          radius: 17,
+          radius: 22,
           hp: cfg.gunHits,
           maxHp: cfg.gunHits,
           cool: Math.random() * cfg.gunCool,

@@ -226,7 +226,7 @@ export const station = {
   spokes: 8,
   spin: 0.016,
   gunHits: 4,
-  moduleHits: 5,
+  moduleHits: 30,
   gunCool: 1.45,
   gunRange: 1180,
   gunSpeed: 680,
