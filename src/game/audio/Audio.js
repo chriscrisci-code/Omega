@@ -229,17 +229,9 @@ export class GameAudio {
     };
   }
 
-  incomingBeep(urgency = 0.5, at) {
+  incomingBeep(at) {
     if (!this.ctx || this.ctx.state !== "running") return;
-    const u = Math.min(1, Math.max(0, urgency));
-    const t = at ?? this.now();
-    const peak = 0.055 + u * 0.05;
-    const pitch = 470 + u * 80;
-    this.tone({ type: "sine", freq: pitch, dur: 0.1, peak, attack: 0.01, at: t });
-    this.tone({ type: "sine", freq: pitch * 2, dur: 0.07, peak: peak * 0.18, attack: 0.012, at: t });
-    this.tone({ type: "sine", freq: 180, dur: 0.12, peak: peak * 0.22, attack: 0.008, at: t });
-    this.tone({ type: "sine", freq: pitch * 0.88, dur: 0.11, peak: peak * 0.82, attack: 0.01, at: t + 0.16 });
-    this.tone({ type: "sine", freq: pitch * 1.76, dur: 0.08, peak: peak * 0.14, attack: 0.012, at: t + 0.16 });
+    this.tone({ type: "square", freq: 250, dur: 0.5, peak: 0.055, attack: 0.012, at: at ?? this.now() });
   }
 
   tickFly(amount = 0, recede = 1) {
@@ -366,9 +358,7 @@ export const SFX = {
   star: {
     name: "STAR",
     fire: (audio) => {
-      audio.incomingBeep(0.35);
-      audio.incomingBeep(0.7, audio.now() + 0.28);
-      audio.incomingBeep(1, audio.now() + 0.5);
+      audio.incomingBeep();
     },
   },
   boom: {

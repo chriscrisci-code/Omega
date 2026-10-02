@@ -239,11 +239,10 @@ export class Game {
       this.starBeepWait = 0;
       return;
     }
-    const urgency = 1 - Math.min(1, closest / 4000);
     this.starBeepWait -= t;
     if (this.starBeepWait <= 0) {
-      this.audio.incomingBeep(urgency);
-      this.starBeepWait = Math.max(0.16, 0.95 - urgency * 0.72);
+      this.audio.incomingBeep();
+      this.starBeepWait = 1;
     }
   }
 
