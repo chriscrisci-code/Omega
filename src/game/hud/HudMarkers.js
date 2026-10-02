@@ -230,7 +230,7 @@ export class HudMarkers {
       const tint = alert && extras.hubClose ? 0xffc266 : target.hotColor;
       const glow = alert && extras.hubClose ? 0xff9a3c : target.color;
       pip.label.clear();
-      const showLabel = item.cone ? i === coneBest : true;
+      const showLabel = !extras.compact && (item.cone ? i === coneBest : true);
       if (!showLabel) return;
       pip.label.rotation = -pip.node.rotation;
       drawVectorText(pip.label, target.name ? `${target.name}  ${range}` : range, 0, 14, 9, glow, tint, "center");

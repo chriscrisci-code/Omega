@@ -1137,6 +1137,64 @@ body.is-phone .hud-br {
   bottom: 168px;
 }
 
+body.is-phone .hud-center .help,
+body.is-phone .credit,
+body.is-phone .version,
+body.is-phone [data-label],
+body.is-phone #special,
+body.is-phone #hub-ore,
+body.is-phone #points,
+body.is-phone #dock-hint,
+body.is-phone .dock-ship .vector-text {
+  display: none;
+}
+
+body.is-phone.is-attract .stick,
+body.is-phone:has(#ships-page:not(.is-hidden)) .stick,
+body.is-phone:has(#controls-page:not(.is-hidden)) .stick,
+body.is-phone:has(.hud-center.is-wave) .stick,
+body.is-phone:has(.hud-center.is-scores) .stick {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+body.is-phone:has(.dock-bay:not(.is-hidden)) .hud-bl,
+body.is-phone:has(.dock-bay:not(.is-hidden)) .hud-br,
+body.is-phone:has(.dock-bay:not(.is-hidden)) .mode-banner {
+  display: none;
+}
+
+body.is-phone .dock-bay {
+  bottom: 158px;
+  width: min(920px, 94vw);
+}
+
+body.is-phone .dock-panel {
+  padding: 2px 6px 4px;
+  background: rgba(5, 8, 14, 0.62);
+}
+
+body.is-phone .dock-up,
+body.is-phone .dock-seat {
+  min-width: 88px;
+}
+
+body.is-phone .mode-banner {
+  bottom: 178px;
+}
+
+body.is-phone .tag {
+  margin-bottom: 16px;
+}
+
+body.is-phone .cta {
+  margin-top: 20px;
+}
+
+body.is-phone .ships-link {
+  margin-top: 12px;
+}
+
 .device-pick {
   position: absolute;
   left: 50%;

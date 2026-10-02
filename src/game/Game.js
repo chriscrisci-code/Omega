@@ -2587,6 +2587,7 @@ export class Game {
       time: performance.now() * 0.001,
       mapping,
       lock: this.selected?.alive ? this.selected : null,
+      compact: this.input.layout === "phone",
     });
   }
 

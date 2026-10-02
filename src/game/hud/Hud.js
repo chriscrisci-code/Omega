@@ -127,6 +127,10 @@ export class Hud {
 
   setOre(cargo, banked = 0, name = "") {
     this.paint(this.ore, String(cargo), 26, CYAN, HOT, "center");
+    if (this.layout === "phone") {
+      if (this.hubOre) this.hubOre.innerHTML = "";
+      return;
+    }
     const line = name ? `HUB ${banked}  ${name}` : banked ? `HUB ${banked}` : "";
     this.paint(this.hubOre, line, 10, DIM, CYAN, "center");
   }
@@ -169,6 +173,10 @@ export class Hud {
   }
 
   setSpecial(name) {
+    if (this.layout === "phone") {
+      if (this.special) this.special.innerHTML = "";
+      return;
+    }
     this.paint(this.special, name || "WARP EMP MSL", 14, CYAN, HOT, "right");
   }
 
@@ -224,10 +232,9 @@ export class Hud {
       return;
     }
     if (this.layout === "phone") {
-      this.help[0] && this.paint(this.help[0], "LEFT STICK THRUST  RIGHT STICK TURN", 11, DIM, CYAN, "center");
-      this.help[1] && this.paint(this.help[1], "DOUBLE TAP STICK FIRE  FLICK FWD WARP  FLICK BACK EMP", 11, DIM, CYAN, "center");
-      this.help[2] && this.paint(this.help[2], "TWO FINGER TAP MISSILE  DOUBLE TAP SHIELD", 10, DIM, CYAN, "center");
-      this.paint(document.querySelector("[data-label=special]"), "FLICK", 10, DIM, CYAN, "right");
+      this.help.forEach((line) => {
+        if (line) line.innerHTML = "";
+      });
       return;
     }
     this.help[0] && this.paint(this.help[0], "MOUSE AIM  LEFT FIRE  WHEEL FWD WARP  WHEEL BACK EMP  WHEEL BUTTON MISSILE", 11, DIM, CYAN, "center");
@@ -238,6 +245,8 @@ export class Hud {
 
   setLayout(id) {
     this.layout = id === "phone" ? "phone" : "desktop";
+    this.paint(this.shipsLink, this.layout === "phone" ? "SHIPS" : "S SHIPS", 14, DIM, CYAN, "center");
+    this.paint(this.controlsLink, this.layout === "phone" ? "CONTROLS" : "C CONTROLS", 14, DIM, CYAN, "center");
     this.paintHelp();
   }
 
