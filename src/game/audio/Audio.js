@@ -383,6 +383,13 @@ export const SFX = {
       audio.tone({ type: "sine", freq: 80, glide: 260, dur: 1, peak: 0.1, attack: 0.04 });
     },
   },
+  laser: {
+    name: "LASER",
+    fire: (audio) => {
+      audio.tone({ type: "sine", freq: 1680, dur: 0.9, peak: 0.16, attack: 0.02 });
+      audio.tone({ type: "sine", freq: 2520, dur: 0.7, peak: 0.07, attack: 0.03 });
+    },
+  },
   emp: {
     name: "EMP",
     fire: (audio) => {
@@ -606,7 +613,7 @@ export const SFX = {
 
 export const SFX_GROUPS = [
   { name: "GUNS", ids: ["thud", "enemy"] },
-  { name: "SPECIAL", ids: ["missile", "star", "warp", "emp"] },
+  { name: "SPECIAL", ids: ["missile", "star", "warp", "emp", "laser"] },
   { name: "THRUST", ids: ["main", "side"] },
   { name: "HITS", ids: ["hit", "rock", "boom", "die", "hub"] },
   { name: "ORE", ids: ["spawn", "ore", "dump", "up"] },

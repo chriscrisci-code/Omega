@@ -472,6 +472,7 @@ export class Game {
         }
         enemy.laserOn = true;
         enemy.laserCharge = 0;
+        this.sfx("laser");
       }
       enemy.laserCharge += t;
       const strength = Math.min(1, enemy.laserCharge / destroyerConfig.laserTime);
@@ -1321,7 +1322,7 @@ export class Game {
       if (!this.input.fireHeld || this.hubLaserWait > 0) return;
       this.hubLaserOn = true;
       this.hubLaserLife = hubGunner.laserHold;
-      this.sfx("on");
+      this.sfx("laser");
     }
     const origin = this.gunnerOrigin();
     const range = hubGunner.laserRange;
