@@ -127,7 +127,7 @@ export const hubGunner = {
   laserRange: 920,
   laserTick: 0.14,
   laserWidth: 14,
-  laserHold: 3,
+  laserHold: 2,
   laserRest: 1,
 };
 
