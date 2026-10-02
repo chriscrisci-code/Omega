@@ -235,8 +235,8 @@ export function vectorTitleSvg(text, size, color = "#66e0ff", hot = "#c8f8ff", o
   const motion = Boolean(options.motion);
   const block = Boolean(options.block);
   const { strokes, width, height } = displayStrokes(text, size, block ? 0.1 : 0.26, block ? BLOCK : DISPLAY);
-  const layers = motion ? 9 : 12;
-  const echoes = motion ? 4 : 0;
+  const layers = motion ? 4 : 12;
+  const echoes = motion ? 2 : 0;
   const dx = size * 0.052;
   const dy = size * 0.046;
   const trail = (layers + echoes * 2.2) * dx;

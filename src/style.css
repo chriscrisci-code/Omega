@@ -377,7 +377,7 @@ body.is-attract .hud-center h1 {
 }
 
 .hud-center h1 .vector-title {
-  width: min(980px, 94vw);
+  width: min(520px, 70vw);
   height: auto;
   overflow: visible;
 }
