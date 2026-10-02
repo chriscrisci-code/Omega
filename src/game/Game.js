@@ -261,6 +261,34 @@ export class Game {
     return Math.hypot(this.app.screen.width, this.app.screen.height) * 0.5 / this.playZoom();
   }
 
+  viewEdgeAlong(ox, oy, angle) {
+    const screen = this.app.screen;
+    const zoom = this.camZoom || cameraConfig.zoom;
+    const space = this.space();
+    const c = Math.cos(this.camRot);
+    const s = Math.sin(this.camRot);
+    const dx = wrapDelta(ox - this.camX, space.width);
+    const dy = wrapDelta(oy - this.camY, space.height);
+    const lx = dx * c - dy * s;
+    const ly = dx * s + dy * c;
+    const vx = Math.cos(angle) * c - Math.sin(angle) * s;
+    const vy = Math.cos(angle) * s + Math.sin(angle) * c;
+    const hw = screen.width * 0.5 / zoom;
+    const hh = screen.height * 0.5 / zoom;
+    let reach = Infinity;
+    const hit = (pos, dir, edge) => {
+      if (Math.abs(dir) < 1e-6) return;
+      const along = (edge - pos) / dir;
+      if (along > 0) reach = Math.min(reach, along);
+    };
+    hit(lx, vx, hw);
+    hit(lx, vx, -hw);
+    hit(ly, vy, hh);
+    hit(ly, vy, -hh);
+    if (!Number.isFinite(reach) || reach < 40) return Math.hypot(hw, hh) + 40;
+    return reach + 28;
+  }
+
   ringPoint(cx, cy, radius) {
     const angle = rand(0, Math.PI * 2);
     return {
@@ -1325,7 +1353,7 @@ export class Game {
       this.sfx("laser");
     }
     const origin = this.gunnerOrigin();
-    const range = hubGunner.laserRange;
+    const range = this.viewEdgeAlong(origin.x, origin.y, this.hubGunAngle);
     let best = range;
     let hit = null;
     let kind = "";
