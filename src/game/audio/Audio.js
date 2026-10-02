@@ -229,9 +229,9 @@ export class GameAudio {
     };
   }
 
-  incomingBeep(at) {
+  incomingBeep({ at, dur = 0.5 } = {}) {
     if (!this.ctx || this.ctx.state !== "running") return;
-    this.tone({ type: "square", freq: 250, dur: 0.5, peak: 0.055, attack: 0.012, at: at ?? this.now() });
+    this.tone({ type: "square", freq: 250, dur, peak: 0.055, attack: 0.012, at: at ?? this.now() });
   }
 
   tickFly(amount = 0, recede = 1) {
