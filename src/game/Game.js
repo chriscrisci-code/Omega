@@ -3089,6 +3089,8 @@ export class Game {
       this.audio.tickEngine(0, 0, 0, 0);
     }
     this.tickMissileAudio(t, space);
+    const laserOn = Boolean(this.hubLaserOn) || this.enemies.some((enemy) => enemy.alive && enemy.role === "destroyer" && enemy.laserOn);
+    this.audio.tickLaser(laserOn);
     this.audio.tickMusic({ bed: 0, dark: 0, heat: 0, hiss: 0 });
 
     this.input.endFrame();

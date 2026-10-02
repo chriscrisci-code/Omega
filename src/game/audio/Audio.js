@@ -6,6 +6,8 @@ export class GameAudio {
     this.master = null;
     this._noise = null;
     this.engines = null;
+    this.laserBed = null;
+    this._laserOn = 0;
     this.musicVol = 0.8;
   }
 
@@ -234,6 +236,46 @@ export class GameAudio {
     this.tone({ type: "square", freq: 250, dur, peak: 0.055, attack: 0.012, at: at ?? this.now() });
   }
 
+  ensureLaser() {
+    if (this.laserBed || !this.ctx) return;
+    const hissSrc = this.noiseSource();
+    const hissFilter = this.ctx.createBiquadFilter();
+    hissFilter.type = "bandpass";
+    hissFilter.frequency.value = 4200;
+    hissFilter.Q.value = 1.4;
+    const hiss = this.ctx.createGain();
+    hiss.gain.value = 0;
+    hissSrc.connect(hissFilter);
+    hissFilter.connect(hiss);
+    hiss.connect(this.master);
+    hissSrc.start();
+    const buzz = this.ctx.createOscillator();
+    buzz.type = "sawtooth";
+    buzz.frequency.value = 1760;
+    const buzzFilter = this.ctx.createBiquadFilter();
+    buzzFilter.type = "highpass";
+    buzzFilter.frequency.value = 900;
+    const buzzGain = this.ctx.createGain();
+    buzzGain.gain.value = 0;
+    buzz.connect(buzzFilter);
+    buzzFilter.connect(buzzGain);
+    buzzGain.connect(this.master);
+    buzz.start();
+    this.laserBed = { hiss, buzzGain };
+  }
+
+  tickLaser(on = 0) {
+    if (!this.ctx || this.ctx.state !== "running") return;
+    const amt = on ? 1 : 0;
+    if (amt === this._laserOn && (amt === 0 || this.laserBed)) return;
+    this._laserOn = amt;
+    if (amt === 0 && !this.laserBed) return;
+    this.ensureLaser();
+    const t = this.now();
+    this.laserBed.hiss.gain.setTargetAtTime(amt * 0.11, t, 0.04);
+    this.laserBed.buzzGain.gain.setTargetAtTime(amt * 0.07, t, 0.04);
+  }
+
   tickFly(amount = 0, recede = 1) {
     if (!this.ctx || this.ctx.state !== "running") return;
     this.ensureEngine();
@@ -386,8 +428,7 @@ export const SFX = {
   laser: {
     name: "LASER",
     fire: (audio) => {
-      audio.tone({ type: "sine", freq: 1680, dur: 0.9, peak: 0.16, attack: 0.02 });
-      audio.tone({ type: "sine", freq: 2520, dur: 0.7, peak: 0.07, attack: 0.03 });
+      audio.tone({ type: "sine", freq: 1880, dur: 0.08, peak: 0.12, attack: 0.004 });
     },
   },
   emp: {
