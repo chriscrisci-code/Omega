@@ -1,6 +1,6 @@
 import { Container, Graphics } from "pixi.js";
 import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig } from "./config.js";
-import { chipBurst, Debris, shatter } from "./entities/Debris.js";
+import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
 import { Station } from "./entities/Station.js";
@@ -633,7 +633,11 @@ export class Game {
   }
 
   spawnShards(points, body, options) {
-    const specs = options.chips ? chipBurst(body, options, options.chips) : shatter(points, body, options);
+    const specs = options.wreck
+      ? wreckBurst(body, options, options.wreck)
+      : options.chips
+        ? chipBurst(body, options, options.chips)
+        : shatter(points, body, options);
     for (const spec of specs) {
       const shard = new Debris(spec);
       this.shards.push(shard);
@@ -1975,13 +1979,24 @@ export class Game {
     part.hp -= amount;
     const dead = part.hp <= 0;
     const building = part.part === "module";
-    this.spawnShards(null, { x, y, vx: 0, vy: 0, rotation: this.station.rotation, radius: part.radius }, {
-      color: this.station.color,
-      hotColor: this.station.hotColor,
-      kick: debrisConfig.rockKick * (building ? 0.95 : 0.7),
-      life: building ? 0.7 : 0.5,
-      chips: building ? (dead ? 22 : 12) : (dead ? 8 : 5),
-    });
+    const hunk = { x, y, vx: 0, vy: 0, rotation: this.station.rotation, radius: Math.max(22, part.radius || 24) };
+    if (building) {
+      this.spawnShards(null, hunk, {
+        color: this.station.color,
+        hotColor: this.station.hotColor,
+        kick: debrisConfig.rockKick * 0.55,
+        life: dead ? 2.4 : 1.8,
+        wreck: dead ? 16 : 7,
+      });
+    } else {
+      this.spawnShards(null, hunk, {
+        color: this.station.color,
+        hotColor: this.station.hotColor,
+        kick: debrisConfig.rockKick * 0.7,
+        life: 0.5,
+        chips: dead ? 8 : 5,
+      });
+    }
     this.fx.emit(building ? 10 : 6, {
       x,
       y,
@@ -2000,12 +2015,12 @@ export class Game {
     this.addScore(part.part === "gun" ? stationCfg.scoreGun : stationCfg.scoreModule);
     this.fx.burst(part.x, part.y, this.station.color, building ? 26 : 14, building ? 220 : 160);
     if (building) {
-      this.spawnShards(null, { x: part.x, y: part.y, vx: 0, vy: 0, rotation: this.station.rotation, radius: part.radius * 1.15 }, {
+      this.spawnShards(null, { x: part.x, y: part.y, vx: 0, vy: 0, rotation: this.station.rotation, radius: Math.max(36, part.radius * 1.35) }, {
         color: this.station.color,
-        hotColor: this.station.hotColor,
-        kick: debrisConfig.rockKick * 1.15,
-        life: 0.85,
-        chips: 14,
+        hotColor: colors.white,
+        kick: debrisConfig.rockKick * 0.7,
+        life: 2.8,
+        wreck: 12,
       });
     }
     this.shake = Math.max(this.shake, building ? 7 : 5);

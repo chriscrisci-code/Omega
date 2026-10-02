@@ -159,6 +159,60 @@ export function shatter(points, body, look) {
   return shards;
 }
 
+export function wreckBurst(body, look, count = 8) {
+  const shards = [];
+  const r = Math.max(18, body.radius || 24);
+  for (let i = 0; i < count; i += 1) {
+    const angle = rand(0, Math.PI * 2);
+    const reach = r * rand(0.1, 0.75);
+    const ox = Math.cos(angle) * reach;
+    const oy = Math.sin(angle) * reach;
+    const w = r * rand(0.28, 0.72);
+    const h = r * rand(0.16, 0.42);
+    const rot = rand(0, Math.PI * 2);
+    const c = Math.cos(rot);
+    const s = Math.sin(rot);
+    const plate = [
+      { x: ox + c * w - s * h, y: oy + s * w + c * h },
+      { x: ox - c * w - s * h, y: oy - s * w + c * h },
+      { x: ox - c * w + s * h, y: oy - s * w - c * h },
+    ];
+    if (Math.random() < 0.55) plate.push({ x: ox + c * w + s * h, y: oy + s * w - c * h });
+    shards.push(
+      shardFromLocals(plate, body, look, {
+        closed: true,
+        life: (look.life || 1.6) + rand(0.4, 1.4),
+        kickScale: rand(0.35, 0.75),
+        spinScale: rand(0.45, 1.3),
+        width: rand(1.45, 2.1),
+      }),
+    );
+    if (Math.random() < 0.45) {
+      const beam = r * rand(0.4, 0.95);
+      const bx = Math.cos(angle + 0.4) * beam;
+      const by = Math.sin(angle + 0.4) * beam;
+      shards.push(
+        shardFromLocals(
+          [
+            { x: ox, y: oy },
+            { x: ox + bx, y: oy + by },
+          ],
+          body,
+          look,
+          {
+            closed: false,
+            life: (look.life || 1.6) * rand(0.7, 1.1),
+            kickScale: rand(0.5, 0.95),
+            spinScale: rand(0.8, 1.8),
+            width: rand(1.3, 1.9),
+          },
+        ),
+      );
+    }
+  }
+  return shards;
+}
+
 export function chipBurst(body, look, count = 5) {
   const shards = [];
   for (let i = 0; i < count; i += 1) {
