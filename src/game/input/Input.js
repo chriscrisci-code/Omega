@@ -428,6 +428,14 @@ export class Input {
     return this.keysPressed("fullscreen");
   }
 
+  get pausePressed() {
+    return this.keysPressed("pause") || this.anyPressed(["KeyP"]);
+  }
+
+  get savePressed() {
+    return this.keysPressed("save") || this.anyPressed(["KeyV"]);
+  }
+
   get quitPressed() {
     return this.keysPressed("quit") || this.anyPressed(["Escape"]);
   }

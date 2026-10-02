@@ -13,6 +13,8 @@ export const ACTIONS = [
   { id: "missile", name: "MISSILE" },
   { id: "map", name: "MAP" },
   { id: "home", name: "HOME" },
+  { id: "pause", name: "PAUSE" },
+  { id: "save", name: "SAVE" },
   { id: "fullscreen", name: "FULLSCREEN" },
   { id: "quit", name: "END RUN" },
 ];
@@ -91,6 +93,8 @@ const KEYS = {
   turnR: [key("KeyE"), key("ArrowRight")],
   map: [key("KeyM")],
   home: [key("KeyH")],
+  pause: [key("KeyP")],
+  save: [key("KeyV")],
   fullscreen: [key("KeyF")],
   quit: [key("Escape")],
 };
@@ -148,6 +152,8 @@ export const DEFAULTS = {
     missile: [gesture("twoFinger")],
     map: [key("KeyM")],
     home: [key("KeyH")],
+    pause: [key("KeyP")],
+    save: [key("KeyV")],
     fullscreen: [key("KeyF")],
     quit: [key("Escape")],
   },

@@ -140,6 +140,9 @@ export class Game {
     this.burstLeft = 0;
     this.fireWasOn = false;
     this.missileCool = 0;
+    this.missileQueued = 0;
+    this.paused = false;
+    this.saveFlash = 0;
     this.timer = 0;
     this.shake = 0;
     this.nextLifeAt = extraLifeEvery;
@@ -675,6 +678,9 @@ export class Game {
     this.hubMissiles.forEach((missile) => missile.kill(true));
     this.castleStars.forEach((star) => star.kill(true));
     this.missileCool = 0;
+    this.missileQueued = 0;
+    this.paused = false;
+    this.saveFlash = 0;
     this.emp.kill();
     this.empCool = 0;
     this.warpCool = 0;
@@ -1053,6 +1059,7 @@ export class Game {
     this.selected = null;
     this.lockMark.visible = false;
     this.missileCool = 0;
+    this.missileQueued = 0;
     this.empCool = 0;
     this.warpCool = 0;
     this.cooldown = 0;
@@ -1655,6 +1662,21 @@ export class Game {
     }
   }
 
+  togglePause() {
+    if (this.mode !== PLAYING || this.attractOnDemo) return;
+    this.paused = !this.paused;
+    if (this.paused) this.hud.setMode("PAUSE");
+  }
+
+  manualSave() {
+    if (this.attractOnDemo) return;
+    if (this.mode !== PLAYING && this.mode !== DYING && this.mode !== CONTINUE) return;
+    this.writeCheckpoint({ force: true });
+    this.saveFlash = 1.1;
+    this.hud.setMode("SAVED");
+    this.sfx("dump");
+  }
+
   writeCheckpoint(options = {}) {
     if (this.attractOnDemo) return;
     const force = Boolean(options.force);
@@ -1757,35 +1779,35 @@ export class Game {
   }
 
   fireMissile(force = false) {
-    if ((!force && this.missileCool > 0) || !this.ship.alive || this.ship.docked) return;
-    const space = this.space();
+    if (!this.ship.alive || this.ship.docked) return;
+    if (!force && this.missileCool > 0) return;
     const volley = this.missileVolley();
     if (volley <= 0) return;
-    const targets = this.missileTargets(space, volley);
-    const nose = this.ship.nose();
-    let fired = 0;
-    for (let i = 0; i < volley; i += 1) {
-      const missile = this.missiles.find((item) => !item.alive);
-      if (!missile) break;
-      const spread = (i - (volley - 1) * 0.5) * 0.07;
-      missile.fire(nose.x, nose.y, this.ship.rotation + spread, targets[i] || null);
-      fired += 1;
-      const mark = targets[i];
-      if (mark) {
-        this.fx.emit(4, {
-          x: mark.x,
-          y: mark.y,
-          color: colors.amber,
-          speed: 36,
-          speedVar: 16,
-          life: 0.18,
-          size: 4,
-        });
-      }
+    if (!force) {
+      if (this.missileQueued > 0) return;
+      this.missileQueued = volley;
     }
-    if (!fired) return;
+    if (this.missileCool > 0 || this.missileQueued <= 0) return;
+    const missile = this.missiles.find((item) => !item.alive);
+    if (!missile) return;
+    const space = this.space();
+    const mark = this.missileTargets(space, 1)[0] || null;
+    const nose = this.ship.nose();
+    missile.fire(nose.x, nose.y, this.ship.rotation, mark);
+    this.missileQueued -= 1;
     this.missileCool = missiles.cooldown;
     this.sfx("missile");
+    if (mark) {
+      this.fx.emit(4, {
+        x: mark.x,
+        y: mark.y,
+        color: colors.amber,
+        speed: 36,
+        speedVar: 16,
+        life: 0.18,
+        size: 4,
+      });
+    }
     this.fx.emit(10, {
       x: nose.x,
       y: nose.y,
@@ -2371,6 +2393,8 @@ export class Game {
 
   endRun(reason = "final") {
     if (this.mode === TITLE || this.mode === GAMEOVER || this.mode === INITIALS) return;
+    this.paused = false;
+    this.missileQueued = 0;
     if (this.runDirty || this.score > 0 || this.points > 0) this.writeCheckpoint({ force: true });
     this.hud.hideContinue();
     if (this.ship.alive) this.ship.kill();
@@ -2650,6 +2674,24 @@ export class Game {
       this.endRun(this.mode === CONTINUE ? "final" : "abort");
     }
 
+    if (this.mode !== INITIALS && this.mode !== CONTROLS) {
+      if (this.input.pausePressed) this.togglePause();
+      if (this.input.savePressed) this.manualSave();
+    }
+    if (this.saveFlash > 0) this.saveFlash = Math.max(0, this.saveFlash - t);
+
+    if (this.paused) {
+      this.hud.setMode(this.saveFlash > 0 ? "SAVED" : "PAUSE");
+      this.shake *= 0.86;
+      if (this.shake < 0.2) this.shake = 0;
+      this.applyCamera(t, screen);
+      this.audio.tickEngine(0, 0, 0, 0);
+      this.audio.tickLaser(false);
+      this.audio.tickMusic({ bed: 0, dark: 0, heat: 0, hiss: 0 });
+      this.input.endFrame();
+      return;
+    }
+
     if (this.mode === TITLE && this.input.shipsPressed) {
       this.openShips();
     } else if (this.mode === TITLE && this.input.controlsPressed) {
@@ -2684,6 +2726,9 @@ export class Game {
     this.missileCool = Math.max(0, this.missileCool - t);
     this.empCool = Math.max(0, this.empCool - t);
     this.warpCool = Math.max(0, this.warpCool - t);
+    if ((this.mode === PLAYING || this.attractOnDemo) && !this.ship.docked && this.missileQueued > 0 && this.missileCool <= 0) {
+      this.fireMissile(true);
+    }
 
     this.input.aim =
       this.mode === PLAYING && !this.ship.docked && !this.input.mapHeld && !this.homeOn && this.input.aimMode === "mouse"
@@ -2765,7 +2810,7 @@ export class Game {
             : this.assaultRest
               ? "CLEAR"
               : `WAVE  ${this.assaultIndex}`;
-      this.hud.setMode(modeLabel);
+      this.hud.setMode(this.saveFlash > 0 ? "SAVED" : modeLabel);
     } else if (this.mode === DYING) {
       this.leaveHubSeat();
       this.hud.hideDock();
