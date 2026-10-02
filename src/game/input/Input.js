@@ -1,3 +1,4 @@
+import { octantMove } from "../math.js";
 import { ACTIONS, aimMode, bindId, cleanBind, cloneBinds, normalizeBinds } from "./bindings.js";
 
 function clamp(value, min, max) {
@@ -347,6 +348,12 @@ export class Input {
     }
   }
 
+  padOctant() {
+    const x = this.axisValue("strafeR") - this.axisValue("strafeL");
+    const surgeAxis = this.axisValue("thrust") - this.axisValue("reverse");
+    return octantMove(x, -surgeAxis);
+  }
+
   get rotate() {
     let value = this.touchRotate;
     if (this.keysDown("turnL")) value -= 1;
@@ -364,8 +371,7 @@ export class Input {
     if (this.keysDown("reverse")) value -= 1;
     if (this.padDown("thrust")) value += 1;
     if (this.padDown("reverse")) value -= 1;
-    value += this.axisValue("thrust");
-    value -= this.axisValue("reverse");
+    value += this.padOctant().surge;
     return clamp(value, -1, 1);
   }
 
@@ -375,8 +381,7 @@ export class Input {
     if (this.keysDown("strafeR")) value += 1;
     if (this.padDown("strafeL")) value -= 1;
     if (this.padDown("strafeR")) value += 1;
-    value -= this.axisValue("strafeL");
-    value += this.axisValue("strafeR");
+    value += this.padOctant().strafe;
     return clamp(value, -1, 1);
   }
 

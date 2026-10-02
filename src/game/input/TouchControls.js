@@ -1,3 +1,5 @@
+import { octantMove } from "../math.js";
+
 const DEAD = 0.16;
 const REACH = 54;
 const TAP_MS = 280;
@@ -135,16 +137,6 @@ export class TouchControls {
     if (held > TAP_MS) this.turnTap = null;
   }
 
-  octantMove(x, y) {
-    const mag = Math.hypot(x, y);
-    if (mag <= DEAD) return { surge: 0, strafe: 0 };
-    const slice = Math.round(Math.atan2(x, -y) / (Math.PI / 4));
-    const oct = ((slice % 8) + 8) % 8;
-    const surge = [1, 1, 0, -1, -1, -1, 0, 1][oct];
-    const strafe = [0, 1, 1, 1, 0, -1, -1, -1][oct];
-    return { surge, strafe };
-  }
-
   syncAxes() {
     const move = this.move;
     const turn = this.turn;
@@ -152,7 +144,7 @@ export class TouchControls {
     let strafe = 0;
     let rotate = 0;
     if (move) {
-      const region = this.octantMove(move.x, move.y);
+      const region = octantMove(move.x, move.y, DEAD);
       surge = region.surge;
       strafe = region.strafe;
     }

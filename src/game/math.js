@@ -8,6 +8,17 @@ export function wrapDelta(dx, size) {
   return dx - size * Math.round(dx / size);
 }
 
+export function octantMove(x, y, dead = 0.16) {
+  const mag = Math.hypot(x, y);
+  if (mag <= dead) return { surge: 0, strafe: 0 };
+  const slice = Math.round(Math.atan2(x, -y) / (Math.PI / 4));
+  const oct = ((slice % 8) + 8) % 8;
+  return {
+    surge: [1, 1, 0, -1, -1, -1, 0, 1][oct],
+    strafe: [0, 1, 1, 1, 0, -1, -1, -1][oct],
+  };
+}
+
 export function damp(current, target, tau, dt) {
   return current + (target - current) * (1 - Math.exp(-dt / tau));
 }
