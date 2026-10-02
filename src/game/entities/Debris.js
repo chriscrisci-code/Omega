@@ -159,6 +159,10 @@ export function shatter(points, body, look) {
   return shards;
 }
 
+function wreckLife(base) {
+  return Math.random() < 0.8 ? rand(0.22, 0.5) : base;
+}
+
 export function wreckBurst(body, look, count = 8) {
   const shards = [];
   const r = Math.max(18, body.radius || 24);
@@ -181,7 +185,7 @@ export function wreckBurst(body, look, count = 8) {
     shards.push(
       shardFromLocals(plate, body, look, {
         closed: true,
-        life: (look.life || 1.6) + rand(0.4, 1.4),
+        life: wreckLife((look.life || 1.6) + rand(0.4, 1.4)),
         kickScale: rand(0.35, 0.75),
         spinScale: rand(0.45, 1.3),
         width: rand(1.45, 2.1),
@@ -201,7 +205,7 @@ export function wreckBurst(body, look, count = 8) {
           look,
           {
             closed: false,
-            life: (look.life || 1.6) * rand(0.7, 1.1),
+            life: wreckLife((look.life || 1.6) * rand(0.7, 1.1)),
             kickScale: rand(0.5, 0.95),
             spinScale: rand(0.8, 1.8),
             width: rand(1.3, 1.9),
