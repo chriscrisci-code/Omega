@@ -99,6 +99,7 @@ export class Missile {
     this.y = y;
     this.angle = angle;
     this.dropFor = this.star ? 0 : options.drop ?? 0;
+    this.dropTurn = options.dropTurn ?? missiles.dropTurn ?? 1.2;
     this.coastVx = options.coastVx ?? 0;
     this.coastVy = options.coastVy ?? 0;
     this.speed = this.dropFor > 0 ? Math.hypot(this.coastVx, this.coastVy) : this.speed0;
@@ -132,14 +133,28 @@ export class Missile {
         if (this.target && !this.blind) {
           const dx = wrapDelta(this.target.x - this.x, space.width);
           const dy = wrapDelta(this.target.y - this.y, space.height);
-          this.angle = turnToward(this.angle, Math.atan2(dy, dx), (this.turnRate ?? missiles.turn) * dt);
+          const dropping = this.clock < this.dropFor;
+          const turn = dropping ? this.dropTurn : this.turnRate ?? missiles.turn;
+          this.angle = turnToward(this.angle, Math.atan2(dy, dx), turn * dt);
         }
         if (this.clock < this.dropFor) {
           this.vx = this.coastVx;
           this.vy = this.coastVy;
           this.speed = Math.hypot(this.vx, this.vy);
+        } else if (this.dropFor > 0) {
+          const top = this.topSpeed ?? missiles.topSpeed;
+          const coast = Math.hypot(this.coastVx, this.coastVy);
+          const accel = Math.max(40, (top - coast) / (this.rampTime ?? missiles.ramp));
+          this.vx += Math.cos(this.angle) * accel * dt;
+          this.vy += Math.sin(this.angle) * accel * dt;
+          this.speed = Math.hypot(this.vx, this.vy);
+          if (this.speed > top) {
+            this.vx *= top / this.speed;
+            this.vy *= top / this.speed;
+            this.speed = top;
+          }
         } else {
-          const u = Math.min(1, (this.clock - this.dropFor) / (this.rampTime ?? missiles.ramp));
+          const u = Math.min(1, this.clock / (this.rampTime ?? missiles.ramp));
           const base = this.speed0 ?? missiles.speed;
           const top = this.topSpeed ?? missiles.topSpeed;
           this.speed = base + (top - base) * u * u;

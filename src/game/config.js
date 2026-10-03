@@ -141,9 +141,10 @@ export const lead = {
 export const missiles = {
   speed: 520,
   topSpeed: 1040,
-  ramp: 1.8,
+  ramp: 3.4,
   drop: 0.42,
   dropKick: 86,
+  dropTurn: 1.2,
   life: 30,
   cooldown: 1 / 3,
   max: 24,
