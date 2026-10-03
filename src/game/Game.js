@@ -141,6 +141,7 @@ export class Game {
     this.fireWasOn = false;
     this.missileCool = 0;
     this.missileQueued = 0;
+    this.missileDropSide = 1;
     this.paused = false;
     this.saveFlash = 0;
     this.timer = 0;
@@ -683,6 +684,7 @@ export class Game {
     this.castleStars.forEach((star) => star.kill(true));
     this.missileCool = 0;
     this.missileQueued = 0;
+    this.missileDropSide = 1;
     this.paused = false;
     this.saveFlash = 0;
     this.emp.kill();
@@ -1406,15 +1408,15 @@ export class Game {
     return this.missileTargets(space, 1)[0] || null;
   }
 
-  missileTargets(space, count) {
+  missileTargets(space, count, skip = []) {
     const picks = [];
-    const used = new Set();
-    if (this.selected?.alive && (this.enemies.includes(this.selected) || this.selected.kind === "station")) {
+    const used = new Set(skip);
+    if (this.selected?.alive && !used.has(this.selected) && (this.enemies.includes(this.selected) || this.selected.kind === "station")) {
       picks.push(this.selected);
       used.add(this.selected);
     }
     const ranked = [];
-    for (const enemy of [...this.enemies, ...this.stationTargets()]) {
+    for (const enemy of [...this.enemies, ...this.stationTargets(), ...this.castleStars]) {
       if (!enemy.alive || used.has(enemy)) continue;
       const dx = wrapDelta(enemy.x - this.ship.x, space.width);
       const dy = wrapDelta(enemy.y - this.ship.y, space.height);
@@ -1795,9 +1797,19 @@ export class Game {
     const missile = this.missiles.find((item) => !item.alive);
     if (!missile) return;
     const space = this.space();
-    const mark = this.missileTargets(space, 1)[0] || null;
+    const taken = this.missiles.filter((item) => item.alive && item.target?.alive).map((item) => item.target);
+    const mark = this.missileTargets(space, 1, taken)[0] || null;
     const nose = this.ship.nose();
-    missile.fire(nose.x, nose.y, this.ship.rotation, mark);
+    const heading = this.ship.rotation;
+    const side = this.missileDropSide;
+    this.missileDropSide *= -1;
+    const peel = heading + side * 1.95;
+    const kick = missiles.dropKick ?? 86;
+    missile.fire(nose.x + Math.cos(heading + side * 1.2) * 7, nose.y + Math.sin(heading + side * 1.2) * 7, heading, mark, {
+      drop: missiles.drop,
+      coastVx: (this.ship.vx || 0) + Math.cos(peel) * kick,
+      coastVy: (this.ship.vy || 0) + Math.sin(peel) * kick,
+    });
     this.missileQueued -= 1;
     this.missileCool = missiles.cooldown;
     this.sfx("missile");
@@ -3034,6 +3046,16 @@ export class Game {
           if (hits(missile, enemy, space.width, space.height)) {
             this.detonateMissile(missile, enemy);
             this.chipEnemy(enemy, missile, missiles.damage, "missile");
+            struck = true;
+            break;
+          }
+        }
+        if (struck) continue;
+        for (const star of this.castleStars) {
+          if (!star.alive) continue;
+          if (hits(missile, star, space.width, space.height)) {
+            this.detonateMissile(missile, star);
+            this.detonateMissile(star, star);
             struck = true;
             break;
           }

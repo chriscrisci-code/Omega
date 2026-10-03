@@ -142,6 +142,8 @@ export const missiles = {
   speed: 520,
   topSpeed: 1040,
   ramp: 1.8,
+  drop: 0.42,
+  dropKick: 86,
   life: 30,
   cooldown: 1 / 3,
   max: 24,

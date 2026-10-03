@@ -18,6 +18,7 @@ export class Missile {
     this.points = [];
     this.star = false;
     this.blind = false;
+    this.dropFor = 0;
     this.tint = colors.orange;
     this.tintHot = colors.amber;
     this.view.visible = false;
@@ -78,9 +79,11 @@ export class Missile {
     this.body.stroke({ width: 2.6, color: colors.orange, alpha: 0.32, join: "round" });
     this.body.poly(BODY, true);
     this.body.stroke({ width: 1.1, color: colors.amber, join: "round" });
-    this.body.moveTo(-3.2, 0);
-    this.body.lineTo(-7 - Math.random() * 2.5, 0);
-    this.body.stroke({ width: 1.3, color: colors.white, alpha: 0.9, cap: "round" });
+    if (this.clock >= this.dropFor) {
+      this.body.moveTo(-3.2, 0);
+      this.body.lineTo(-7 - Math.random() * 2.5, 0);
+      this.body.stroke({ width: 1.3, color: colors.white, alpha: 0.9, cap: "round" });
+    }
   }
 
   fire(x, y, angle, target = null, options = {}) {
@@ -95,9 +98,12 @@ export class Missile {
     this.x = x;
     this.y = y;
     this.angle = angle;
-    this.speed = this.speed0;
-    this.vx = Math.cos(angle) * this.speed;
-    this.vy = Math.sin(angle) * this.speed;
+    this.dropFor = this.star ? 0 : options.drop ?? 0;
+    this.coastVx = options.coastVx ?? 0;
+    this.coastVy = options.coastVy ?? 0;
+    this.speed = this.dropFor > 0 ? Math.hypot(this.coastVx, this.coastVy) : this.speed0;
+    this.vx = this.dropFor > 0 ? this.coastVx : Math.cos(angle) * this.speed;
+    this.vy = this.dropFor > 0 ? this.coastVy : Math.sin(angle) * this.speed;
     this.target = target;
     this.blind = false;
     this.life = options.life ?? missiles.life;
@@ -128,12 +134,18 @@ export class Missile {
           const dy = wrapDelta(this.target.y - this.y, space.height);
           this.angle = turnToward(this.angle, Math.atan2(dy, dx), (this.turnRate ?? missiles.turn) * dt);
         }
-        const u = Math.min(1, this.clock / (this.rampTime ?? missiles.ramp));
-        const base = this.speed0 ?? missiles.speed;
-        const top = this.topSpeed ?? missiles.topSpeed;
-        this.speed = base + (top - base) * u * u;
-        this.vx = Math.cos(this.angle) * this.speed;
-        this.vy = Math.sin(this.angle) * this.speed;
+        if (this.clock < this.dropFor) {
+          this.vx = this.coastVx;
+          this.vy = this.coastVy;
+          this.speed = Math.hypot(this.vx, this.vy);
+        } else {
+          const u = Math.min(1, (this.clock - this.dropFor) / (this.rampTime ?? missiles.ramp));
+          const base = this.speed0 ?? missiles.speed;
+          const top = this.topSpeed ?? missiles.topSpeed;
+          this.speed = base + (top - base) * u * u;
+          this.vx = Math.cos(this.angle) * this.speed;
+          this.vy = Math.sin(this.angle) * this.speed;
+        }
         this.x += this.vx * dt;
         this.y += this.vy * dt;
         wrap(this, space.width, space.height);
