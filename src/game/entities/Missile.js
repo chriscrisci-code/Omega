@@ -120,6 +120,14 @@ export class Missile {
     this.view.position.set(x, y);
   }
 
+  agility() {
+    const hold = missiles.agileHold ?? 2;
+    const slew = missiles.agileSlew ?? 2;
+    if (this.clock <= hold) return 0;
+    if (slew <= 0 || this.clock >= hold + slew) return 1;
+    return (this.clock - hold) / slew;
+  }
+
   update(dt, space) {
     if (!this.alive && !this.points.length) return;
     this.clock += dt;
@@ -152,6 +160,14 @@ export class Missile {
             this.vx *= top / this.speed;
             this.vy *= top / this.speed;
             this.speed = top;
+          }
+          const agile = this.agility();
+          if (agile > 0) {
+            const nx = Math.cos(this.angle) * this.speed;
+            const ny = Math.sin(this.angle) * this.speed;
+            this.vx += (nx - this.vx) * agile;
+            this.vy += (ny - this.vy) * agile;
+            this.speed = Math.hypot(this.vx, this.vy);
           }
         } else {
           const u = Math.min(1, this.clock / (this.rampTime ?? missiles.ramp));

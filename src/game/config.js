@@ -145,6 +145,8 @@ export const missiles = {
   drop: 0.42,
   dropKick: 86,
   dropTurn: 1.2,
+  agileHold: 2,
+  agileSlew: 2,
   life: 30,
   cooldown: 1 / 3,
   max: 24,
