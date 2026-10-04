@@ -311,11 +311,12 @@ export class Game {
     const space = this.space();
     const safeX = this.ship.x;
     const safeY = this.ship.y;
-    const near = this.viewRadius() * 0.45;
-    const far = this.viewRadius() * 1.15;
+    const near = rocks.waveNear;
+    const far = rocks.waveFar;
+    const pad = rocks.wavePad;
     for (let i = 0; i < count; i += 1) {
       let point = this.ringPoint(safeX, safeY, rand(near, far));
-      for (let tries = 0; tries < 8 && Math.hypot(wrapDelta(point.x - safeX, space.width), wrapDelta(point.y - safeY, space.height)) < 220; tries += 1) {
+      for (let tries = 0; tries < 8 && Math.hypot(wrapDelta(point.x - safeX, space.width), wrapDelta(point.y - safeY, space.height)) < pad; tries += 1) {
         point = this.ringPoint(safeX, safeY, rand(near, far));
       }
       this.addRock(point.x, point.y, 3);
@@ -3168,7 +3169,7 @@ export class Game {
 
       if (this.mode === PLAYING) {
         this.waveCooldown = Math.max(0, this.waveCooldown - t);
-        if (this.waveCooldown <= 0 && this.nearbyRocks(this.viewRadius() * 1.35) < 3) {
+        if (this.waveCooldown <= 0 && this.nearbyRocks(rocks.waveCheck) < 3) {
           this.wave += 1;
           this.spawnWave();
           this.waveCooldown = 2.4;
