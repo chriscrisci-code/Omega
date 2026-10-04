@@ -45,7 +45,7 @@ const PAD_NAMES = ["A", "B", "X", "Y", "LB", "RB", "LT", "RT", "VIEW", "MENU", "
 const GESTURE_NAMES = {
   flickFwd: "FLICK FWD",
   flickBack: "FLICK BACK",
-  stickFire: "STICK TAP FIRE",
+  stickFire: "STICK FWD FIRE",
   stickMove: "LEFT STICK",
   stickTurn: "RIGHT STICK",
   doubleTap: "DOUBLE TAP",

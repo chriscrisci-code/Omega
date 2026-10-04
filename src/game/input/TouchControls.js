@@ -1,6 +1,7 @@
 import { octantMove } from "../math.js";
 
 const DEAD = 0.16;
+const FIRE_FWD = 0.22;
 const REACH = 54;
 const TAP_MS = 280;
 const TAP_DIST = 28;
@@ -32,7 +33,6 @@ export class TouchControls {
     this.fingers = new Map();
     this.twoFinger = null;
     this.firing = false;
-    this.turnTap = null;
     this.screenTap = null;
 
     this.onStart = (event) => this.touchStart(event);
@@ -108,33 +108,17 @@ export class TouchControls {
   }
 
   releaseTurn(state) {
-    const now = performance.now();
-    const held = now - state.heldAt;
+    const held = performance.now() - state.heldAt;
     if (held >= 50 && held <= FLICK_MS && Math.abs(state.x) <= FLICK_SLIP) {
       if (-state.y >= FLICK_MIN) {
         this.input.emitGesture("flickFwd");
-        this.turnTap = null;
         return;
       }
       if (state.y >= FLICK_MIN) {
         this.input.emitGesture("flickBack");
-        this.turnTap = null;
         return;
       }
     }
-    if (held <= TAP_MS && Math.hypot(state.x, state.y) < 0.35) {
-      if (this.turnTap && now - this.turnTap.t <= DOUBLE_MS) {
-        if (this.input.hasGesture("stickFire")) {
-          this.firing = !this.firing;
-          this.syncFire();
-        }
-        this.turnTap = null;
-        return;
-      }
-      this.turnTap = { t: now };
-      return;
-    }
-    if (held > TAP_MS) this.turnTap = null;
   }
 
   syncAxes() {
@@ -149,9 +133,11 @@ export class TouchControls {
       strafe = region.strafe;
     }
     if (turn && Math.abs(turn.x) > DEAD) rotate = this.turnForce(turn);
+    this.firing = Boolean(this.input.hasGesture("stickFire") && turn && -turn.y > FIRE_FWD);
     this.input.touchStrafe = clamp(strafe, -1, 1);
     this.input.touchSurge = clamp(surge, -1, 1);
     this.input.touchRotate = clamp(rotate, -1, 1);
+    this.syncFire();
   }
 
   turnForce(turn) {
@@ -229,7 +215,6 @@ export class TouchControls {
     this.stickIds.clear();
     this.twoFinger = null;
     this.firing = false;
-    this.turnTap = null;
     this.screenTap = null;
     this.input.touchFire = false;
     this.input.touchSurge = 0;
