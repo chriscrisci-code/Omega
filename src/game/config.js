@@ -88,6 +88,17 @@ export const farGrid = {
   cells: 24,
 };
 
+/** Slow vector veils behind the lattice. factor 0.1 stays under one 2000 tile on the 16000 torus. */
+export const farNebula = {
+  factor: 0.1,
+  spacing: 2000,
+  veilGlow: 0.04,
+  veilAlpha: 0.09,
+  starGlow: 0.05,
+  starAlpha: 0.16,
+  starSize: 3.2,
+};
+
 /** Which HUD marker kinds are shown. Later this becomes a player filter. */
 export const hudFilters = {
   hub: true,
