@@ -92,8 +92,8 @@ export const farGrid = {
 export const farNebula = {
   factor: 0.1,
   spacing: 2000,
-  veilGlow: 0.04,
-  veilAlpha: 0.09,
+  veilGlow: 0.055,
+  veilAlpha: 0.12,
   starGlow: 0.05,
   starAlpha: 0.16,
   starSize: 3.2,

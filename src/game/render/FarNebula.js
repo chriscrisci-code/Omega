@@ -10,33 +10,41 @@ function veilPts(seed, cx, cy, rx, ry, turn, count) {
   const pts = [];
   for (let i = 0; i < count; i += 1) {
     const a = turn + (i / count) * Math.PI * 2;
-    const jiggle = 0.68 + hash(seed + i * 19) * 0.52;
+    const jiggle = 0.62 + hash(seed + i * 19) * 0.62;
     pts.push(cx + Math.cos(a) * rx * jiggle, cy + Math.sin(a) * ry * jiggle);
   }
   return pts;
 }
 
-function strokeVeil(g, pts, closed, color, hot) {
+function arcPts(seed, cx, cy, rx, ry, turn, span, count) {
+  const pts = [];
+  for (let i = 0; i < count; i += 1) {
+    const t = i / (count - 1);
+    const a = turn + t * span;
+    const jiggle = 0.78 + hash(seed + i * 11) * 0.4;
+    pts.push(cx + Math.cos(a) * rx * jiggle, cy + Math.sin(a) * ry * jiggle);
+  }
+  return pts;
+}
+
+function strokePoly(g, pts, closed, color, hot, fat) {
   const draw = () => {
     g.moveTo(pts[0], pts[1]);
     for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]);
     if (closed) g.closePath();
   };
   draw();
-  g.stroke({ width: 22, color, alpha: cfg.veilGlow, cap: "round", join: "round" });
+  g.stroke({ width: fat, color, alpha: cfg.veilGlow, cap: "round", join: "round" });
   draw();
-  g.stroke({ width: 1.35, color: hot, alpha: cfg.veilAlpha, cap: "round", join: "round" });
+  g.stroke({ width: 1.2, color: hot, alpha: cfg.veilAlpha, cap: "round", join: "round" });
 }
 
-const VEILS = [
-  { seed: 11, x: -2100, y: -900, rx: 820, ry: 420, turn: 0.4, n: 11, closed: true, color: colors.cyan, hot: colors.cyanHot },
-  { seed: 23, x: 1600, y: -1500, rx: 640, ry: 780, turn: 1.1, n: 9, closed: true, color: colors.magenta, hot: colors.magentaHot },
-  { seed: 31, x: 900, y: 1700, rx: 980, ry: 360, turn: 2.4, n: 13, closed: false, color: colors.cyan, hot: colors.cyanHot },
-  { seed: 47, x: -1400, y: 1400, rx: 520, ry: 690, turn: 0.7, n: 10, closed: true, color: colors.magenta, hot: colors.magentaHot },
-  { seed: 59, x: 40, y: -80, rx: 1100, ry: 280, turn: 2.9, n: 12, closed: false, color: colors.cyan, hot: colors.white },
-  { seed: 67, x: 2400, y: 800, rx: 460, ry: 540, turn: 1.6, n: 8, closed: true, color: colors.cyan, hot: colors.cyanHot },
-  { seed: 73, x: -2500, y: 400, rx: 700, ry: 320, turn: 5.1, n: 11, closed: false, color: colors.magenta, hot: colors.magentaHot },
-  { seed: 89, x: 400, y: 2600, rx: 580, ry: 410, turn: 3.3, n: 9, closed: true, color: colors.cyan, hot: colors.cyanHot },
+const CLOUDS = [
+  { seed: 11, x: -1800, y: -700, rx: 920, ry: 560, turn: 0.35, color: colors.cyan, hot: colors.cyanHot },
+  { seed: 23, x: 1500, y: -1300, rx: 780, ry: 900, turn: 1.2, color: colors.magenta, hot: colors.magentaHot },
+  { seed: 41, x: 200, y: 1600, rx: 1100, ry: 480, turn: 2.5, color: colors.cyan, hot: colors.cyanHot },
+  { seed: 53, x: -1600, y: 1500, rx: 640, ry: 820, turn: 0.8, color: colors.magenta, hot: colors.magentaHot },
+  { seed: 71, x: 2200, y: 700, rx: 700, ry: 520, turn: 4.1, color: colors.cyan, hot: colors.white },
 ];
 
 export class FarNebula {
@@ -47,16 +55,38 @@ export class FarNebula {
     this.paint();
   }
 
+  paintCloud(g, cloud) {
+    const shells = [1, 0.78, 0.56, 0.34];
+    shells.forEach((scale, i) => {
+      const n = 10 + i;
+      const pts = veilPts(cloud.seed + i * 7, cloud.x, cloud.y, cloud.rx * scale, cloud.ry * scale, cloud.turn + i * 0.18, n);
+      strokePoly(g, pts, true, cloud.color, cloud.hot, 28 - i * 4);
+    });
+    for (let k = 0; k < 5; k += 1) {
+      const twist = cloud.turn + hash(cloud.seed + k * 31) * Math.PI * 2;
+      const reach = 0.55 + hash(cloud.seed + k * 17) * 0.7;
+      const span = 0.7 + hash(cloud.seed + k * 43) * 1.4;
+      const pts = arcPts(
+        cloud.seed + 200 + k,
+        cloud.x + Math.cos(twist) * cloud.rx * 0.12,
+        cloud.y + Math.sin(twist) * cloud.ry * 0.12,
+        cloud.rx * reach,
+        cloud.ry * reach * (0.55 + hash(cloud.seed + k) * 0.5),
+        twist,
+        span,
+        8,
+      );
+      strokePoly(g, pts, false, cloud.color, k % 2 ? colors.white : cloud.hot, 16);
+    }
+  }
+
   paint() {
     const g = this.marks;
     g.clear();
-    for (const veil of VEILS) {
-      const pts = veilPts(veil.seed, veil.x, veil.y, veil.rx, veil.ry, veil.turn, veil.n);
-      strokeVeil(g, pts, veil.closed, veil.color, veil.hot);
-    }
+    for (const cloud of CLOUDS) this.paintCloud(g, cloud);
     const size = cfg.starSize;
     const drawStars = () => {
-      for (let i = 0; i < 48; i += 1) {
+      for (let i = 0; i < 64; i += 1) {
         const x = (hash(i * 13.7) - 0.5) * 7200;
         const y = (hash(i * 29.3) - 0.5) * 7200;
         g.moveTo(x - size, y);
