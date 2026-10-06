@@ -52,7 +52,7 @@ export class Hud {
     this.paint(this.version, `V ${version}`, 8, DIM, CYAN, "right");
     this.paint(this.musicDown, "-", 14, DIM, CYAN, "center");
     this.paint(this.musicUp, "+", 14, DIM, CYAN, "center");
-    this.setMusic(0.5);
+    this.setMusic(0.2);
     this.musicDown?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -220,14 +220,14 @@ export class Hud {
     if (this.profile === "laptop") {
       this.help[0] && this.paint(this.help[0], "KEYS MOVE  HEADING AIM  TAP FIRE  TWO FINGER SCROLL WARP EMP", 11, DIM, CYAN, "center");
       this.help[1] && this.paint(this.help[1], "DOUBLE TAP SHIELD  CORNER TR MISSILE  C CONTROLS", 11, DIM, CYAN, "center");
-      this.help[2] && this.paint(this.help[2], "M MAP  H HOME  P PAUSE  V SAVE  F FULLSCREEN  ESC END RUN", 10, DIM, CYAN, "center");
+      this.help[2] && this.paint(this.help[2], "M MAP  L LOCK  H HOME  P PAUSE  V SAVE  F FULLSCREEN  ESC END RUN", 10, DIM, CYAN, "center");
       this.paint(document.querySelector("[data-label=special]"), "WHEEL", 10, DIM, CYAN, "right");
       return;
     }
     if (this.profile === "gamepad") {
       this.help[0] && this.paint(this.help[0], "LEFT STICK MOVE  RIGHT STICK TURN  X RT FIRE", 11, DIM, CYAN, "center");
       this.help[1] && this.paint(this.help[1], "Y WARP  A EMP  B SHIELD  RB MISSILE", 11, DIM, CYAN, "center");
-      this.help[2] && this.paint(this.help[2], "VIEW MAP  P PAUSE  V SAVE  C CONTROLS  ESC END RUN", 10, DIM, CYAN, "center");
+      this.help[2] && this.paint(this.help[2], "VIEW MAP  L LOCK  P PAUSE  V SAVE  C CONTROLS  ESC END RUN", 10, DIM, CYAN, "center");
       this.paint(document.querySelector("[data-label=special]"), "PAD", 10, DIM, CYAN, "right");
       return;
     }
@@ -239,7 +239,7 @@ export class Hud {
     }
     this.help[0] && this.paint(this.help[0], "MOUSE AIM  LEFT FIRE  WHEEL FWD WARP  WHEEL BACK EMP  WHEEL BUTTON MISSILE", 11, DIM, CYAN, "center");
     this.help[1] && this.paint(this.help[1], "RIGHT TOGGLE SHIELD  A D STRAFE  W S THRUST  Q E ROTATE", 11, DIM, CYAN, "center");
-    this.help[2] && this.paint(this.help[2], "M MAP  DBL CLICK LOCK  H HOME  P PAUSE  V SAVE  F FULLSCREEN  ESC END RUN", 10, DIM, CYAN, "center");
+    this.help[2] && this.paint(this.help[2], "M MAP  L LOCK  H HOME  P PAUSE  V SAVE  F FULLSCREEN  ESC END RUN", 10, DIM, CYAN, "center");
     this.paint(document.querySelector("[data-label=special]"), "WHEEL", 10, DIM, CYAN, "right");
   }
 

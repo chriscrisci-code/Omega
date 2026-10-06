@@ -1511,6 +1511,72 @@ export class Game {
     this.bindMissilesToFocus();
   }
 
+  lockAtCrosshairs() {
+    const screen = this.app.screen;
+    const space = this.space();
+    const zoom = this.camZoom || cameraConfig.zoom;
+    const cos = Math.cos(this.camRot);
+    const sin = Math.sin(this.camRot);
+    const toScreen = (x, y) => {
+      const dx = wrapDelta(x - this.camX, space.width);
+      const dy = wrapDelta(y - this.camY, space.height);
+      return {
+        x: (dx * cos - dy * sin) * zoom,
+        y: (dx * sin + dy * cos) * zoom,
+      };
+    };
+    const usePointer = this.input.hasPointer && (this.usingMouseAim() || this.input.mapHeld);
+    let aimX = 0;
+    let aimY = 0;
+    let axisX = 0;
+    let axisY = 0;
+    if (usePointer) {
+      aimX = this.input.mouseX - screen.width * 0.5;
+      aimY = this.input.mouseY - screen.height * 0.5;
+    } else {
+      const origin = this.gunnerOrigin();
+      const heading = this.hubSeat && this.ship.docked ? this.hubGunAngle : this.ship.rotation;
+      const hx = Math.cos(heading);
+      const hy = Math.sin(heading);
+      axisX = hx * cos - hy * sin;
+      axisY = hx * sin + hy * cos;
+      const originScreen = toScreen(origin.x, origin.y);
+      aimX = originScreen.x;
+      aimY = originScreen.y;
+    }
+    const marks = [...this.enemies.filter((enemy) => enemy.alive), ...this.stationTargets()];
+    let best = null;
+    let bestDist = Infinity;
+    const score = (target, frontOnly) => {
+      const at = toScreen(target.x, target.y);
+      if (usePointer) return Math.hypot(at.x - aimX, at.y - aimY);
+      const along = (at.x - aimX) * axisX + (at.y - aimY) * axisY;
+      if (frontOnly && along < 0) return Infinity;
+      const px = at.x - aimX - axisX * along;
+      const py = at.y - aimY - axisY * along;
+      return Math.hypot(px, py);
+    };
+    for (const target of marks) {
+      const dist = score(target, true);
+      if (dist < bestDist) {
+        best = target;
+        bestDist = dist;
+      }
+    }
+    if (!best) {
+      for (const target of marks) {
+        const dist = score(target, false);
+        if (dist < bestDist) {
+          best = target;
+          bestDist = dist;
+        }
+      }
+    }
+    this.selected = best;
+    this.focusFire = Boolean(best);
+    this.bindMissilesToFocus();
+  }
+
   drawLock() {
     this.lockMark.clear();
     if (!this.selected?.alive) {
@@ -2789,7 +2855,7 @@ export class Game {
     if (this.mode === PLAYING && !this.ship.docked && this.input.empPressed) this.fireEmp();
     if (this.mode === PLAYING && !this.ship.docked && this.input.missilePressed) this.fireMissile();
     if (this.mode === PLAYING && this.input.mapHeld && this.input.selectPressed) this.selectAtPointer();
-    if (this.mode === PLAYING && this.input.lockPressed) this.selectAtPointer();
+    if (this.mode === PLAYING && this.input.lockPressed) this.lockAtCrosshairs();
 
     this.cooldown = Math.max(0, this.cooldown - t);
     this.missileCool = Math.max(0, this.missileCool - t);

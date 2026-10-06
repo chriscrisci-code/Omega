@@ -232,7 +232,6 @@ export class Input {
     const now = performance.now();
     if (now - this.tapAt < 320 && Math.hypot(event.clientX - this.tapX, event.clientY - this.tapY) < 28) {
       this.emitGesture("doubleTap");
-      this.emitGesture("dblClick");
       this.tapAt = 0;
       return;
     }
@@ -476,7 +475,7 @@ export class Input {
   }
 
   get lockPressed() {
-    return this._lockTick || this.keysPressed("lock") || this.padEdge("lock");
+    return this._lockTick || this.keysPressed("lock") || this.padEdge("lock") || this.anyPressed(["KeyL"]);
   }
 
   get homePressed() {

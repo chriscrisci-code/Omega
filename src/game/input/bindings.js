@@ -50,7 +50,6 @@ const GESTURE_NAMES = {
   stickMove: "LEFT STICK",
   stickTurn: "RIGHT STICK",
   doubleTap: "DOUBLE TAP",
-  dblClick: "DBL CLICK",
   twoFinger: "TWO FINGER",
 };
 
@@ -94,6 +93,7 @@ const KEYS = {
   turnL: [key("KeyQ"), key("ArrowLeft")],
   turnR: [key("KeyE"), key("ArrowRight")],
   map: [key("KeyM")],
+  lock: [key("KeyL")],
   home: [key("KeyH")],
   pause: [key("KeyP")],
   save: [key("KeyV")],
@@ -110,7 +110,6 @@ export const DEFAULTS = {
     warp: [wheel(-1)],
     emp: [wheel(1)],
     missile: [mouse(1)],
-    lock: [gesture("dblClick")],
   },
   gamepad: {
     ...KEYS,
@@ -127,7 +126,6 @@ export const DEFAULTS = {
     emp: [pad(0), wheel(1)],
     missile: [pad(5)],
     map: [...KEYS.map, pad(8)],
-    lock: [gesture("dblClick")],
     home: [...KEYS.home],
   },
   laptop: {
@@ -155,6 +153,7 @@ export const DEFAULTS = {
     emp: [gesture("flickBack")],
     missile: [gesture("twoFinger")],
     map: [key("KeyM")],
+    lock: [key("KeyL")],
     home: [key("KeyH")],
     pause: [key("KeyP")],
     save: [key("KeyV")],
@@ -224,6 +223,7 @@ export function normalizeBinds(profile, data) {
       return true;
     });
   }
+  if (!next.lock.length) next.lock = cloneBinds(id).lock;
   return next;
 }
 

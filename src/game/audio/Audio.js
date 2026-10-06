@@ -10,7 +10,7 @@ export class GameAudio {
     this.engines = null;
     this.laserBed = null;
     this._laserOn = 0;
-    this.musicVol = 0.5;
+    this.musicVol = 0.2;
     this._musicStarting = false;
   }
 

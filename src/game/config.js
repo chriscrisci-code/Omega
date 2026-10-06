@@ -50,7 +50,7 @@ export const emp = {
 
 /** Looping track volume. + / − step 10%. */
 export const music = {
-  volume: 0.5,
+  volume: 0.2,
   step: 0.1,
   title: 0.35,
   fly: 0.55,
