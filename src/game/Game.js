@@ -3323,7 +3323,9 @@ export class Game {
 
   musicOutLevel() {
     if (this.mode === TITLE) return music.titleVol;
-    if (this.mode === PLAYING) return this.save.settings.music ?? music.volume;
+    if (this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE) {
+      return this.save.settings.music ?? music.volume;
+    }
     return music.menuVol;
   }
 
