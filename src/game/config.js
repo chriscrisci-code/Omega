@@ -53,7 +53,7 @@ export const music = {
   volume: 0.2,
   step: 0.1,
   titleVol: 0,
-  menuVol: 0.05,
+  menuVol: 0.1,
   title: 0.35,
   fly: 0.55,
   dock: 0.38,
