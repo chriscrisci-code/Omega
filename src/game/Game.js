@@ -2821,7 +2821,7 @@ export class Game {
       this.audio.tickEngine(0, 0, 0, 0);
       this.audio.tickLaser(false);
       this.tickMusicInput();
-      this.audio.tickMusic();
+      this.audio.tickMusic(this.musicOutLevel());
       this.input.endFrame();
       return;
     }
@@ -3310,7 +3310,7 @@ export class Game {
     const laserOn = Boolean(this.hubLaserOn) || this.enemies.some((enemy) => enemy.alive && enemy.role === "destroyer" && enemy.laserOn);
     this.audio.tickLaser(laserOn);
     this.tickMusicInput();
-    this.audio.tickMusic();
+    this.audio.tickMusic(this.musicOutLevel());
 
     this.input.endFrame();
   }
@@ -3319,6 +3319,12 @@ export class Game {
     if (this.input.capture) return;
     if (this.input.musicDownPressed) this.nudgeMusic(-music.step);
     if (this.input.musicUpPressed) this.nudgeMusic(music.step);
+  }
+
+  musicOutLevel() {
+    if (this.mode === TITLE) return music.titleVol;
+    if (this.mode === PLAYING) return this.save.settings.music ?? music.volume;
+    return music.menuVol;
   }
 
   applyMusicVol(value) {

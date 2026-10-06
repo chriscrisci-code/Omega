@@ -48,10 +48,12 @@ export const emp = {
   cooldown: 8,
 };
 
-/** Looping track volume. + / − step 10%. */
+/** Looping track. + / − is the play level. Title is muted; other screens sit lower. */
 export const music = {
   volume: 0.2,
   step: 0.1,
+  titleVol: 0,
+  menuVol: 0.05,
   title: 0.35,
   fly: 0.55,
   dock: 0.38,

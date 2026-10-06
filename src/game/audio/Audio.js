@@ -12,11 +12,11 @@ export class GameAudio {
     this._laserOn = 0;
     this.musicVol = 0.2;
     this._musicStarting = false;
+    this._musicLevel = 0;
   }
 
   setMusicVol(value) {
     this.musicVol = Math.max(0, Math.min(1, Number(value) || 0));
-    if (this.music?.out) this.music.out.gain.value = this.musicVol;
   }
 
   async unlock() {
@@ -314,15 +314,17 @@ export class GameAudio {
     el.loop = true;
     el.preload = "auto";
     const out = this.ctx.createGain();
-    out.gain.value = this.musicVol;
+    out.gain.value = 0;
     this.ctx.createMediaElementSource(el).connect(out);
     out.connect(this.ctx.destination);
     this.music = { el, out };
   }
 
-  tickMusic() {
+  tickMusic(level) {
+    if (level != null) this._musicLevel = Math.max(0, Math.min(1, Number(level) || 0));
     if (!this.ctx || this.ctx.state !== "running") return;
     this.ensureMusic();
+    if (this.music?.out) this.music.out.gain.value = this._musicLevel ?? 0;
     const el = this.music?.el;
     if (!el || !el.paused || this._musicStarting) return;
     this._musicStarting = true;
