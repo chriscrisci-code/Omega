@@ -18,7 +18,6 @@ import { maybePhone } from "./input/device.js";
 import { ParticlePool } from "./particles/ParticlePool.js";
 import { ShipsGallery } from "./ships/ShipsGallery.js";
 import { FarGrid } from "./render/FarGrid.js";
-import { FarNebula } from "./render/FarNebula.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
@@ -53,8 +52,7 @@ export class Game {
     this.vectors = new Container();
     this.fx = new ParticlePool(createGlowTexture(), worldConfig.width, worldConfig.height);
     this.far = new FarGrid();
-    this.nebula = new FarNebula();
-    this.world.addChild(this.nebula.view, this.far.view, this.vectors, this.fx.container);
+    this.world.addChild(this.far.view, this.vectors, this.fx.container);
     this.world.filters = [createBloomFilter()];
     this.world.scale.set(cameraConfig.zoom);
     this.pips = new HudMarkers();
@@ -2620,7 +2618,6 @@ export class Game {
     this.world.pivot.set(this.camX, this.camY);
     this.world.position.set(screen.width / 2 + shakeX, screen.height / 2 + shakeY);
     this.world.rotation = this.camRot;
-    this.nebula.sync(this.camX, this.camY, !mapping && this.mode !== SHIPS);
     this.far.sync(this.camX, this.camY, !mapping && this.mode !== SHIPS);
 
     const shipBoost = mapping ? 22 : this.attractOnDemo ? 1.45 : 1;
