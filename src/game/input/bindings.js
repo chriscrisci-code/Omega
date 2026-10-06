@@ -12,6 +12,7 @@ export const ACTIONS = [
   { id: "emp", name: "EMP" },
   { id: "missile", name: "MISSILE" },
   { id: "map", name: "MAP" },
+  { id: "lock", name: "LOCK" },
   { id: "home", name: "HOME" },
   { id: "pause", name: "PAUSE" },
   { id: "save", name: "SAVE" },
@@ -49,6 +50,7 @@ const GESTURE_NAMES = {
   stickMove: "LEFT STICK",
   stickTurn: "RIGHT STICK",
   doubleTap: "DOUBLE TAP",
+  dblClick: "DBL CLICK",
   twoFinger: "TWO FINGER",
 };
 
@@ -108,6 +110,7 @@ export const DEFAULTS = {
     warp: [wheel(-1)],
     emp: [wheel(1)],
     missile: [mouse(1)],
+    lock: [gesture("dblClick")],
   },
   gamepad: {
     ...KEYS,
@@ -124,6 +127,7 @@ export const DEFAULTS = {
     emp: [pad(0), wheel(1)],
     missile: [pad(5)],
     map: [...KEYS.map, pad(8)],
+    lock: [gesture("dblClick")],
     home: [...KEYS.home],
   },
   laptop: {

@@ -33,6 +33,7 @@ export class Input {
     this._warpTicks = 0;
     this._empTicks = 0;
     this._missileTicks = 0;
+    this._lockTick = false;
     this._shieldTick = false;
     this._shipsClick = false;
     this._controlsClick = false;
@@ -195,6 +196,7 @@ export class Input {
     else if (id === "fire") this.touchFire = true;
     else if (id === "home") this.pressed.add("__home__");
     else if (id === "map") this.keys.add("__map__");
+    else if (id === "lock") this._lockTick = true;
   }
 
   emitWheel(dir) {
@@ -230,6 +232,7 @@ export class Input {
     const now = performance.now();
     if (now - this.tapAt < 320 && Math.hypot(event.clientX - this.tapX, event.clientY - this.tapY) < 28) {
       this.emitGesture("doubleTap");
+      this.emitGesture("dblClick");
       this.tapAt = 0;
       return;
     }
@@ -436,6 +439,14 @@ export class Input {
     return this.keysPressed("save") || this.anyPressed(["KeyV"]);
   }
 
+  get musicDownPressed() {
+    return this.anyPressed(["Minus", "NumpadSubtract"]);
+  }
+
+  get musicUpPressed() {
+    return this.anyPressed(["Equal", "NumpadAdd"]);
+  }
+
   get quitPressed() {
     return this.keysPressed("quit") || this.anyPressed(["Escape"]);
   }
@@ -462,6 +473,10 @@ export class Input {
 
   get mapHeld() {
     return this.keysDown("map") || this.padDown("map") || this.keys.has("__map__");
+  }
+
+  get lockPressed() {
+    return this._lockTick || this.keysPressed("lock") || this.padEdge("lock");
   }
 
   get homePressed() {
@@ -501,6 +516,7 @@ export class Input {
     this._warpTicks = 0;
     this._empTicks = 0;
     this._missileTicks = 0;
+    this._lockTick = false;
     this._shieldTick = false;
     this._shipsClick = false;
     this._controlsClick = false;

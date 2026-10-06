@@ -1,4 +1,6 @@
-/** Web Audio SFX. Noisy, muted, no sample files. */
+/** Web Audio SFX, plus the looping Sunlight bed. */
+
+const SUNLIGHT = new URL("../../../music/Sunlight v4.mp3", import.meta.url).href;
 
 export class GameAudio {
   constructor() {
@@ -8,7 +10,8 @@ export class GameAudio {
     this.engines = null;
     this.laserBed = null;
     this._laserOn = 0;
-    this.musicVol = 0.8;
+    this.musicVol = 0.5;
+    this._musicStarting = false;
   }
 
   setMusicVol(value) {
@@ -27,6 +30,7 @@ export class GameAudio {
     }
     if (this.ctx.state !== "running") await this.ctx.resume();
     this.ensureMusic();
+    this.tickMusic();
     return this.ctx;
   }
 
@@ -305,48 +309,28 @@ export class GameAudio {
   }
 
   ensureMusic() {
-    if (this.music || !this.ctx || this.ctx.state !== "running") return;
+    if (this.music || !this.ctx) return;
+    const el = new Audio(SUNLIGHT);
+    el.loop = true;
+    el.preload = "auto";
     const out = this.ctx.createGain();
     out.gain.value = this.musicVol;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 720;
-    filter.Q.value = 0.4;
-    const bus = this.ctx.createGain();
-    bus.gain.value = 0.0001;
-    bus.connect(filter);
-    filter.connect(out);
-    out.connect(this.master);
-
-    const tone = (freq, type = "sine") => {
-      const osc = this.ctx.createOscillator();
-      osc.type = type;
-      osc.frequency.value = freq;
-      const gain = this.ctx.createGain();
-      gain.gain.value = 0.0001;
-      osc.connect(gain);
-      gain.connect(bus);
-      osc.start();
-      return { osc, gain };
-    };
-
-    this.music = {
-      bus,
-      filter,
-      out,
-      low: tone(110),
-      fifth: tone(164.81),
-      minor: tone(130.81),
-      air: tone(196),
-      sub: tone(55),
-    };
+    this.ctx.createMediaElementSource(el).connect(out);
+    out.connect(this.ctx.destination);
+    this.music = { el, out };
   }
 
   tickMusic() {
-    if (this.music) {
-      this.music.out.gain.value = 0;
-      this.music.bus.gain.value = 0;
-    }
+    if (!this.ctx || this.ctx.state !== "running") return;
+    this.ensureMusic();
+    const el = this.music?.el;
+    if (!el || !el.paused || this._musicStarting) return;
+    this._musicStarting = true;
+    el.play()
+      .catch(() => {})
+      .finally(() => {
+        this._musicStarting = false;
+      });
   }
 }
 

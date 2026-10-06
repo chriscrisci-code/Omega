@@ -48,8 +48,10 @@ export const emp = {
   cooldown: 8,
 };
 
-/** Sample-free ambient bed. Suspended for now (single-tone issue). */
+/** Looping track volume. + / − step 10%. */
 export const music = {
+  volume: 0.5,
+  step: 0.1,
   title: 0.35,
   fly: 0.55,
   dock: 0.38,

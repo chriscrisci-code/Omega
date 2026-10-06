@@ -114,6 +114,7 @@ export class Game {
     this.enemies = [];
     this.shards = [];
     this.selected = null;
+    this.focusFire = false;
     this.lockMark = new Graphics();
     this.lockMark.visible = false;
     this.vectors.addChild(this.lockMark);
@@ -722,6 +723,7 @@ export class Game {
     this.hubWarnPulse = 0;
     this.starBeepWait = 0;
     this.selected = null;
+    this.focusFire = false;
     this.lockMark.visible = false;
     this.hangar.view.visible = false;
     this.pips.view.visible = true;
@@ -1064,6 +1066,7 @@ export class Game {
     this.hubMissiles.forEach((missile) => missile.kill(true));
     this.emp.kill();
     this.selected = null;
+    this.focusFire = false;
     this.lockMark.visible = false;
     this.missileCool = 0;
     this.missileQueued = 0;
@@ -1087,6 +1090,7 @@ export class Game {
     this.castleStars.forEach((star) => star.kill(true));
     this.emp.kill();
     this.selected = null;
+    this.focusFire = false;
     this.lockMark.visible = false;
     this.hubThreat = 0;
     this.hubThreatClose = false;
@@ -1161,6 +1165,7 @@ export class Game {
     }
     const prey = this.lockTarget(space);
     this.selected = prey;
+    this.focusFire = false;
     const heading = prey
       ? Math.atan2(wrapDelta(prey.y - this.ship.y, space.height), wrapDelta(prey.x - this.ship.x, space.width))
       : this.ship.rotation + 1.1 * t;
@@ -1409,12 +1414,27 @@ export class Game {
     return this.missileTargets(space, 1)[0] || null;
   }
 
+  focusShip() {
+    if (!this.focusFire || !this.selected?.alive) return null;
+    if (this.enemies.includes(this.selected) || this.selected.kind === "station") return this.selected;
+    return null;
+  }
+
+  bindMissilesToFocus() {
+    const focus = this.focusShip();
+    if (!focus) return;
+    for (const missile of this.missiles) {
+      if (missile.alive) missile.target = focus;
+    }
+  }
+
   missileTargets(space, count, skip = []) {
     const picks = [];
     const used = new Set(skip);
-    if (this.selected?.alive && !used.has(this.selected) && (this.enemies.includes(this.selected) || this.selected.kind === "station")) {
-      picks.push(this.selected);
-      used.add(this.selected);
+    const focus = this.focusShip();
+    if (focus && !used.has(focus)) {
+      picks.push(focus);
+      used.add(focus);
     }
     const ranked = [];
     for (const enemy of [...this.enemies, ...this.stationTargets(), ...this.castleStars]) {
@@ -1479,19 +1499,23 @@ export class Game {
       const sy = (dx * sin + dy * cos) * zoom;
       const dist = Math.hypot(sx - mx, sy - my);
       const boost = mapping && target.kind !== "base" ? 16 : 1;
-      const reach = Math.max(32, (target.radius * boost + 18) * zoom);
+      const pad = mapping ? 18 : 30;
+      const reach = Math.max(mapping ? 32 : 44, (target.radius * boost + pad) * zoom);
       if (dist < reach && dist < bestDist) {
         best = target;
         bestDist = dist;
       }
     }
     this.selected = best;
+    this.focusFire = Boolean(best && (this.enemies.includes(best) || best.kind === "station"));
+    this.bindMissilesToFocus();
   }
 
   drawLock() {
     this.lockMark.clear();
     if (!this.selected?.alive) {
       this.selected = null;
+      this.focusFire = false;
       this.lockMark.visible = false;
       return;
     }
@@ -1798,8 +1822,9 @@ export class Game {
     const missile = this.missiles.find((item) => !item.alive);
     if (!missile) return;
     const space = this.space();
-    const taken = this.missiles.filter((item) => item.alive && item.target?.alive).map((item) => item.target);
-    const mark = this.missileTargets(space, 1, taken)[0] || null;
+    const focus = this.focusShip();
+    const taken = focus ? [] : this.missiles.filter((item) => item.alive && item.target?.alive).map((item) => item.target);
+    const mark = focus || this.missileTargets(space, 1, taken)[0] || null;
     const nose = this.ship.nose();
     const heading = this.ship.rotation;
     const side = this.missileDropSide;
@@ -2040,6 +2065,7 @@ export class Game {
     this.sfx("pop");
     if (this.selected === part) {
       this.selected = null;
+      this.focusFire = false;
       this.lockMark.visible = false;
     }
   }
@@ -2406,6 +2432,7 @@ export class Game {
   offerContinue() {
     this.mode = CONTINUE;
     this.selected = null;
+    this.focusFire = false;
     this.lockMark.visible = false;
     this.hud.hideDock();
     this.hud.setMode("");
@@ -2439,6 +2466,7 @@ export class Game {
     if (this.ship.alive) this.ship.kill();
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
     this.selected = null;
+    this.focusFire = false;
     this.lockMark.visible = false;
     this.hud.setHubAlert(null);
     this.leaveHubSeat();
@@ -2726,7 +2754,8 @@ export class Game {
       this.applyCamera(t, screen);
       this.audio.tickEngine(0, 0, 0, 0);
       this.audio.tickLaser(false);
-      this.audio.tickMusic({ bed: 0, dark: 0, heat: 0, hiss: 0 });
+      this.tickMusicInput();
+      this.audio.tickMusic();
       this.input.endFrame();
       return;
     }
@@ -2760,6 +2789,7 @@ export class Game {
     if (this.mode === PLAYING && !this.ship.docked && this.input.empPressed) this.fireEmp();
     if (this.mode === PLAYING && !this.ship.docked && this.input.missilePressed) this.fireMissile();
     if (this.mode === PLAYING && this.input.mapHeld && this.input.selectPressed) this.selectAtPointer();
+    if (this.mode === PLAYING && this.input.lockPressed) this.selectAtPointer();
 
     this.cooldown = Math.max(0, this.cooldown - t);
     this.missileCool = Math.max(0, this.missileCool - t);
@@ -3213,9 +3243,16 @@ export class Game {
     this.tickMissileAudio(t, space);
     const laserOn = Boolean(this.hubLaserOn) || this.enemies.some((enemy) => enemy.alive && enemy.role === "destroyer" && enemy.laserOn);
     this.audio.tickLaser(laserOn);
-    this.audio.tickMusic({ bed: 0, dark: 0, heat: 0, hiss: 0 });
+    this.tickMusicInput();
+    this.audio.tickMusic();
 
     this.input.endFrame();
+  }
+
+  tickMusicInput() {
+    if (this.input.capture) return;
+    if (this.input.musicDownPressed) this.nudgeMusic(-music.step);
+    if (this.input.musicUpPressed) this.nudgeMusic(music.step);
   }
 
   applyMusicVol(value) {
@@ -3226,7 +3263,7 @@ export class Game {
   }
 
   nudgeMusic(delta) {
-    this.applyMusicVol((this.save.settings.music ?? 0.8) + delta);
+    this.applyMusicVol((this.save.settings.music ?? music.volume) + delta);
     this.storage.save(this.save);
     this.audio.unlock();
   }

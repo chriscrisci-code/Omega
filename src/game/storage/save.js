@@ -57,7 +57,8 @@ const empty = {
     controls: "",
     profile: "",
     binds: null,
-    music: 0.8,
+    music: 0.5,
+    song: true,
   },
 };
 
@@ -78,9 +79,9 @@ function cleanName(name) {
 }
 
 function clampMusic(value) {
-  if (value == null || value === "") return 0.8;
+  if (value == null || value === "") return 0.5;
   const n = Number(value);
-  if (!Number.isFinite(n)) return 0.8;
+  if (!Number.isFinite(n)) return 0.5;
   return Math.max(0, Math.min(1, n));
 }
 
@@ -248,7 +249,8 @@ function normalize(data) {
         fullscreen: Boolean(data.settings?.fullscreen),
         difficulty: data.settings?.difficulty === "hard" || data.settings?.difficulty === "medium" ? data.settings.difficulty : "easy",
         controls: data.settings?.controls === "phone" || data.settings?.controls === "desktop" ? data.settings.controls : "",
-        music: clampMusic(data.settings?.music),
+        music: data.settings?.song ? clampMusic(data.settings?.music) : 0.5,
+        song: true,
       },
       data.settings,
     ),
