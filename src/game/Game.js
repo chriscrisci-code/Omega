@@ -18,6 +18,7 @@ import { maybePhone } from "./input/device.js";
 import { ParticlePool } from "./particles/ParticlePool.js";
 import { ShipsGallery } from "./ships/ShipsGallery.js";
 import { FarGrid } from "./render/FarGrid.js";
+import { LockCam } from "./render/LockCam.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
@@ -57,7 +58,8 @@ export class Game {
     this.world.scale.set(cameraConfig.zoom);
     this.pips = new HudMarkers();
     this.hangar = new ShipsGallery();
-    app.stage.addChild(this.world, this.pips.view, this.hangar.view);
+    this.lockCam = new LockCam();
+    app.stage.addChild(this.world, this.pips.view, this.lockCam.view, this.hangar.view);
     this.hud.shipsLink?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -725,6 +727,7 @@ export class Game {
     this.selected = null;
     this.focusFire = false;
     this.lockMark.visible = false;
+    this.lockCam.clear();
     this.hangar.view.visible = false;
     this.pips.view.visible = true;
     this.station.reset();
@@ -2129,11 +2132,7 @@ export class Game {
     }
     this.shake = Math.max(this.shake, building ? 7 : 5);
     this.sfx("pop");
-    if (this.selected === part) {
-      this.selected = null;
-      this.focusFire = false;
-      this.lockMark.visible = false;
-    }
+    this.noteLockDeath(part);
   }
 
   bounceShot(shot, enemy, space) {
@@ -2219,6 +2218,7 @@ export class Game {
     this.noteKill();
     this.shake = Math.max(this.shake, 4);
     this.sfx("boom");
+    this.noteLockDeath(enemy);
     enemy.destroy();
     this.enemies.splice(this.enemies.indexOf(enemy), 1);
   }
@@ -2818,10 +2818,12 @@ export class Game {
       this.shake *= 0.86;
       if (this.shake < 0.2) this.shake = 0;
       this.applyCamera(t, screen);
+      this.tickLockCam(0);
       this.audio.tickEngine(0, 0, 0, 0);
       this.audio.tickLaser(false);
       this.tickMusicInput();
       this.audio.tickMusic(this.musicOutLevel());
+      this.renderLockCam(screen);
       this.input.endFrame();
       return;
     }
@@ -3292,6 +3294,8 @@ export class Game {
     this.applyCamera(t, screen);
     if (this.mode === SHIPS) this.hangar.layout(screen);
     this.fx.update(t, { x: this.camX, y: this.camY, w: space.width, h: space.height });
+    this.tickLockCam(t);
+    this.renderLockCam(screen);
 
     if (this.input.fireHeld || this.input.leftHeld || this.input.keys.size) this.audio.unlock();
     if (this.mode === PLAYING && this.ship.alive && !this.ship.docked) {
@@ -3327,6 +3331,51 @@ export class Game {
       return this.save.settings.music ?? music.volume;
     }
     return music.menuVol;
+  }
+
+  noteLockDeath(body) {
+    if (!body) return;
+    if (this.lockCam.target !== body && this.selected !== body) return;
+    this.lockCam.target = body;
+    this.lockCam.noteDeath(body);
+    if (this.selected === body) {
+      this.selected = null;
+      this.focusFire = false;
+      this.lockMark.visible = false;
+    }
+  }
+
+  tickLockCam(dt) {
+    if (this.mode !== PLAYING && this.mode !== DYING && this.mode !== CONTINUE) {
+      this.lockCam.clear();
+      return;
+    }
+    const live = this.focusShip();
+    if (live) {
+      this.lockCam.follow(live);
+      return;
+    }
+    if (this.lockCam.hold > 0) this.lockCam.tick(dt);
+    else this.lockCam.clear();
+  }
+
+  renderLockCam(screen) {
+    if (!this.lockCam.active) {
+      this.lockCam.view.visible = false;
+      return;
+    }
+    const space = this.space();
+    const placedX = this.camX + wrapDelta(this.lockCam.x - this.camX, space.width);
+    const placedY = this.camY + wrapDelta(this.lockCam.y - this.camY, space.height);
+    this.lockCam.render(this.app.renderer, this.world, {
+      screen,
+      compact: this.input.layout === "phone",
+      placedX,
+      placedY,
+      radius: this.lockCam.target?.radius || 20,
+      hide: [this.far.view, this.lockMark, this.leadMark, this.sightMark],
+      scales: [this.ship, ...this.enemies].filter((item) => item?.view),
+    });
   }
 
   applyMusicVol(value) {

@@ -81,6 +81,15 @@ export const camera = {
   zoom: 0.56,
 };
 
+/** Close-up of a locked ship, bottom center-left. */
+export const lockCam = {
+  hold: 2,
+  width: 252,
+  height: 168,
+  phoneWidth: 176,
+  phoneHeight: 118,
+};
+
 /** Distant + lattice. factor 0.25 and spacing 500 tile cleanly on the 16000 torus. */
 export const farGrid = {
   spacing: 500,
