@@ -484,7 +484,7 @@ export class Game {
         enemy.laserG?.clear();
         continue;
       }
-      if (enemy.stunned > 0 || !this.ship.alive) {
+      if (enemy.stunned > 0 || !this.ship.alive || this.mode !== PLAYING) {
         enemy.laserCharge = 0;
         enemy.laserOn = false;
         enemy.paintLaser(null);
@@ -2497,6 +2497,7 @@ export class Game {
 
   offerContinue() {
     this.mode = CONTINUE;
+    this.silenceLasers();
     this.selected = null;
     this.focusFire = false;
     this.lockMark.visible = false;
@@ -2633,6 +2634,17 @@ export class Game {
     );
   }
 
+  silenceLasers() {
+    this.stopHubLaser();
+    for (const enemy of this.enemies) {
+      if (enemy.role !== "destroyer") continue;
+      enemy.laserCharge = 0;
+      enemy.laserOn = false;
+      enemy.paintLaser(null);
+    }
+    this.audio.tickLaser(false);
+  }
+
   killShip() {
     if (this.attractOnDemo || !this.ship.alive || this.ship.docked) return;
     this.ship.kill();
@@ -2653,6 +2665,7 @@ export class Game {
     this.cargo = 0;
     this.ship.setCargo(0);
     this.hud.setOre(0, this.hub.ore, this.hub.upgradeName());
+    this.silenceLasers();
     this.mode = DYING;
     this.timer = shipConfig.respawnDelay;
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
@@ -3311,7 +3324,10 @@ export class Game {
       this.audio.tickEngine(0, 0, 0, 0);
     }
     this.tickMissileAudio(t, space);
-    const laserOn = Boolean(this.hubLaserOn) || this.enemies.some((enemy) => enemy.alive && enemy.role === "destroyer" && enemy.laserOn);
+    const laserOn =
+      this.mode === PLAYING &&
+      this.ship.alive &&
+      (Boolean(this.hubLaserOn) || this.enemies.some((enemy) => enemy.alive && enemy.role === "destroyer" && enemy.laserOn));
     this.audio.tickLaser(laserOn);
     this.tickMusicInput();
     this.audio.tickMusic(this.musicOutLevel());
