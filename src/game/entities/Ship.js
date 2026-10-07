@@ -1,4 +1,4 @@
-import { Container, Graphics } from "pixi.js";
+import { Container, Graphics, Rectangle } from "pixi.js";
 import { assaultShip, bullets, colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
 import { ThrustFlame } from "../particles/ThrustFlame.js";
 import { createGlowTexture, strokeGlow, strokeLine } from "../render/textures.js";
@@ -32,6 +32,7 @@ function closePoly(pts) {
 export class Ship {
   constructor() {
     this.view = new Container();
+    this.view.boundsArea = new Rectangle(-96, -96, 192, 192);
     this.g = new Graphics();
     const glow = createGlowTexture();
     this.jets = {
@@ -223,7 +224,12 @@ export class Ship {
     this.markG.clear();
     if (this.surge > 0.15) {
       const flicker = 13 + Math.random() * 4;
-      strokeGlow(this.markG, [-7, 0, -12, 3.2, -flicker, 0, -12, -3.2], colors.orange, colors.amber, 1.2);
+      if (this.isAssault()) {
+        strokeLine(this.markG, [-7, 2.4, -flicker, 0], colors.orange, colors.amber, 1.15);
+        strokeLine(this.markG, [-7, -2.4, -flicker, 0], colors.orange, colors.amber, 1.15);
+      } else {
+        strokeGlow(this.markG, [-7, 0, -12, 3.2, -flicker, 0, -12, -3.2], colors.orange, colors.amber, 1.2);
+      }
     }
     if (this.surge < -0.15) {
       const flicker = 18 + Math.random() * 3;
@@ -247,18 +253,22 @@ export class Ship {
     const flash = Math.max(0, this.shieldFlash / 0.06);
     const pulse = 0.55 + (this.shieldEnergy / (this.shieldMax || shieldConfig.max)) * 0.45;
     if (this.isAssault()) {
-      strokeGlow(this.shieldG, ringPts(12, radius, spin * 0.18), colors.cyan, colors.cyanHot, 1.5 + flash * 1.8);
-      strokeGlow(this.shieldG, ringPts(8, radius * 0.68, -spin * 0.28), colors.cyan, colors.cyanHot, 1.35 + flash);
-      strokeGlow(this.shieldG, ringPts(6, radius * 0.4, spin * 0.42 + Math.PI / 6), colors.cyan, colors.white, 1.2 + flash);
+      strokeLine(this.shieldG, closePoly(ringPts(12, radius, spin * 0.18)), colors.cyan, colors.cyanHot, 1.5 + flash * 1.8);
+      strokeLine(this.shieldG, closePoly(ringPts(8, radius * 0.68, -spin * 0.28)), colors.cyan, colors.cyanHot, 1.35 + flash);
+      strokeLine(this.shieldG, closePoly(ringPts(6, radius * 0.4, spin * 0.42 + Math.PI / 6)), colors.cyan, colors.white, 1.2 + flash);
     } else {
       strokeGlow(this.shieldG, ringPts(8, radius, spin), colors.cyan, colors.cyanHot, 1.25 + flash * 2.4);
     }
     if (flash > 0) {
       const bloom = ringPts(this.isAssault() ? 12 : 8, radius * (1 + flash * 0.28), spin * 0.18);
-      this.shieldG.poly(bloom, true);
-      this.shieldG.stroke({ width: 8, color: colors.white, alpha: 0.35 * flash });
-      this.shieldG.poly(bloom, true);
-      this.shieldG.stroke({ width: 2.2, color: colors.white, alpha: 0.9 * flash });
+      if (this.isAssault()) {
+        strokeLine(this.shieldG, closePoly(bloom), colors.white, colors.white, 2.2);
+      } else {
+        this.shieldG.poly(bloom, true);
+        this.shieldG.stroke({ width: 8, color: colors.white, alpha: 0.35 * flash });
+        this.shieldG.poly(bloom, true);
+        this.shieldG.stroke({ width: 2.2, color: colors.white, alpha: 0.9 * flash });
+      }
     }
     this.shieldG.alpha = pulse + flash * 0.45;
     this.shieldG.rotation = -this.rotation;
@@ -270,7 +280,7 @@ export class Ship {
     for (const gun of this.turrets) {
       gun.g.visible = on;
       gun.g.position.set(gun.x, gun.y);
-      gun.g.rotation = gun.angle;
+      if (Number.isFinite(gun.angle)) gun.g.rotation = gun.angle;
       if (!assault) {
         if (gun.painted) {
           gun.g.clear();
@@ -444,10 +454,7 @@ export class Ship {
     this.view.rotation = this.rotation;
     this.view.visible = this.invuln <= 0 || Math.floor(this.invuln * 14) % 2 === 0;
     this.drawMarks();
-    this.jets.rear.update(dt, this.surge > 0.15);
-    this.jets.nose.update(dt, this.surge < -0.15);
-    this.jets.left.update(dt, this.strafe > 0.15);
-    this.jets.right.update(dt, this.strafe < -0.15);
+    this.tickJets(dt);
   }
 
   autopilotHome(dt, hub, bounds) {
@@ -504,10 +511,15 @@ export class Ship {
     this.view.rotation = this.rotation;
     this.view.visible = this.invuln <= 0 || Math.floor(this.invuln * 14) % 2 === 0;
     this.drawMarks();
-    this.jets.rear.update(dt, this.surge > 0.15);
-    this.jets.nose.update(dt, false);
-    this.jets.left.update(dt, false);
-    this.jets.right.update(dt, false);
+    this.tickJets(dt, { nose: false, left: false, right: false });
+  }
+
+  tickJets(dt, flags = {}) {
+    const spray = !this.isAssault();
+    this.jets.rear.update(dt, spray && this.surge > 0.15);
+    this.jets.nose.update(dt, spray && (flags.nose ?? this.surge < -0.15));
+    this.jets.left.update(dt, spray && (flags.left ?? this.strafe > 0.15));
+    this.jets.right.update(dt, spray && (flags.right ?? this.strafe < -0.15));
   }
 
   kill() {

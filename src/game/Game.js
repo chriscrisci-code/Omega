@@ -1,4 +1,4 @@
-import { Container, Graphics } from "pixi.js";
+import { Container, Graphics, Rectangle } from "pixi.js";
 import { applyDifficulty, assault, assaultShip, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
@@ -55,6 +55,8 @@ export class Game {
     this.far = new FarGrid();
     this.world.addChild(this.far.view, this.vectors, this.fx.container);
     this.world.filters = [createBloomFilter()];
+    this.worldFilterArea = new Rectangle(0, 0, 1, 1);
+    this.world.filterArea = this.worldFilterArea;
     this.world.scale.set(cameraConfig.zoom);
     this.pips = new HudMarkers();
     this.hangar = new ShipsGallery();
@@ -1933,7 +1935,7 @@ export class Game {
   }
 
   tickAssaultShield(space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked || this.ship.undockLock > 0) {
+    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
       this.ship.autoShield = false;
       return;
     }
@@ -1950,29 +1952,36 @@ export class Game {
   }
 
   tickAssaultTurrets(t, space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked || this.ship.undockLock > 0) {
+    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
       this.ship.drawTurrets();
       return;
     }
     const threats = this.assaultThreats(space);
     const picks = threats.slice(0, 2);
+    const canFire = this.ship.undockLock <= 0;
     this.ship.turrets.forEach((gun, i) => {
       gun.cool = Math.max(0, gun.cool - t);
       const pick = picks[i] || picks[0] || null;
-      if (!pick) {
-        gun.angle = turnToward(gun.angle, i === 0 ? -0.4 : 0.4, assaultShip.turretTurn * t);
-        return;
+      let desired = i === 0 ? -0.4 : 0.4;
+      if (pick) {
+        const vx = Number.isFinite(pick.body.vx) ? pick.body.vx : 0;
+        const vy = Number.isFinite(pick.body.vy) ? pick.body.vy : 0;
+        const eta = pick.dist / bullets.speed;
+        const aimX = pick.dx + vx * eta;
+        const aimY = pick.dy + vy * eta;
+        if (Number.isFinite(aimX) && Number.isFinite(aimY)) {
+          desired = wrapDelta(Math.atan2(aimY, aimX) - this.ship.rotation, Math.PI * 2);
+        }
       }
-      const eta = pick.dist / bullets.speed;
-      const aimX = pick.dx + (pick.body.vx || 0) * eta;
-      const aimY = pick.dy + (pick.body.vy || 0) * eta;
-      const desired = wrapDelta(Math.atan2(aimY, aimX) - this.ship.rotation, Math.PI * 2);
-      gun.angle = turnToward(gun.angle, desired, assaultShip.turretTurn * t);
+      const next = turnToward(gun.angle, desired, assaultShip.turretTurn * t);
+      if (Number.isFinite(next)) gun.angle = next;
+      if (!canFire || !pick || !Number.isFinite(gun.angle) || !Number.isFinite(desired)) return;
       const error = Math.abs(wrapDelta(desired - gun.angle, Math.PI * 2));
       if (error > assaultShip.turretAim || gun.cool > 0) return;
       const bullet = this.shots.find((shot) => !shot.alive);
       if (!bullet) return;
       const muzzle = this.ship.turretWorld(gun);
+      if (!Number.isFinite(muzzle.x) || !Number.isFinite(muzzle.y) || !Number.isFinite(muzzle.angle)) return;
       bullet.fire(muzzle.x, muzzle.y, muzzle.angle);
       gun.cool = assaultShip.turretCool;
     });
@@ -2835,6 +2844,11 @@ export class Game {
     this.world.pivot.set(this.camX, this.camY);
     this.world.position.set(screen.width / 2 + shakeX, screen.height / 2 + shakeY);
     this.world.rotation = this.camRot;
+    this.worldFilterArea.x = 0;
+    this.worldFilterArea.y = 0;
+    this.worldFilterArea.width = screen.width;
+    this.worldFilterArea.height = screen.height;
+    this.world.filterArea = this.worldFilterArea;
     this.far.sync(this.camX, this.camY, !mapping && this.mode !== SHIPS);
 
     const shipBoost = mapping ? 22 : this.attractOnDemo ? 1.45 : 1;

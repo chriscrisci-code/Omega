@@ -31,6 +31,7 @@ export class Bullet {
   }
 
   fire(x, y, angle, options = {}) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(angle)) return;
     this.alive = true;
     this.hostile = Boolean(options.hostile);
     this.x = x;
