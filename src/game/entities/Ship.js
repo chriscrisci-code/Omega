@@ -22,6 +22,13 @@ function mark(g, x0, y0, x1, y1) {
   g.stroke({ width: 1.35, color: colors.white, cap: "round" });
 }
 
+function closePoly(pts) {
+  if (!pts || pts.length < 4) return pts;
+  const n = pts.length;
+  if (pts[0] === pts[n - 2] && pts[1] === pts[n - 1]) return pts;
+  return [...pts, pts[0], pts[1]];
+}
+
 export class Ship {
   constructor() {
     this.view = new Container();
@@ -115,6 +122,7 @@ export class Ship {
     this.shieldMax = this.shieldMax || shieldConfig.max;
     this.shieldEnergy = this.shieldMax;
     this.shieldOn = false;
+    this.autoShield = false;
     this.shieldLock = 0;
     this.shieldSpin = 0;
     this.shieldFlash = 0;
@@ -225,36 +233,35 @@ export class Ship {
     const spin = this.shieldSpin;
     const flash = Math.max(0, this.shieldFlash / 0.06);
     const pulse = 0.55 + (this.shieldEnergy / (this.shieldMax || shieldConfig.max)) * 0.45;
-    strokeGlow(this.shieldG, ringPts(8, radius, spin), colors.cyan, colors.cyanHot, 1.25 + flash * 2.4);
+    if (this.isAssault()) {
+      strokeLine(this.shieldG, closePoly(ringPts(12, radius, spin * 0.18)), colors.cyan, colors.cyanHot, 1.5 + flash * 1.8);
+      strokeLine(this.shieldG, closePoly(ringPts(8, radius * 0.68, -spin * 0.28)), colors.cyan, colors.cyanHot, 1.35 + flash);
+      strokeLine(this.shieldG, closePoly(ringPts(6, radius * 0.4, spin * 0.42 + Math.PI / 6)), colors.cyan, colors.white, 1.2 + flash);
+    } else {
+      strokeGlow(this.shieldG, ringPts(8, radius, spin), colors.cyan, colors.cyanHot, 1.25 + flash * 2.4);
+    }
     if (flash > 0) {
-      const bloom = ringPts(8, radius * (1 + flash * 0.28), spin * 0.18);
-      this.shieldG.poly(bloom, true);
-      this.shieldG.stroke({ width: 8, color: colors.white, alpha: 0.35 * flash });
-      this.shieldG.poly(bloom, true);
-      this.shieldG.stroke({ width: 2.2, color: colors.white, alpha: 0.9 * flash });
+      const bloom = ringPts(this.isAssault() ? 12 : 8, radius * (1 + flash * 0.28), spin * 0.18);
+      if (this.isAssault()) {
+        strokeLine(this.shieldG, closePoly(bloom), colors.white, colors.white, 2.2);
+      } else {
+        this.shieldG.poly(bloom, true);
+        this.shieldG.stroke({ width: 8, color: colors.white, alpha: 0.35 * flash });
+        this.shieldG.poly(bloom, true);
+        this.shieldG.stroke({ width: 2.2, color: colors.white, alpha: 0.9 * flash });
+      }
     }
     this.shieldG.alpha = pulse + flash * 0.45;
     this.shieldG.rotation = -this.rotation;
   }
 
   drawTurrets() {
-    const assault = this.isAssault() && this.alive;
-    const on = assault && !this.docked;
     for (const gun of this.turrets) {
-      gun.g.visible = on;
-      gun.g.position.set(gun.x, gun.y);
-      if (Number.isFinite(gun.angle)) gun.g.rotation = gun.angle;
-      if (!assault) {
-        if (gun.painted) {
-          gun.g.clear();
-          gun.painted = false;
-        }
-        continue;
+      gun.g.visible = false;
+      if (gun.painted) {
+        gun.g.clear();
+        gun.painted = false;
       }
-      if (gun.painted) continue;
-      gun.g.clear();
-      strokeLine(gun.g, [-4, -3.4, 9, 0, -4, 3.4], colors.cyan, colors.cyanHot, 1.15);
-      gun.painted = true;
     }
   }
 
@@ -492,6 +499,7 @@ export class Ship {
     this.dockPad = null;
     this.dockHold = 0;
     this.shieldOn = false;
+    this.autoShield = false;
     this.warping = false;
     this.drawShield();
     this.drawTurrets();

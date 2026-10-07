@@ -305,12 +305,11 @@ export const bloom = {
 
 export const extraLifeEvery = 10000;
 
-/** Assault kit. Shield extras are off while we isolate the turret hang. */
+/** Assault kit. Turrets off while we confirm the shield path is clean. */
 export const assaultShip = {
-  turretCool: 0.22,
-  turretRange: 780,
-  turretTurn: 4.4,
-  turretAim: 0.28,
+  shieldMul: 2,
+  autoShieldLead: 0.38,
+  autoShieldPad: 28,
 };
 
 /** Career XP. Persists across Continue and new runs. Not run score. */
