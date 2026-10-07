@@ -1,5 +1,5 @@
-import { Container, Graphics, Rectangle } from "pixi.js";
-import { assaultShip, bullets, colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
+import { Container, Graphics } from "pixi.js";
+import { bullets, colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
 import { ThrustFlame } from "../particles/ThrustFlame.js";
 import { createGlowTexture, strokeGlow, strokeLine } from "../render/textures.js";
 import { catalogToGameSkin } from "../ships/catalog.js";
@@ -22,17 +22,9 @@ function mark(g, x0, y0, x1, y1) {
   g.stroke({ width: 1.35, color: colors.white, cap: "round" });
 }
 
-function closePoly(pts) {
-  if (!pts || pts.length < 4) return pts;
-  const n = pts.length;
-  if (pts[0] === pts[n - 2] && pts[1] === pts[n - 1]) return pts;
-  return [...pts, pts[0], pts[1]];
-}
-
 export class Ship {
   constructor() {
     this.view = new Container();
-    this.view.boundsArea = new Rectangle(-96, -96, 192, 192);
     this.g = new Graphics();
     const glow = createGlowTexture();
     this.jets = {
@@ -73,29 +65,18 @@ export class Ship {
     };
     this.shieldG = new Graphics();
     this.cargoG = new Graphics();
-    this.detailG = new Graphics();
     this.markG = new Graphics();
-    this.turretL = new Graphics();
-    this.turretR = new Graphics();
     this.view.addChild(
       this.shieldG,
       this.cargoG,
       this.g,
-      this.detailG,
       this.markG,
-      this.turretL,
-      this.turretR,
       this.jets.rear.container,
       this.jets.nose.container,
       this.jets.left.container,
       this.jets.right.container,
     );
     this.radius = shipConfig.radius;
-    this.kit = "";
-    this.turrets = [
-      { g: this.turretL, x: 10, y: -12, angle: -0.4, cool: 0, painted: false },
-      { g: this.turretR, x: 10, y: 12, angle: 0.4, cool: 0, painted: false },
-    ];
     this.surge = 0;
     this.strafe = 0;
     this.docked = false;
@@ -125,16 +106,13 @@ export class Ship {
     this.shieldMax = this.shieldMax || shieldConfig.max;
     this.shieldEnergy = this.shieldMax;
     this.shieldOn = false;
-    this.autoShield = false;
     this.shieldLock = 0;
     this.shieldSpin = 0;
     this.shieldFlash = 0;
-    for (const gun of this.turrets || []) gun.cool = 0;
     this.warping = false;
     this.view.visible = true;
     this.draw();
     this.drawShield();
-    this.drawTurrets();
     this.setCargo(0);
   }
 
@@ -168,48 +146,30 @@ export class Ship {
   muzzle(side = 0) {
     const c = Math.cos(this.rotation);
     const s = Math.sin(this.rotation);
-    const nose = this.kit === "assault" ? 24 : 16;
-    const across = side * bullets.gunSep * (this.kit === "assault" ? assaultShip.scale : 1);
+    const across = side * bullets.gunSep;
     return {
-      x: this.x + c * nose + -s * across,
-      y: this.y + s * nose + c * across,
+      x: this.x + c * 16 + -s * across,
+      y: this.y + s * 16 + c * across,
     };
   }
 
-  isAssault() {
-    return this.kit === "assault";
-  }
-
   shieldRadius() {
-    return this.isAssault() ? shieldConfig.radius * assaultShip.scale : shieldConfig.radius;
+    return shieldConfig.radius;
   }
 
   setSkin(spec) {
-    this.kit = spec?.id === "ASSAULT" ? "assault" : "";
     this.skin = spec ? catalogToGameSkin(spec) : null;
-    const scale = this.isAssault() ? assaultShip.scale : 1;
-    this.radius = shipConfig.radius * scale;
-    this.turrets[0].x = 10 * scale;
-    this.turrets[0].y = -12 * scale;
-    this.turrets[1].x = 10 * scale;
-    this.turrets[1].y = 12 * scale;
-    for (const gun of this.turrets) gun.painted = false;
+    this.radius = shipConfig.radius;
     this.draw();
-    this.drawTurrets();
     this.drawShield();
   }
 
   draw() {
     this.g.clear();
-    this.detailG.clear();
     if (this.skin) {
-      // Extra closed polys on the same Graphics as a catalog hull can hang Pixi 8.
-      for (const hull of this.skin.hulls) {
-        if (this.isAssault()) strokeLine(this.g, closePoly(hull), colors.cyan, colors.cyanHot, 1.55);
-        else strokeGlow(this.g, hull, colors.cyan, colors.cyanHot, 1.55);
-      }
-      for (const detail of this.skin.details) strokeLine(this.detailG, closePoly(detail), colors.cyan, colors.cyanHot, 1.2);
-      for (const line of this.skin.lines) strokeLine(this.detailG, line, colors.cyan, colors.cyanHot, 1.3);
+      for (const hull of this.skin.hulls) strokeGlow(this.g, hull, colors.cyan, colors.cyanHot, 1.55);
+      for (const detail of this.skin.details) strokeGlow(this.g, detail, colors.cyan, colors.cyanHot, 1.2);
+      for (const line of this.skin.lines) strokeLine(this.g, line, colors.cyan, colors.cyanHot, 1.3);
     } else {
       strokeGlow(this.g, HULL, colors.cyan, colors.cyanHot, 1.7);
       mark(this.g, -2, -7.2, 3, -7.2);
@@ -224,12 +184,7 @@ export class Ship {
     this.markG.clear();
     if (this.surge > 0.15) {
       const flicker = 13 + Math.random() * 4;
-      if (this.isAssault()) {
-        strokeLine(this.markG, [-7, 2.4, -flicker, 0], colors.orange, colors.amber, 1.15);
-        strokeLine(this.markG, [-7, -2.4, -flicker, 0], colors.orange, colors.amber, 1.15);
-      } else {
-        strokeGlow(this.markG, [-7, 0, -12, 3.2, -flicker, 0, -12, -3.2], colors.orange, colors.amber, 1.2);
-      }
+      strokeGlow(this.markG, [-7, 0, -12, 3.2, -flicker, 0, -12, -3.2], colors.orange, colors.amber, 1.2);
     }
     if (this.surge < -0.15) {
       const flicker = 18 + Math.random() * 3;
@@ -252,60 +207,16 @@ export class Ship {
     const spin = this.shieldSpin;
     const flash = Math.max(0, this.shieldFlash / 0.06);
     const pulse = 0.55 + (this.shieldEnergy / (this.shieldMax || shieldConfig.max)) * 0.45;
-    if (this.isAssault()) {
-      strokeLine(this.shieldG, closePoly(ringPts(12, radius, spin * 0.18)), colors.cyan, colors.cyanHot, 1.5 + flash * 1.8);
-      strokeLine(this.shieldG, closePoly(ringPts(8, radius * 0.68, -spin * 0.28)), colors.cyan, colors.cyanHot, 1.35 + flash);
-      strokeLine(this.shieldG, closePoly(ringPts(6, radius * 0.4, spin * 0.42 + Math.PI / 6)), colors.cyan, colors.white, 1.2 + flash);
-    } else {
-      strokeGlow(this.shieldG, ringPts(8, radius, spin), colors.cyan, colors.cyanHot, 1.25 + flash * 2.4);
-    }
+    strokeGlow(this.shieldG, ringPts(8, radius, spin), colors.cyan, colors.cyanHot, 1.25 + flash * 2.4);
     if (flash > 0) {
-      const bloom = ringPts(this.isAssault() ? 12 : 8, radius * (1 + flash * 0.28), spin * 0.18);
-      if (this.isAssault()) {
-        strokeLine(this.shieldG, closePoly(bloom), colors.white, colors.white, 2.2);
-      } else {
-        this.shieldG.poly(bloom, true);
-        this.shieldG.stroke({ width: 8, color: colors.white, alpha: 0.35 * flash });
-        this.shieldG.poly(bloom, true);
-        this.shieldG.stroke({ width: 2.2, color: colors.white, alpha: 0.9 * flash });
-      }
+      const bloom = ringPts(8, radius * (1 + flash * 0.28), spin * 0.18);
+      this.shieldG.poly(bloom, true);
+      this.shieldG.stroke({ width: 8, color: colors.white, alpha: 0.35 * flash });
+      this.shieldG.poly(bloom, true);
+      this.shieldG.stroke({ width: 2.2, color: colors.white, alpha: 0.9 * flash });
     }
     this.shieldG.alpha = pulse + flash * 0.45;
     this.shieldG.rotation = -this.rotation;
-  }
-
-  drawTurrets() {
-    const assault = this.isAssault() && this.alive;
-    const on = assault && !this.docked;
-    for (const gun of this.turrets) {
-      gun.g.visible = on;
-      gun.g.position.set(gun.x, gun.y);
-      if (Number.isFinite(gun.angle)) gun.g.rotation = gun.angle;
-      if (!assault) {
-        if (gun.painted) {
-          gun.g.clear();
-          gun.painted = false;
-        }
-        continue;
-      }
-      if (gun.painted) continue;
-      gun.g.clear();
-      strokeLine(gun.g, [-4, -3.4, 9, 0, -4, 3.4], colors.cyan, colors.cyanHot, 1.15);
-      gun.painted = true;
-    }
-  }
-
-  turretWorld(gun, extra = 0) {
-    const reach = 10 + extra;
-    const lx = gun.x + Math.cos(gun.angle) * reach;
-    const ly = gun.y + Math.sin(gun.angle) * reach;
-    const c = Math.cos(this.rotation);
-    const s = Math.sin(this.rotation);
-    return {
-      x: this.x + lx * c - ly * s,
-      y: this.y + lx * s + ly * c,
-      angle: this.rotation + gun.angle,
-    };
   }
 
   setShieldMax(max, fill = false) {
@@ -454,7 +365,10 @@ export class Ship {
     this.view.rotation = this.rotation;
     this.view.visible = this.invuln <= 0 || Math.floor(this.invuln * 14) % 2 === 0;
     this.drawMarks();
-    this.tickJets(dt);
+    this.jets.rear.update(dt, this.surge > 0.15);
+    this.jets.nose.update(dt, this.surge < -0.15);
+    this.jets.left.update(dt, this.strafe > 0.15);
+    this.jets.right.update(dt, this.strafe < -0.15);
   }
 
   autopilotHome(dt, hub, bounds) {
@@ -511,15 +425,10 @@ export class Ship {
     this.view.rotation = this.rotation;
     this.view.visible = this.invuln <= 0 || Math.floor(this.invuln * 14) % 2 === 0;
     this.drawMarks();
-    this.tickJets(dt, { nose: false, left: false, right: false });
-  }
-
-  tickJets(dt, flags = {}) {
-    const spray = !this.isAssault();
-    this.jets.rear.update(dt, spray && this.surge > 0.15);
-    this.jets.nose.update(dt, spray && (flags.nose ?? this.surge < -0.15));
-    this.jets.left.update(dt, spray && (flags.left ?? this.strafe > 0.15));
-    this.jets.right.update(dt, spray && (flags.right ?? this.strafe < -0.15));
+    this.jets.rear.update(dt, this.surge > 0.15);
+    this.jets.nose.update(dt, false);
+    this.jets.left.update(dt, false);
+    this.jets.right.update(dt, false);
   }
 
   kill() {
@@ -531,10 +440,8 @@ export class Ship {
     this.dockPad = null;
     this.dockHold = 0;
     this.shieldOn = false;
-    this.autoShield = false;
     this.warping = false;
     this.drawShield();
-    this.drawTurrets();
     for (const jet of Object.values(this.jets)) jet.stop();
     this.view.visible = false;
   }

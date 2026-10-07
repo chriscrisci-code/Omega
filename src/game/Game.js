@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
-import { applyDifficulty, assault, assaultShip, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -1180,7 +1180,6 @@ export class Game {
     if (!this.ship.shieldOn && this.ship.shieldEnergy > 0.35) this.ship.tickShield(t, true);
     else this.ship.tickShield(t, false);
     this.shoot();
-    this.tickAssaultKit(t, space);
     if (this.attractAge > 0.2) this.fireMissile();
     this.ship.view.visible = true;
     this.ship.view.alpha = 1;
@@ -1234,7 +1233,7 @@ export class Game {
     const top = shipLevels.shield || 4;
     const n = Math.max(1, Math.min(top, this.levels?.shield || 1));
     const pool = shieldConfig.max * (1 + (n - 1) / (top - 1));
-    return this.ship?.isAssault?.() ? pool * assaultShip.shieldMul : pool;
+    return pool;
   }
 
   upgradeCost(id) {
@@ -1895,102 +1894,6 @@ export class Game {
     this.applyShieldLevel(true);
     this.persistLoadout();
     this.hud.bay.setState(this.shipId);
-  }
-
-  assaultThreats(space) {
-    const list = [];
-    const range = assaultShip.turretRange;
-    const consider = (body) => {
-      if (!body || body.alive === false) return;
-      if (!Number.isFinite(body.x) || !Number.isFinite(body.y)) return;
-      const dx = wrapDelta(body.x - this.ship.x, space.width);
-      const dy = wrapDelta(body.y - this.ship.y, space.height);
-      const dist = Math.hypot(dx, dy);
-      if (!Number.isFinite(dist) || dist >= range) return;
-      list.push({ body, dist, dx, dy });
-    };
-    for (const enemy of this.enemies) consider(enemy);
-    if (this.station?.awake) {
-      for (const gun of this.station.guns || []) consider(gun);
-    }
-    list.sort((a, b) => a.dist - b.dist || 0);
-    return list;
-  }
-
-  missileAboutToHit(space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) return false;
-    const reach = this.ship.shieldRadius() + assaultShip.autoShieldPad;
-    for (const star of this.castleStars) {
-      if (!star.alive) continue;
-      const dx = wrapDelta(star.x - this.ship.x, space.width);
-      const dy = wrapDelta(star.y - this.ship.y, space.height);
-      const dist = Math.hypot(dx, dy);
-      if (dist < reach) return true;
-      const relx = (star.vx || 0) - this.ship.vx;
-      const rely = (star.vy || 0) - this.ship.vy;
-      const closing = dist > 1 ? (dx * relx + dy * rely) / dist : 0;
-      if (closing < -40 && dist / -closing < assaultShip.autoShieldLead) return true;
-    }
-    return false;
-  }
-
-  tickAssaultShield(space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
-      this.ship.autoShield = false;
-      return;
-    }
-    const threat = this.missileAboutToHit(space);
-    if (threat && this.ship.shieldEnergy > 0.06) {
-      if (!this.ship.shieldOn) {
-        this.ship.forceShield(true);
-        this.ship.autoShield = true;
-      }
-    } else if (this.ship.autoShield) {
-      this.ship.forceShield(false);
-      this.ship.autoShield = false;
-    }
-  }
-
-  tickAssaultTurrets(t, space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
-      this.ship.drawTurrets();
-      return;
-    }
-    const threats = this.assaultThreats(space);
-    const picks = threats.slice(0, 2);
-    const canFire = this.ship.undockLock <= 0;
-    this.ship.turrets.forEach((gun, i) => {
-      gun.cool = Math.max(0, gun.cool - t);
-      const pick = picks[i] || picks[0] || null;
-      let desired = i === 0 ? -0.4 : 0.4;
-      if (pick) {
-        const vx = Number.isFinite(pick.body.vx) ? pick.body.vx : 0;
-        const vy = Number.isFinite(pick.body.vy) ? pick.body.vy : 0;
-        const eta = pick.dist / bullets.speed;
-        const aimX = pick.dx + vx * eta;
-        const aimY = pick.dy + vy * eta;
-        if (Number.isFinite(aimX) && Number.isFinite(aimY)) {
-          desired = wrapDelta(Math.atan2(aimY, aimX) - this.ship.rotation, Math.PI * 2);
-        }
-      }
-      const next = turnToward(gun.angle, desired, assaultShip.turretTurn * t);
-      if (Number.isFinite(next)) gun.angle = next;
-      if (!canFire || !pick || !Number.isFinite(gun.angle) || !Number.isFinite(desired)) return;
-      const error = Math.abs(wrapDelta(desired - gun.angle, Math.PI * 2));
-      if (error > assaultShip.turretAim || gun.cool > 0) return;
-      const bullet = this.shots.find((shot) => !shot.alive);
-      if (!bullet) return;
-      const muzzle = this.ship.turretWorld(gun);
-      if (!Number.isFinite(muzzle.x) || !Number.isFinite(muzzle.y) || !Number.isFinite(muzzle.angle)) return;
-      bullet.fire(muzzle.x, muzzle.y, muzzle.angle);
-      gun.cool = assaultShip.turretCool;
-    });
-    this.ship.drawTurrets();
-  }
-
-  tickAssaultKit(t, space) {
-    this.tickAssaultShield(space);
-    this.tickAssaultTurrets(t, space);
   }
 
   fireMissile(force = false) {
@@ -3058,8 +2961,6 @@ export class Game {
       }
       const shieldWas = this.ship.shieldOn;
       this.ship.tickShield(t, this.input.shieldPressed);
-      if (this.input.shieldPressed) this.ship.autoShield = false;
-      this.tickAssaultKit(t, space);
       if (!shieldWas && this.ship.shieldOn) this.sfx("on");
       else if (shieldWas && !this.ship.shieldOn) this.sfx("off");
       if (this.cargo > 0) this.ship.setCargo(this.cargo);
