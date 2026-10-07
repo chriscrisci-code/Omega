@@ -308,12 +308,19 @@ export const extraLifeEvery = 10000;
 /** Assault kit. AI guns fire with no turret art. No DSF 22 nose cannon. */
 export const assaultShip = {
   shieldMul: 2,
+  hullHits: 3,
+  hullIFrames: 0.55,
   turretCool: 0.22,
   turretRange: 780,
   turretTurn: 4.4,
   turretAim: 0.28,
   autoShieldLead: 0.38,
   autoShieldPad: 28,
+  wingHullHits: 2,
+  wingBack: 58,
+  wingSide: 50,
+  wingSkin: 13,
+  wingShield: 24,
 };
 
 /** Career XP. Persists across Continue and new runs. Not run score. */

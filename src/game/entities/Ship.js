@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import { bullets, colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
+import { assaultShip, bullets, colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
 import { ThrustFlame } from "../particles/ThrustFlame.js";
 import { createGlowTexture, strokeGlow, strokeLine } from "../render/textures.js";
 import { catalogToGameSkin } from "../ships/catalog.js";
@@ -27,6 +27,33 @@ function closePoly(pts) {
   const n = pts.length;
   if (pts[0] === pts[n - 2] && pts[1] === pts[n - 1]) return pts;
   return [...pts, pts[0], pts[1]];
+}
+
+/** Hub-style expanding rings. Used only while an Assault shield is actually on. */
+export function paintAssaultShield(g, opts) {
+  const radius = opts.radius;
+  const spin = opts.spin || 0;
+  const max = opts.max || shieldConfig.max;
+  const flash = Math.max(0, (opts.flash || 0) / 0.06);
+  const pulse = 0.55 + ((opts.energy || 0) / max) * 0.45;
+  const wave = opts.regenWave || 0;
+  g.clear();
+  if (!opts.on) return;
+  const rings = [
+    { sides: 12, size: 1, turn: spin * 0.18, width: 1.5 + flash * 1.8, hot: colors.cyanHot },
+    { sides: 8, size: 0.68, turn: -spin * 0.28, width: 1.35 + flash, hot: colors.cyanHot },
+    { sides: 6, size: 0.4, turn: spin * 0.42 + Math.PI / 6, width: 1.2 + flash, hot: colors.white },
+  ];
+  rings.forEach((ring, i) => {
+    const u = (wave + (rings.length - 1 - i) / rings.length) % 1;
+    const scale = 1 + u * 0.55;
+    strokeLine(g, closePoly(ringPts(ring.sides, radius * ring.size * scale, ring.turn)), colors.cyan, ring.hot, ring.width);
+  });
+  if (flash > 0) {
+    strokeLine(g, closePoly(ringPts(12, radius * (1 + flash * 0.28), spin * 0.18)), colors.white, colors.white, 2.2);
+  }
+  g.alpha = Math.max(0.22, pulse * (1 - ((wave * 3) % 1) * 0.45)) + flash * 0.45;
+  g.rotation = -(opts.rotation || 0);
 }
 
 export class Ship {
@@ -85,6 +112,8 @@ export class Ship {
     );
     this.radius = shipConfig.radius;
     this.kit = "";
+    this.hullMax = 1;
+    this.hullHp = 1;
     this.turrets = [
       { x: 8, y: -10, angle: -0.4, cool: 0 },
       { x: 8, y: 10, angle: 0.4, cool: 0 },
@@ -123,6 +152,8 @@ export class Ship {
     this.shieldSpin = 0;
     this.shieldFlash = 0;
     this.regenWave = 0;
+    this.hullMax = this.hullMax || 1;
+    this.hullHp = this.hullMax;
     for (const gun of this.turrets || []) gun.cool = 0;
     this.warping = false;
     this.view.visible = true;
@@ -180,6 +211,8 @@ export class Ship {
     this.kit = spec?.id === "ASSAULT" ? "assault" : "";
     this.skin = spec ? catalogToGameSkin(spec) : null;
     this.radius = shipConfig.radius;
+    this.hullMax = this.kit === "assault" ? assaultShip.hullHits : 1;
+    this.hullHp = this.hullMax;
     this.draw();
     this.drawShield();
   }
@@ -221,42 +254,35 @@ export class Ship {
   }
 
   drawShield() {
+    if (this.isAssault()) {
+      paintAssaultShield(this.shieldG, {
+        on: this.shieldOn,
+        radius: this.shieldRadius(),
+        spin: this.shieldSpin,
+        energy: this.shieldEnergy,
+        max: this.shieldMax || shieldConfig.max,
+        flash: this.shieldFlash,
+        regenWave: this.regenWave,
+        rotation: this.rotation,
+      });
+      return;
+    }
     this.shieldG.clear();
+    if (!this.shieldOn) return;
     const radius = this.shieldRadius();
     const spin = this.shieldSpin;
     const max = this.shieldMax || shieldConfig.max;
     const flash = Math.max(0, this.shieldFlash / 0.06);
     const pulse = 0.55 + (this.shieldEnergy / max) * 0.45;
-    const regenerating =
-      this.isAssault() && this.alive && !this.docked && !this.shieldOn && this.shieldEnergy < max - 0.01;
-    if (!this.shieldOn && !regenerating) return;
-    if (this.isAssault()) {
-      const rings = [
-        { sides: 12, size: 1, turn: spin * 0.18, width: 1.5 + flash * 1.8, hot: colors.cyanHot },
-        { sides: 8, size: 0.68, turn: -spin * 0.28, width: 1.35 + flash, hot: colors.cyanHot },
-        { sides: 6, size: 0.4, turn: spin * 0.42 + Math.PI / 6, width: 1.2 + flash, hot: colors.white },
-      ];
-      rings.forEach((ring, i) => {
-        const u = regenerating ? (this.regenWave + (rings.length - 1 - i) / rings.length) % 1 : 0;
-        const scale = 1 + u * 0.55;
-        strokeLine(this.shieldG, closePoly(ringPts(ring.sides, radius * ring.size * scale, ring.turn)), colors.cyan, ring.hot, ring.width);
-      });
-      this.shieldG.alpha = regenerating ? Math.max(0.22, 1 - ((this.regenWave * 3) % 1) * 0.45) : pulse + flash * 0.45;
-    } else {
-      strokeGlow(this.shieldG, ringPts(8, radius, spin), colors.cyan, colors.cyanHot, 1.25 + flash * 2.4);
-      this.shieldG.alpha = pulse + flash * 0.45;
+    strokeGlow(this.shieldG, ringPts(8, radius, spin), colors.cyan, colors.cyanHot, 1.25 + flash * 2.4);
+    if (flash > 0) {
+      const bloom = ringPts(8, radius * (1 + flash * 0.28), spin * 0.18);
+      this.shieldG.poly(bloom, true);
+      this.shieldG.stroke({ width: 8, color: colors.white, alpha: 0.35 * flash });
+      this.shieldG.poly(bloom, true);
+      this.shieldG.stroke({ width: 2.2, color: colors.white, alpha: 0.9 * flash });
     }
-    if (this.shieldOn && flash > 0) {
-      const bloom = ringPts(this.isAssault() ? 12 : 8, radius * (1 + flash * 0.28), spin * 0.18);
-      if (this.isAssault()) {
-        strokeLine(this.shieldG, closePoly(bloom), colors.white, colors.white, 2.2);
-      } else {
-        this.shieldG.poly(bloom, true);
-        this.shieldG.stroke({ width: 8, color: colors.white, alpha: 0.35 * flash });
-        this.shieldG.poly(bloom, true);
-        this.shieldG.stroke({ width: 2.2, color: colors.white, alpha: 0.9 * flash });
-      }
-    }
+    this.shieldG.alpha = pulse + flash * 0.45;
     this.shieldG.rotation = -this.rotation;
   }
 

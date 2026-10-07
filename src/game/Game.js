@@ -10,6 +10,7 @@ import { Enemy, HUNTER } from "./entities/Enemy.js";
 import { Missile } from "./entities/Missile.js";
 import { Ore } from "./entities/Ore.js";
 import { HULL, Ship } from "./entities/Ship.js";
+import { Wingman } from "./entities/Wingman.js";
 import { HudMarkers } from "./hud/HudMarkers.js";
 import { Hud } from "./hud/Hud.js";
 import { Input } from "./input/Input.js";
@@ -68,6 +69,8 @@ export class Game {
       this.input._controlsClick = true;
     });
 
+    this.wingmen = [new Wingman(-1), new Wingman(1)];
+    for (const wing of this.wingmen) this.vectors.addChild(wing.view);
     this.ship = new Ship();
     this.vectors.addChild(this.ship.view);
     this.bases = createBases(worldConfig.width, worldConfig.height);
@@ -486,7 +489,14 @@ export class Game {
         enemy.laserG?.clear();
         continue;
       }
-      if (enemy.stunned > 0 || !this.ship.alive || this.mode !== PLAYING) {
+      if (enemy.stunned > 0 || this.mode !== PLAYING) {
+        enemy.laserCharge = 0;
+        enemy.laserOn = false;
+        enemy.paintLaser(null);
+        continue;
+      }
+      const prey = enemy.hunt?.alive ? enemy.hunt : this.nearestEscort(enemy, space);
+      if (!prey || this.ship.docked) {
         enemy.laserCharge = 0;
         enemy.laserOn = false;
         enemy.paintLaser(null);
@@ -499,10 +509,10 @@ export class Game {
         enemy.paintLaser(null);
         continue;
       }
-      const dx = wrapDelta(this.ship.x - enemy.x, space.width);
-      const dy = wrapDelta(this.ship.y - enemy.y, space.height);
+      const dx = wrapDelta(prey.x - enemy.x, space.width);
+      const dy = wrapDelta(prey.y - enemy.y, space.height);
       const dist = Math.hypot(dx, dy);
-      const locked = !this.ship.docked && dist < destroyerConfig.laserRange;
+      const locked = dist < destroyerConfig.laserRange;
       if (!enemy.laserOn) {
         if (!locked) {
           enemy.paintLaser(null);
@@ -514,13 +524,13 @@ export class Game {
       }
       enemy.laserCharge += t;
       const strength = Math.min(1, enemy.laserCharge / destroyerConfig.laserTime);
-      if (locked && this.ship.shieldOn) {
-        enemy.paintLaser(this.ship, space, 0.22, true);
+      if (locked && prey.shieldOn) {
+        enemy.paintLaser(prey, space, 0.22, true);
       } else if (locked) {
-        enemy.paintLaser(this.ship, space, strength, false);
-        if (enemy.laserCharge >= destroyerConfig.laserTime && this.ship.invuln <= 0) this.killShip();
+        enemy.paintLaser(prey, space, strength, false);
+        if (enemy.laserCharge >= destroyerConfig.laserTime && (prey.invuln || 0) <= 0) this.hurtFriendly(prey);
       } else {
-        enemy.paintLaser(this.ship, space, strength * 0.35, false);
+        enemy.paintLaser(prey, space, strength * 0.35, false);
       }
       if (enemy.laserCharge >= destroyerConfig.laserTime) {
         enemy.laserCharge = 0;
@@ -577,7 +587,7 @@ export class Game {
     const bullet = this.hostileShots.find((shot) => !shot.alive);
     if (!bullet) return;
     if (enemy.role === "destroyer") {
-      const prey = this.ship.alive ? this.ship : this.hub;
+      const prey = enemy.hunt?.alive ? enemy.hunt : this.ship.alive ? this.ship : this.hub;
       const dx = wrapDelta(prey.x - enemy.x, worldConfig.width);
       const dy = wrapDelta(prey.y - enemy.y, worldConfig.height);
       const aim = Math.atan2(dy, dx);
@@ -606,11 +616,12 @@ export class Game {
     this.sfx("enemy");
   }
 
-  fireStationGun(gun) {
+  fireStationGun(gun, prey) {
     const bullet = this.hostileShots.find((shot) => !shot.alive);
-    if (!bullet || !this.ship.alive) return;
-    const dx = wrapDelta(this.ship.x - gun.x, worldConfig.width);
-    const dy = wrapDelta(this.ship.y - gun.y, worldConfig.height);
+    const mark = prey || this.ship;
+    if (!bullet || !mark?.alive) return;
+    const dx = wrapDelta(mark.x - gun.x, worldConfig.width);
+    const dy = wrapDelta(mark.y - gun.y, worldConfig.height);
     bullet.fire(gun.x, gun.y, Math.atan2(dy, dx), {
       hostile: true,
       color: this.station.color,
@@ -628,13 +639,20 @@ export class Game {
 
   tickStation(t, space) {
     if (!this.station?.awake) return;
-    this.station.update(t, this.ship, space);
+    const aim = this.nearestEscort(this.station, space) || this.ship;
+    this.station.update(t, aim, space);
     if (this.mode !== PLAYING || this.attractOnDemo || this.assaultRest) return;
-    if (!this.ship.alive || this.ship.docked) return;
+    if (this.ship.docked || !this.escortGroup().length) return;
     let fired = 0;
-    for (const gun of this.station.readyGuns(this.ship, space)) {
+    for (const gun of this.station.guns || []) {
       if (fired >= stationCfg.fireMax) break;
-      this.fireStationGun(gun);
+      if (!gun.alive || gun.cool > 0) continue;
+      const prey = this.nearestEscort(gun, space);
+      if (!prey) continue;
+      const dx = wrapDelta(prey.x - gun.x, space.width);
+      const dy = wrapDelta(prey.y - gun.y, space.height);
+      if (dx * dx + dy * dy > stationCfg.gunRange * stationCfg.gunRange) continue;
+      this.fireStationGun(gun, prey);
       fired += 1;
     }
   }
@@ -1081,10 +1099,12 @@ export class Game {
     this.cooldown = 0;
     const setup = ATTRACT_SCENES[this.attractScene] ?? ATTRACT_SCENES[0];
     this.attractCue = setup(this, demoSkinFor(this.attractScene)) || {};
+    this.syncWingmen({ revive: true });
     this.snapCamera();
   }
 
   endAttractDemo() {
+    for (const wing of this.wingmen) wing.kill();
     this.ship.setSkin(null);
     this.ship.kill();
     this.ship.view.visible = false;
@@ -1887,6 +1907,142 @@ export class Game {
   applyShipSkin() {
     const spec = SHIP_CATALOG.find((item) => item.id === this.shipId);
     this.ship.setSkin(spec || null);
+    this.syncWingmen({ revive: true });
+  }
+
+  escortGroup() {
+    const list = [];
+    if (this.ship.alive && !this.ship.docked) list.push(this.ship);
+    if (this.ship.isAssault() && !this.ship.docked) {
+      for (const wing of this.wingmen) {
+        if (wing.flying()) list.push(wing);
+      }
+    }
+    return list;
+  }
+
+  nearestEscort(from, space) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const body of this.escortGroup()) {
+      if (!from || !Number.isFinite(from.x) || !Number.isFinite(from.y)) continue;
+      const dist = Math.hypot(
+        wrapDelta(body.x - from.x, space.width),
+        wrapDelta(body.y - from.y, space.height),
+      );
+      if (dist < bestDist) {
+        best = body;
+        bestDist = dist;
+      }
+    }
+    return best;
+  }
+
+  pickHunt(enemy, space) {
+    if (enemy.role === "raider" && this.hub.alive) return this.hub;
+    const group = this.escortGroup();
+    if (!group.length) return this.ship.alive ? this.ship : null;
+    if (enemy.hunt && group.includes(enemy.hunt)) {
+      const held = Math.hypot(
+        wrapDelta(enemy.hunt.x - enemy.x, space.width),
+        wrapDelta(enemy.hunt.y - enemy.y, space.height),
+      );
+      const near = this.nearestEscort(enemy, space);
+      if (near) {
+        const nearDist = Math.hypot(
+          wrapDelta(near.x - enemy.x, space.width),
+          wrapDelta(near.y - enemy.y, space.height),
+        );
+        if (held <= nearDist * 1.55) return enemy.hunt;
+      }
+    }
+    return this.nearestEscort(enemy, space) || group[0];
+  }
+
+  syncWingmen(options = {}) {
+    const revive = Boolean(options.revive);
+    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
+      for (const wing of this.wingmen) wing.park();
+      return;
+    }
+    for (const wing of this.wingmen) {
+      if (revive || !wing.alive) wing.spawn(this.ship);
+      else wing.deployed = true;
+    }
+  }
+
+  tickWingmen(t, space) {
+    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
+      for (const wing of this.wingmen) wing.park();
+      return;
+    }
+    for (const wing of this.wingmen) {
+      if (!wing.alive) continue;
+      wing.deployed = true;
+      wing.update(t, this.ship, space);
+      const threat = this.missileAboutToHit(space, wing);
+      if (threat && wing.shieldEnergy > 0.06) {
+        if (!wing.shieldOn) {
+          wing.forceShield(true);
+          wing.autoShield = true;
+        }
+      } else if (wing.autoShield) {
+        wing.forceShield(false);
+        wing.autoShield = false;
+      }
+    }
+  }
+
+  killWingman(wing) {
+    if (!wing?.alive) return;
+    this.spawnShards(null, wing, {
+      color: colors.cyan,
+      hotColor: colors.cyanHot,
+      kick: debrisConfig.shipKick * 0.85,
+      life: debrisConfig.shipLife * 0.8,
+      chips: 8,
+    });
+    this.fx.burst(wing.x, wing.y, colors.cyan, 16, 180);
+    this.fx.burst(wing.x, wing.y, colors.white, 8, 130);
+    this.shake = Math.max(this.shake, 8);
+    this.sfx("die");
+    wing.kill();
+  }
+
+  hurtFriendly(body) {
+    if (this.attractOnDemo || !body?.alive) return;
+    if ((body.invuln || 0) > 0) return;
+    if (body !== this.ship) {
+      body.hullHp = (body.hullHp ?? 1) - 1;
+      body.invuln = assaultShip.hullIFrames;
+      this.spawnShards(null, body, {
+        color: colors.cyan,
+        hotColor: colors.cyanHot,
+        kick: debrisConfig.rockKick * 0.45,
+        life: 0.35,
+        chips: 4,
+      });
+      this.shake = Math.max(this.shake, 5);
+      this.sfx("hub");
+      if (body.hullHp <= 0) this.killWingman(body);
+      return;
+    }
+    if (this.ship.isAssault() && this.ship.hullHp > 1) {
+      this.ship.hullHp -= 1;
+      this.ship.invuln = assaultShip.hullIFrames;
+      this.spawnShards(HULL, this.ship, {
+        color: colors.cyan,
+        hotColor: colors.cyanHot,
+        kick: debrisConfig.rockKick * 0.55,
+        life: 0.4,
+        chips: 5,
+      });
+      this.fx.burst(this.ship.x, this.ship.y, colors.cyanHot, 10, 120);
+      this.shake = Math.max(this.shake, 7);
+      this.sfx("hub");
+      return;
+    }
+    this.killShip();
   }
 
   setShip(id) {
@@ -1897,21 +2053,21 @@ export class Game {
     this.hud.bay.setState(this.shipId);
   }
 
-  missileAboutToHit(space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) return false;
-    const reach = this.ship.shieldRadius() + assaultShip.autoShieldPad;
+  missileAboutToHit(space, body = this.ship) {
+    if (!body?.alive) return false;
+    const reach = (body.shieldRadius?.() || shieldConfig.radius) + assaultShip.autoShieldPad;
     for (const star of this.castleStars) {
       if (!star.alive) continue;
       if (!Number.isFinite(star.x) || !Number.isFinite(star.y)) continue;
-      const dx = wrapDelta(star.x - this.ship.x, space.width);
-      const dy = wrapDelta(star.y - this.ship.y, space.height);
+      const dx = wrapDelta(star.x - body.x, space.width);
+      const dy = wrapDelta(star.y - body.y, space.height);
       const dist = Math.hypot(dx, dy);
       if (!Number.isFinite(dist)) continue;
       if (dist < reach) return true;
       const vx = Number.isFinite(star.vx) ? star.vx : 0;
       const vy = Number.isFinite(star.vy) ? star.vy : 0;
-      const relx = vx - this.ship.vx;
-      const rely = vy - this.ship.vy;
+      const relx = vx - (body.vx || 0);
+      const rely = vy - (body.vy || 0);
       const closing = dist > 1 ? (dx * relx + dy * rely) / dist : 0;
       if (closing < -40 && dist / -closing < assaultShip.autoShieldLead) return true;
     }
@@ -1991,6 +2147,7 @@ export class Game {
   tickAssaultKit(t, space) {
     this.tickAssaultShield(space);
     this.tickAssaultTurrets(t, space);
+    this.tickWingmen(t, space);
   }
 
   fireMissile(force = false) {
@@ -2515,11 +2672,12 @@ export class Game {
 
   fireCastleStar(base, space) {
     const star = this.castleStars.find((item) => !item.alive);
-    if (!star || !this.ship.alive) return;
-    const dx = wrapDelta(this.ship.x - base.x, space.width);
-    const dy = wrapDelta(this.ship.y - base.y, space.height);
+    const prey = this.nearestEscort(base, space) || this.ship;
+    if (!star || !prey?.alive) return;
+    const dx = wrapDelta(prey.x - base.x, space.width);
+    const dy = wrapDelta(prey.y - base.y, space.height);
     const angle = Math.atan2(dy, dx);
-    star.fire(base.x + Math.cos(angle) * 72, base.y + Math.sin(angle) * 72, angle, this.ship, {
+    star.fire(base.x + Math.cos(angle) * 72, base.y + Math.sin(angle) * 72, angle, prey, {
       star: true,
       color: base.color,
       hot: base.hotColor,
@@ -2533,13 +2691,13 @@ export class Game {
     base.missileCool = castle.starEvery + rand(-1.2, 1.6);
   }
 
-  sparkShield(x, y, cost) {
-    const result = this.ship.absorb(cost);
+  sparkShield(x, y, cost, host = this.ship) {
+    const result = host?.absorb?.(cost);
     if (!result) return false;
-    this.ship.shieldFlash = 0.06;
+    host.shieldFlash = 0.06;
     this.shieldHitFlash(x, y, colors.cyanHot);
     if (result === "pop") {
-      this.fx.burst(this.ship.x, this.ship.y, colors.cyan, 16, 140);
+      this.fx.burst(host.x, host.y, colors.cyan, 16, 140);
       this.shake = Math.max(this.shake, 5);
       this.sfx("pop");
     } else {
@@ -2548,16 +2706,16 @@ export class Game {
     return true;
   }
 
-  deflect(body, cost, space) {
-    const dx = wrapDelta(body.x - this.ship.x, space.width);
-    const dy = wrapDelta(body.y - this.ship.y, space.height);
+  deflect(body, cost, space, host = this.ship) {
+    const dx = wrapDelta(body.x - host.x, space.width);
+    const dy = wrapDelta(body.y - host.y, space.height);
     const mag = Math.hypot(dx, dy) || 1;
     if (body.kick) body.kick(dx / mag, dy / mag, 90);
     else {
       body.vx += (dx / mag) * 90;
       body.vy += (dy / mag) * 90;
     }
-    this.sparkShield(body.x, body.y, cost);
+    this.sparkShield(body.x, body.y, cost, host);
   }
 
   woundHub(at) {
@@ -2650,6 +2808,7 @@ export class Game {
     if (this.runDirty || this.score > 0 || this.points > 0) this.writeCheckpoint({ force: true });
     this.hud.hideContinue();
     if (this.ship.alive) this.ship.kill();
+    for (const wing of this.wingmen) wing.kill();
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
     this.selected = null;
     this.focusFire = false;
@@ -2766,6 +2925,7 @@ export class Game {
 
   killShip() {
     if (this.attractOnDemo || !this.ship.alive || this.ship.docked) return;
+    for (const wing of this.wingmen) wing.park();
     this.ship.kill();
     this.spawnShards(HULL, this.ship, {
       color: colors.cyan,
@@ -2797,6 +2957,7 @@ export class Game {
     }
     this.mode = PLAYING;
     this.ship.reset(this.ship.x, this.ship.y);
+    this.syncWingmen({ revive: true });
     this.snapCamera();
   }
 
@@ -2855,6 +3016,11 @@ export class Game {
     const foeBoost = mapping ? 16 : 1;
     this.ship.view.scale.set(shipBoost);
     this.placeView(this.ship, space.width, space.height);
+    for (const wing of this.wingmen) {
+      wing.view.scale.set(shipBoost * 0.92);
+      if (wing.flying()) this.placeView(wing, space.width, space.height);
+      else wing.view.visible = false;
+    }
     for (const rock of this.asteroids) {
       rock.view.visible = !mapping;
       if (!mapping) this.placeView(rock, space.width, space.height);
@@ -3039,6 +3205,7 @@ export class Game {
           this.runDirty = true;
           this.hud.hideDock();
           this.ship.release(this.input);
+          this.syncWingmen({ revive: true });
           this.sfx("launch");
         } else {
           this.ship.dockedTo.hold(this.ship);
@@ -3179,7 +3346,8 @@ export class Game {
       }
 
       for (const enemy of this.enemies) {
-        const prey = enemy.role === "raider" && this.hub.alive ? this.hub : this.ship;
+        const prey = this.pickHunt(enemy, space) || this.ship;
+        enemy.hunt = prey;
         enemy.update(t, prey, space, this.aimedAt(enemy, space));
         if (enemy.wantsShot(prey, space)) this.fireHostile(enemy);
       }
@@ -3362,42 +3530,43 @@ export class Game {
         }
       }
 
-      if (this.ship.alive && this.ship.invuln <= 0 && !this.ship.docked) {
-        const body = this.ship.hitBody();
+      for (const flyer of this.escortGroup()) {
+        if (!flyer.alive || (flyer.invuln || 0) > 0) continue;
+        const body = flyer.hitBody();
+        let struck = false;
         for (const rock of this.asteroids) {
           if (hits(body, rock, space.width, space.height)) {
-            if (this.ship.shieldOn) this.deflect(rock, shieldConfig.hitBody, space);
-            else this.killShip();
+            if (flyer.shieldOn) this.deflect(rock, shieldConfig.hitBody, space, flyer);
+            else this.hurtFriendly(flyer);
+            struck = true;
             break;
           }
         }
-        if (this.ship.alive) {
-          for (const enemy of this.enemies) {
-            if (hits(body, enemy, space.width, space.height)) {
-              if (this.ship.shieldOn) this.deflect(enemy, shieldConfig.hitBody, space);
-              else this.killShip();
-              break;
-            }
+        if (!flyer.alive || struck) continue;
+        for (const enemy of this.enemies) {
+          if (!enemy.alive || !hits(body, enemy, space.width, space.height)) continue;
+          if (flyer.shieldOn) this.deflect(enemy, shieldConfig.hitBody, space, flyer);
+          else this.hurtFriendly(flyer);
+          struck = true;
+          break;
+        }
+        if (!flyer.alive || struck) continue;
+        for (const shot of this.hostileShots) {
+          if (shot.alive && hitsBeam(shot, body, bullets.streak)) {
+            shot.kill();
+            if (flyer.shieldOn) this.sparkShield(shot.x, shot.y, shieldConfig.hitShot, flyer);
+            else this.hurtFriendly(flyer);
+            struck = true;
+            break;
           }
         }
-        if (this.ship.alive) {
-          for (const shot of this.hostileShots) {
-            if (shot.alive && hitsBeam(shot, body, bullets.streak)) {
-              shot.kill();
-              if (this.ship.shieldOn) this.sparkShield(shot.x, shot.y, shieldConfig.hitShot);
-              else this.killShip();
-              break;
-            }
-          }
-        }
-        if (this.ship.alive) {
-          for (const star of this.castleStars) {
-            if (star.alive && hits(star, body, space.width, space.height)) {
-              this.detonateMissile(star, this.ship);
-              if (this.ship.shieldOn) this.sparkShield(star.x, star.y, shieldConfig.hitBody);
-              else this.killShip();
-              break;
-            }
+        if (!flyer.alive || struck) continue;
+        for (const star of this.castleStars) {
+          if (star.alive && hits(star, body, space.width, space.height)) {
+            this.detonateMissile(star, flyer);
+            if (flyer.shieldOn) this.sparkShield(star.x, star.y, shieldConfig.hitBody, flyer);
+            else this.hurtFriendly(flyer);
+            break;
           }
         }
       }
