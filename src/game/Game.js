@@ -1234,7 +1234,7 @@ export class Game {
     const top = shipLevels.shield || 4;
     const n = Math.max(1, Math.min(top, this.levels?.shield || 1));
     const pool = shieldConfig.max * (1 + (n - 1) / (top - 1));
-    return this.ship?.isAssault?.() ? pool * assaultShip.shieldMul : pool;
+    return pool;
   }
 
   upgradeCost(id) {
@@ -1917,40 +1917,6 @@ export class Game {
     return list;
   }
 
-  missileAboutToHit(space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) return false;
-    const reach = this.ship.shieldRadius() + assaultShip.autoShieldPad;
-    for (const star of this.castleStars) {
-      if (!star.alive) continue;
-      const dx = wrapDelta(star.x - this.ship.x, space.width);
-      const dy = wrapDelta(star.y - this.ship.y, space.height);
-      const dist = Math.hypot(dx, dy);
-      if (dist < reach) return true;
-      const relx = (star.vx || 0) - this.ship.vx;
-      const rely = (star.vy || 0) - this.ship.vy;
-      const closing = dist > 1 ? (dx * relx + dy * rely) / dist : 0;
-      if (closing < -40 && dist / -closing < assaultShip.autoShieldLead) return true;
-    }
-    return false;
-  }
-
-  tickAssaultShield(space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
-      this.ship.autoShield = false;
-      return;
-    }
-    const threat = this.missileAboutToHit(space);
-    if (threat && this.ship.shieldEnergy > 0.06) {
-      if (!this.ship.shieldOn) {
-        this.ship.forceShield(true);
-        this.ship.autoShield = true;
-      }
-    } else if (this.ship.autoShield) {
-      this.ship.forceShield(false);
-      this.ship.autoShield = false;
-    }
-  }
-
   tickAssaultTurrets(t, space) {
     if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
       this.ship.drawTurrets();
@@ -1989,7 +1955,6 @@ export class Game {
   }
 
   tickAssaultKit(t, space) {
-    this.tickAssaultShield(space);
     this.tickAssaultTurrets(t, space);
   }
 
@@ -3058,7 +3023,6 @@ export class Game {
       }
       const shieldWas = this.ship.shieldOn;
       this.ship.tickShield(t, this.input.shieldPressed);
-      if (this.input.shieldPressed) this.ship.autoShield = false;
       this.tickAssaultKit(t, space);
       if (!shieldWas && this.ship.shieldOn) this.sfx("on");
       else if (shieldWas && !this.ship.shieldOn) this.sfx("off");
