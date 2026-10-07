@@ -85,6 +85,7 @@ body.is-scoreboard #game {
 }
 
 .ore-label,
+.xp-label,
 .shield-label,
 .special-label,
 [data-label="pts"] {
@@ -92,7 +93,8 @@ body.is-scoreboard #game {
 }
 
 #points .vector-text,
-#ore .vector-text {
+#ore .vector-text,
+#xp .vector-text {
   margin: 0 auto;
 }
 
@@ -128,7 +130,8 @@ body.is-scoreboard #game {
 
 #score,
 #lives,
-#ore {
+#ore,
+#xp {
   min-height: 34px;
   filter: drop-shadow(0 0 8px rgba(142, 246, 255, 0.45));
 }
@@ -562,6 +565,10 @@ body.is-attract .cta {
   pointer-events: auto;
   cursor: pointer;
   filter: drop-shadow(0 0 8px rgba(142, 246, 255, 0.35));
+}
+
+.ships-link.is-hidden {
+  display: none;
 }
 
 .ships-link .vector-text {

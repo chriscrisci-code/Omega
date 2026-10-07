@@ -1,8 +1,8 @@
 import { world as worldConfig } from "./config.js";
 import { pick, rand, wrapCoord } from "./math.js";
-import { SHIP_CATALOG } from "./ships/catalog.js";
+import { ASSAULT_ID, DEFAULT_SHIP_ID, SHIP_CATALOG } from "./ships/catalog.js";
 
-export const DEMO_SHIPS = ["ACRP33", "DSF22", "F13C", "ATB31", "ATF11", "DSF23", "ATF13", "DSF23V2"];
+export const DEMO_SHIPS = [DEFAULT_SHIP_ID, ASSAULT_ID];
 
 export const ATTRACT_HOLD = 14;
 export const ATTRACT_PLAY = 10;
@@ -22,7 +22,7 @@ function placeShip(game, x, y, rotation, spec) {
 
 export function demoSkinFor(index) {
   const id = DEMO_SHIPS[index % DEMO_SHIPS.length];
-  return SHIP_CATALOG.find((ship) => ship.id === id) ?? SHIP_CATALOG[index % SHIP_CATALOG.length];
+  return SHIP_CATALOG.find((ship) => ship.id === id) ?? SHIP_CATALOG[0];
 }
 
 function sprinkleRocks(game, x, y, count) {

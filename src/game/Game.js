@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig } from "./config.js";
+import { applyDifficulty, assault, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -24,7 +24,7 @@ import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
 import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeCheckpoint, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, wrapCoord, wrapDelta } from "./math.js";
-import { SHIP_CATALOG, WEDGE_ID } from "./ships/catalog.js";
+import { SHIP_CATALOG, resolveShipId } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
 
 const TITLE = "title";
@@ -60,11 +60,6 @@ export class Game {
     this.hangar = new ShipsGallery();
     this.lockCam = new LockCam();
     app.stage.addChild(this.world, this.pips.view, this.lockCam.view, this.hangar.view);
-    this.hud.shipsLink?.addEventListener("pointerdown", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.input._shipsClick = true;
-    });
     this.hud.controlsLink?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -128,6 +123,7 @@ export class Game {
 
     this.mode = TITLE;
     this.score = 0;
+    this.xp = Math.max(0, Math.floor(Number(this.save.xp) || 0));
     this.lives = shipConfig.lives;
     this.wave = 1;
     this.waveCooldown = 0;
@@ -181,7 +177,9 @@ export class Game {
     this.initials = null;
     this.wavePick = null;
     this.startPick = null;
-    this.shipId = this.save.shipId || WEDGE_ID;
+    this.shipId = resolveShipId(this.save.shipId);
+    this.save.shipId = this.shipId;
+    this.save.xp = this.xp;
     this.difficulty = "easy";
     this.lifeEvery = extraLifeEvery;
     this.hud.bay.onPickShip = (id) => this.setShip(id);
@@ -207,11 +205,13 @@ export class Game {
 
     this.hud.setHigh(this.save.highScore);
     this.hud.setScore(0);
+    this.hud.setXp(this.xp);
     this.hud.setPoints(this.points);
     this.hud.setLives(0);
     this.hud.setShield(0, false, shieldConfig.max);
     this.hud.setSpecial("WARP EMP MSL");
     this.hud.setOre(0, 0, "");
+    this.storage.save(this.save);
     this.beginAttractLoop();
     this.offerDevicePick();
     this.ship.reset(worldConfig.width / 2, worldConfig.height / 2);
@@ -714,6 +714,7 @@ export class Game {
     this.snapCamera();
     this.applyShieldLevel(true);
     this.hud.setScore(this.score);
+    this.hud.setXp(this.xp);
     this.hud.setPoints(this.points);
     this.hud.setLives(this.lives);
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
@@ -1201,6 +1202,16 @@ export class Game {
     }
   }
 
+  addXp(amount) {
+    if (this.attractOnDemo) return;
+    const n = Math.max(0, Math.floor(Number(amount) || 0));
+    if (!n) return;
+    this.xp += n;
+    this.save.xp = this.xp;
+    this.hud.setXp(this.xp);
+    this.storage.save(this.save);
+  }
+
   gunTier() {
     if (this.attractOnDemo) return 5;
     return Math.max(1, Math.min(5, this.levels?.gun || 1));
@@ -1270,6 +1281,7 @@ export class Game {
     if (!cost || this.points < cost) return;
     this.points -= cost;
     this.levels[id] = (this.levels[id] || 1) + 1;
+    this.addXp(xpAwards.upgrade);
     if (id === "shield") this.applyShieldLevel(true);
     this.hud.setPoints(this.points);
     this.refreshDock();
@@ -1809,6 +1821,7 @@ export class Game {
     this.save.checkpoint = cp;
     this.save.loadout = normalizeLoadout(loadout);
     this.save.shipId = this.shipId;
+    this.save.xp = this.xp;
     this.storage.save(this.save);
   }
 
@@ -1840,7 +1853,7 @@ export class Game {
   applyCheckpoint() {
     const cp = normalizeCheckpoint(this.save.checkpoint);
     if (!cp) return false;
-    this.shipId = cp.shipId;
+    this.shipId = resolveShipId(cp.shipId);
     this.levels = {
       gun: cp.loadout.gun,
       missile: cp.loadout.missile,
@@ -1863,16 +1876,17 @@ export class Game {
 
   persistLoadout() {
     this.save.shipId = this.shipId;
+    this.save.xp = this.xp;
     this.storage.save(this.save);
   }
 
   applyShipSkin() {
-    const spec = this.shipId === WEDGE_ID ? null : SHIP_CATALOG.find((item) => item.id === this.shipId);
+    const spec = SHIP_CATALOG.find((item) => item.id === this.shipId);
     this.ship.setSkin(spec || null);
   }
 
   setShip(id) {
-    this.shipId = id || WEDGE_ID;
+    this.shipId = resolveShipId(id);
     this.applyShipSkin();
     this.persistLoadout();
     this.hud.bay.setState(this.shipId);
@@ -2049,7 +2063,7 @@ export class Game {
         enemy.vx += (impact.vx / mag) * 8;
         enemy.vy += (impact.vy / mag) * 8;
       }
-      if (enemy.hp <= 0) this.killEnemy(enemy);
+      if (enemy.hp <= 0) this.killEnemy(enemy, via);
       else this.sfx("hit");
       return;
     }
@@ -2075,7 +2089,7 @@ export class Game {
       enemy.vx += (impact.vx / mag) * 40;
       enemy.vy += (impact.vy / mag) * 40;
     }
-    if (enemy.hp <= 0) this.killEnemy(enemy);
+    if (enemy.hp <= 0) this.killEnemy(enemy, via);
     else this.sfx("hit");
   }
 
@@ -2206,7 +2220,7 @@ export class Game {
     });
   }
 
-  killEnemy(enemy) {
+  killEnemy(enemy, via = "shot") {
     this.spawnShards(enemy.hull || HUNTER, enemy, {
       color: enemy.color,
       hotColor: enemy.hotColor,
@@ -2216,6 +2230,7 @@ export class Game {
     this.fx.burst(enemy.x, enemy.y, enemy.color, 12, 150);
     this.addScore(enemy.role === "raider" ? 150 : enemy.role === "destroyer" ? 250 : 75);
     this.noteKill();
+    this.addXp(via === "emp" ? xpAwards.killEmp : via === "missile" ? xpAwards.killMissile : xpAwards.killGun);
     this.shake = Math.max(this.shake, 4);
     this.sfx("boom");
     this.noteLockDeath(enemy);
@@ -2326,6 +2341,7 @@ export class Game {
     flake.kill();
     this.ores.splice(this.ores.indexOf(flake), 1);
     this.cargo += 1;
+    this.addXp(xpAwards.orePickup);
     this.ship.setCargo(this.cargo);
     this.hud.setOre(this.cargo, this.hub.ore, this.hub.upgradeName());
     this.sfx("ore");
@@ -2350,6 +2366,7 @@ export class Game {
     const gained = Math.floor(this.loadoutBank / 3);
     this.loadoutBank -= gained * 3;
     this.addPoints(gained);
+    this.addXp(n * xpAwards.oreDump);
     this.hud.setOre(0, this.hub.ore, this.hub.upgradeName());
     this.fx.burst(this.hub.x, this.hub.y, colors.cyanHot, 10 + n, 120);
     this.sfx(result.unlocked ? "up" : "dump");
@@ -2515,6 +2532,7 @@ export class Game {
     this.lives = shipConfig.lives;
     this.hud.setLives(this.lives);
     this.hud.setScore(0);
+    this.hud.setXp(this.xp);
     this.hud.setPoints(this.points);
     this.hud.hideContinue();
     this.mode = PLAYING;
@@ -2841,9 +2859,7 @@ export class Game {
       return;
     }
 
-    if (this.mode === TITLE && this.input.shipsPressed) {
-      this.openShips();
-    } else if (this.mode === TITLE && this.input.controlsPressed) {
+    if (this.mode === TITLE && this.input.controlsPressed) {
       this.openControls();
     } else if (this.mode === SHIPS && this.input.quitPressed) {
       this.closeShips();
@@ -2988,7 +3004,7 @@ export class Game {
         if (!enemy.alive || this.emp.hit.has(enemy)) continue;
         if (hits(this.emp, enemy, space.width, space.height)) {
           this.emp.hit.add(enemy);
-          if (this.empTier() >= 4) this.killEnemy(enemy);
+          if (this.empTier() >= 4) this.killEnemy(enemy, "emp");
           else enemy.stun(emp.stun * (this.empTier() >= 3 ? 2 : 1));
         }
       }

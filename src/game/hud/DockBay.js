@@ -1,4 +1,4 @@
-import { catalogMiniSvg, SHIP_CATALOG, WEDGE_ID } from "../ships/catalog.js";
+import { catalogMiniSvg, DEFAULT_SHIP_ID, PLAYABLE_SHIP_IDS, SHIP_CATALOG } from "../ships/catalog.js";
 import { vectorTextSvg } from "./vectorText.js";
 
 const CYAN = "#66e0ff";
@@ -19,7 +19,7 @@ export class DockBay {
     this.onBuy = null;
     this.onSeat = null;
     this.onBay = null;
-    this.shipId = WEDGE_ID;
+    this.shipId = DEFAULT_SHIP_ID;
     this.upKey = "";
     this.seat = null;
     this.seats = document.querySelector("#dock-seats");
@@ -54,7 +54,10 @@ export class DockBay {
   buildShips() {
     if (!this.ships) return;
     this.ships.innerHTML = "";
-    const list = [{ id: WEDGE_ID, name: "WEDGE", spec: null }, ...SHIP_CATALOG.map((spec) => ({ id: spec.id, name: spec.name, spec }))];
+    const list = PLAYABLE_SHIP_IDS.map((id) => {
+      const spec = SHIP_CATALOG.find((item) => item.id === id) || null;
+      return { id, name: spec?.name || id, spec };
+    });
     for (const item of list) {
       const button = document.createElement("button");
       button.type = "button";

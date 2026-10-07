@@ -45,6 +45,21 @@ export const SHIP_CATALOG = [
     details: [],
   },
   {
+    id: "ASSAULT",
+    name: "ASSAULT",
+    hulls: [
+      [
+        -32, -60, -24, -78, -14, -80, -10, -50, 0, -58, 10, -50, 14, -80, 20, -66, 28, -78, 34, -58, 40, -32, 26, -2, 48, 14,
+        38, 36, 20, 52, 14, 64, 4, 54, 0, 46, -4, 54, -14, 64, -20, 52, -36, 34, -50, 8, -32, -14, -40, -40,
+      ],
+    ],
+    lines: [[-6, 50, 6, 50]],
+    details: [
+      [-4, -46, 4, -46, 4, -34, -4, -34],
+      [0, -6, 9, 16, 0, 32, -9, 16],
+    ],
+  },
+  {
     id: "DSF23",
     name: "DSF23",
     hulls: [
@@ -155,6 +170,13 @@ export function catalogToGameSkin(spec, target = 17) {
 }
 
 export const WEDGE_ID = "WEDGE";
+export const DEFAULT_SHIP_ID = "DSF22";
+export const ASSAULT_ID = "ASSAULT";
+export const PLAYABLE_SHIP_IDS = [DEFAULT_SHIP_ID, ASSAULT_ID];
+
+export function resolveShipId(id) {
+  return PLAYABLE_SHIP_IDS.includes(id) ? id : DEFAULT_SHIP_ID;
+}
 
 export function catalogMiniSvg(spec, size = 52, color = "#66e0ff", hot = "#c8f8ff") {
   if (!spec) {

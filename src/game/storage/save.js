@@ -1,5 +1,6 @@
 import { shipLevels } from "../config.js";
 import { guessProfile, normalizeBinds } from "../input/bindings.js";
+import { DEFAULT_SHIP_ID, resolveShipId } from "../ships/catalog.js";
 
 const KEY = "vector-game-save";
 
@@ -36,8 +37,9 @@ export const SCORE_BOARDS = [
 
 const empty = {
   highScore: 0,
+  xp: 0,
   maxWave: 1,
-  shipId: "WEDGE",
+  shipId: DEFAULT_SHIP_ID,
   macro: [],
   highScores: DEFAULT_SCORES,
   dailyScores: [],
@@ -180,7 +182,7 @@ export function normalizeCheckpoint(data) {
     score: Math.max(0, Math.floor(Number(data.score) || 0)),
     lives,
     cargo: Math.max(0, Math.floor(Number(data.cargo) || 0)),
-    shipId: typeof data.shipId === "string" && data.shipId ? data.shipId : "WEDGE",
+    shipId: resolveShipId(data.shipId),
     loadout: normalizeLoadout(data.loadout),
     hubOre: Math.max(0, Math.floor(Number(data.hubOre) || 0)),
     seen: seen.length ? seen : ["NORTH"],
@@ -236,8 +238,9 @@ function normalize(data) {
   const killStreaks = normalizeStreaks(data.killStreaks);
   return {
     highScore: Math.max(Number(data.highScore) || 0, highScores[0]?.score || 0),
+    xp: Math.max(0, Math.floor(Number(data.xp) || 0)),
     maxWave: Math.max(1, Math.floor(Number(data.maxWave) || 1)),
-    shipId: typeof data.shipId === "string" && data.shipId ? data.shipId : "WEDGE",
+    shipId: resolveShipId(data.shipId),
     loadout: normalizeLoadout(data.loadout),
     checkpoint: migrateCheckpoint(data),
     macro: normalizeMacro(data.macro),

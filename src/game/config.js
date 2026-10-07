@@ -305,6 +305,16 @@ export const bloom = {
 
 export const extraLifeEvery = 10000;
 
+/** Career XP. Persists across Continue and new runs. Not run score. */
+export const xp = {
+  orePickup: 5,
+  oreDump: 25,
+  upgrade: 40,
+  killGun: 20,
+  killMissile: 12,
+  killEmp: 3,
+};
+
 export const debris = {
   rockLife: 1.25,
   shipLife: 1.45,

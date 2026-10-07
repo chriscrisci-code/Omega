@@ -19,6 +19,7 @@ const RANK = [
 export class Hud {
   constructor() {
     this.score = document.querySelector("#score");
+    this.xp = document.querySelector("#xp");
     this.ore = document.querySelector("#ore");
     this.points = document.querySelector("#points");
     this.hubOre = document.querySelector("#hub-ore");
@@ -88,8 +89,10 @@ export class Hud {
     this.paintContinue();
 
     this.paint(document.querySelector("[data-label=score]"), "SCORE", 10, DIM, CYAN);
+    this.paint(document.querySelector("[data-label=xp]"), "XP", 10, DIM, CYAN, "center");
     this.paint(document.querySelector("[data-label=ore]"), "ORE", 10, DIM, CYAN, "center");
     this.paint(document.querySelector("[data-label=pts]"), "LOADOUT", 10, DIM, CYAN, "center");
+    this.setXp(0);
     this.setPoints(0);
     this.paint(document.querySelector("[data-label=ships]"), "SHIPS", 10, DIM, CYAN, "right");
     this.paint(document.querySelector("[data-label=shield]"), "SHIELD", 10, DIM, CYAN, "right");
@@ -110,7 +113,7 @@ export class Hud {
       event.stopPropagation();
       this.onPickDevice?.("phone");
     });
-    this.paint(this.shipsLink, "S SHIPS", 14, DIM, CYAN, "center");
+    this.shipsLink?.classList.add("is-hidden");
     this.paint(this.controlsLink, "C CONTROLS", 14, DIM, CYAN, "center");
     this.shipsHeading && (this.shipsHeading.innerHTML = vectorTitleSvg("SHIPS", 36, CYAN, HOT));
     this.paint(this.shipsHint, "ESC RETURN  SPACE START", 11, DIM, CYAN, "center");
@@ -123,6 +126,10 @@ export class Hud {
 
   setScore(value) {
     this.paint(this.score, String(value), 26, CYAN, HOT);
+  }
+
+  setXp(value) {
+    this.paint(this.xp, String(Math.max(0, Math.floor(Number(value) || 0))), 26, CYAN, HOT, "center");
   }
 
   setOre(cargo, banked = 0, name = "") {
@@ -245,7 +252,7 @@ export class Hud {
 
   setLayout(id) {
     this.layout = id === "phone" ? "phone" : "desktop";
-    this.paint(this.shipsLink, this.layout === "phone" ? "SHIPS" : "S SHIPS", 14, DIM, CYAN, "center");
+    this.shipsLink?.classList.add("is-hidden");
     this.paint(this.controlsLink, this.layout === "phone" ? "CONTROLS" : "C CONTROLS", 14, DIM, CYAN, "center");
     this.paintHelp();
   }
