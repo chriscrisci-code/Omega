@@ -65,12 +65,14 @@ export class Ship {
     };
     this.shieldG = new Graphics();
     this.cargoG = new Graphics();
+    this.markG = new Graphics();
     this.turretL = new Graphics();
     this.turretR = new Graphics();
     this.view.addChild(
       this.shieldG,
       this.cargoG,
       this.g,
+      this.markG,
       this.turretL,
       this.turretR,
       this.jets.rear.container,
@@ -81,8 +83,8 @@ export class Ship {
     this.radius = shipConfig.radius;
     this.kit = "";
     this.turrets = [
-      { g: this.turretL, x: 10, y: -12, angle: -0.4, cool: 0 },
-      { g: this.turretR, x: 10, y: 12, angle: 0.4, cool: 0 },
+      { g: this.turretL, x: 10, y: -12, angle: -0.4, cool: 0, painted: false },
+      { g: this.turretR, x: 10, y: 12, angle: 0.4, cool: 0, painted: false },
     ];
     this.surge = 0;
     this.strafe = 0;
@@ -181,6 +183,7 @@ export class Ship {
     this.turrets[0].y = -12 * scale;
     this.turrets[1].x = 10 * scale;
     this.turrets[1].y = 12 * scale;
+    for (const gun of this.turrets) gun.painted = false;
     this.draw();
     this.drawTurrets();
     this.drawShield();
@@ -199,22 +202,26 @@ export class Ship {
       mark(this.g, -2, 7.2, 3, 7.2);
       mark(this.g, 0.5, 7.2, 0.5, 10.5);
     }
+    this.drawMarks();
+  }
 
+  drawMarks() {
+    this.markG.clear();
     if (this.surge > 0.15) {
       const flicker = 13 + Math.random() * 4;
-      strokeGlow(this.g, [-7, 0, -12, 3.2, -flicker, 0, -12, -3.2], colors.orange, colors.amber, 1.2);
+      strokeGlow(this.markG, [-7, 0, -12, 3.2, -flicker, 0, -12, -3.2], colors.orange, colors.amber, 1.2);
     }
     if (this.surge < -0.15) {
       const flicker = 18 + Math.random() * 3;
-      mark(this.g, 14, 0, flicker, 0);
+      mark(this.markG, 14, 0, flicker, 0);
     }
     if (this.strafe < -0.15) {
       const flicker = 12 + Math.random() * 3;
-      mark(this.g, 0.5, 8, 0.5, flicker);
+      mark(this.markG, 0.5, 8, 0.5, flicker);
     }
     if (this.strafe > 0.15) {
       const flicker = -(12 + Math.random() * 3);
-      mark(this.g, 0.5, -8, 0.5, flicker);
+      mark(this.markG, 0.5, -8, 0.5, flicker);
     }
   }
 
@@ -246,17 +253,14 @@ export class Ship {
   drawTurrets() {
     const on = this.isAssault() && this.alive && !this.docked;
     for (const gun of this.turrets) {
-      gun.g.clear();
       gun.g.visible = on;
       if (!on) continue;
       gun.g.position.set(gun.x, gun.y);
       gun.g.rotation = gun.angle;
-      const hull = [9, 0, -5, 4.2, -2.4, 0, -5, -4.2];
-      strokeGlow(gun.g, hull, colors.cyan, colors.cyanHot, 1.2);
-      gun.g.circle(0, 0, 3.4);
-      gun.g.stroke({ width: 2.4, color: colors.cyan, alpha: 0.22 });
-      gun.g.circle(0, 0, 3.4);
-      gun.g.stroke({ width: 1.05, color: colors.cyanHot });
+      if (gun.painted) continue;
+      gun.g.clear();
+      strokeGlow(gun.g, [9, 0, -5, 4.2, -2.4, 0, -5, -4.2], colors.cyan, colors.cyanHot, 1.2);
+      gun.painted = true;
     }
   }
 
@@ -418,7 +422,7 @@ export class Ship {
     this.view.position.set(this.x, this.y);
     this.view.rotation = this.rotation;
     this.view.visible = this.invuln <= 0 || Math.floor(this.invuln * 14) % 2 === 0;
-    this.draw();
+    this.drawMarks();
     this.jets.rear.update(dt, this.surge > 0.15);
     this.jets.nose.update(dt, this.surge < -0.15);
     this.jets.left.update(dt, this.strafe > 0.15);
@@ -478,7 +482,7 @@ export class Ship {
     this.view.position.set(this.x, this.y);
     this.view.rotation = this.rotation;
     this.view.visible = this.invuln <= 0 || Math.floor(this.invuln * 14) % 2 === 0;
-    this.draw();
+    this.drawMarks();
     this.jets.rear.update(dt, this.surge > 0.15);
     this.jets.nose.update(dt, false);
     this.jets.left.update(dt, false);
