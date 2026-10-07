@@ -305,9 +305,13 @@ export const bloom = {
 
 export const extraLifeEvery = 10000;
 
-/** Assault kit. Turrets off while we confirm the shield path is clean. */
+/** Assault kit. AI guns fire with no turret art. No DSF 22 nose cannon. */
 export const assaultShip = {
   shieldMul: 2,
+  turretCool: 0.22,
+  turretRange: 780,
+  turretTurn: 4.4,
+  turretAim: 0.28,
   autoShieldLead: 0.38,
   autoShieldPad: 28,
 };

@@ -23,7 +23,7 @@ import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
 import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeCheckpoint, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
-import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, wrapCoord, wrapDelta } from "./math.js";
+import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrapCoord, wrapDelta } from "./math.js";
 import { SHIP_CATALOG, resolveShipId } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
 
@@ -1296,7 +1296,7 @@ export class Game {
   }
 
   shoot() {
-    if (!this.ship.alive || this.ship.docked) return;
+    if (!this.ship.alive || this.ship.docked || this.ship.isAssault()) return;
     const held = this.attractOnDemo || this.input.fireHeld;
     if (!held || this.cooldown > 0) return;
     const gun = this.gunTier();
@@ -1935,9 +1935,62 @@ export class Game {
     }
   }
 
+  assaultThreats(space) {
+    const list = [];
+    const range = assaultShip.turretRange;
+    const consider = (body) => {
+      if (!body || body.alive === false) return;
+      if (!Number.isFinite(body.x) || !Number.isFinite(body.y)) return;
+      const dx = wrapDelta(body.x - this.ship.x, space.width);
+      const dy = wrapDelta(body.y - this.ship.y, space.height);
+      const dist = Math.hypot(dx, dy);
+      if (!Number.isFinite(dist) || dist >= range) return;
+      list.push({ body, dist, dx, dy });
+    };
+    for (const enemy of this.enemies) consider(enemy);
+    if (this.station?.awake) {
+      for (const gun of this.station.guns || []) consider(gun);
+    }
+    list.sort((a, b) => a.dist - b.dist || 0);
+    return list;
+  }
+
+  tickAssaultTurrets(t, space) {
+    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) return;
+    const threats = this.assaultThreats(space);
+    const picks = threats.slice(0, 2);
+    const canFire = this.ship.undockLock <= 0;
+    this.ship.turrets.forEach((gun, i) => {
+      gun.cool = Math.max(0, gun.cool - t);
+      const pick = picks[i] || picks[0] || null;
+      let desired = i === 0 ? -0.4 : 0.4;
+      if (pick) {
+        const vx = Number.isFinite(pick.body.vx) ? pick.body.vx : 0;
+        const vy = Number.isFinite(pick.body.vy) ? pick.body.vy : 0;
+        const eta = pick.dist / bullets.speed;
+        const aimX = pick.dx + vx * eta;
+        const aimY = pick.dy + vy * eta;
+        if (Number.isFinite(aimX) && Number.isFinite(aimY)) {
+          desired = wrapDelta(Math.atan2(aimY, aimX) - this.ship.rotation, Math.PI * 2);
+        }
+      }
+      const next = turnToward(gun.angle, desired, assaultShip.turretTurn * t);
+      if (Number.isFinite(next)) gun.angle = next;
+      if (!canFire || !pick || !Number.isFinite(gun.angle) || !Number.isFinite(desired)) return;
+      const error = Math.abs(wrapDelta(desired - gun.angle, Math.PI * 2));
+      if (error > assaultShip.turretAim || gun.cool > 0) return;
+      const bullet = this.shots.find((shot) => !shot.alive);
+      if (!bullet) return;
+      const muzzle = this.ship.turretWorld(gun);
+      if (!Number.isFinite(muzzle.x) || !Number.isFinite(muzzle.y) || !Number.isFinite(muzzle.angle)) return;
+      bullet.fire(muzzle.x, muzzle.y, muzzle.angle);
+      gun.cool = assaultShip.turretCool;
+    });
+  }
+
   tickAssaultKit(t, space) {
     this.tickAssaultShield(space);
-    this.ship.drawTurrets();
+    this.tickAssaultTurrets(t, space);
   }
 
   fireMissile(force = false) {
