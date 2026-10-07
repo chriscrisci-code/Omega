@@ -22,6 +22,13 @@ function mark(g, x0, y0, x1, y1) {
   g.stroke({ width: 1.35, color: colors.white, cap: "round" });
 }
 
+function closePoly(pts) {
+  if (!pts || pts.length < 4) return pts;
+  const n = pts.length;
+  if (pts[0] === pts[n - 2] && pts[1] === pts[n - 1]) return pts;
+  return [...pts, pts[0], pts[1]];
+}
+
 export class Ship {
   constructor() {
     this.view = new Container();
@@ -65,6 +72,7 @@ export class Ship {
     };
     this.shieldG = new Graphics();
     this.cargoG = new Graphics();
+    this.detailG = new Graphics();
     this.markG = new Graphics();
     this.turretL = new Graphics();
     this.turretR = new Graphics();
@@ -72,6 +80,7 @@ export class Ship {
       this.shieldG,
       this.cargoG,
       this.g,
+      this.detailG,
       this.markG,
       this.turretL,
       this.turretR,
@@ -191,10 +200,15 @@ export class Ship {
 
   draw() {
     this.g.clear();
+    this.detailG.clear();
     if (this.skin) {
-      for (const hull of this.skin.hulls) strokeGlow(this.g, hull, colors.cyan, colors.cyanHot, 1.55);
-      for (const detail of this.skin.details) strokeGlow(this.g, detail, colors.cyan, colors.cyanHot, 1.2);
-      for (const line of this.skin.lines) strokeLine(this.g, line, colors.cyan, colors.cyanHot, 1.3);
+      // Extra closed polys on the same Graphics as a catalog hull can hang Pixi 8.
+      for (const hull of this.skin.hulls) {
+        if (this.isAssault()) strokeLine(this.g, closePoly(hull), colors.cyan, colors.cyanHot, 1.55);
+        else strokeGlow(this.g, hull, colors.cyan, colors.cyanHot, 1.55);
+      }
+      for (const detail of this.skin.details) strokeLine(this.detailG, closePoly(detail), colors.cyan, colors.cyanHot, 1.2);
+      for (const line of this.skin.lines) strokeLine(this.detailG, line, colors.cyan, colors.cyanHot, 1.3);
     } else {
       strokeGlow(this.g, HULL, colors.cyan, colors.cyanHot, 1.7);
       mark(this.g, -2, -7.2, 3, -7.2);
@@ -251,15 +265,22 @@ export class Ship {
   }
 
   drawTurrets() {
-    const on = this.isAssault() && this.alive && !this.docked;
+    const assault = this.isAssault() && this.alive;
+    const on = assault && !this.docked;
     for (const gun of this.turrets) {
       gun.g.visible = on;
-      if (!on) continue;
       gun.g.position.set(gun.x, gun.y);
       gun.g.rotation = gun.angle;
+      if (!assault) {
+        if (gun.painted) {
+          gun.g.clear();
+          gun.painted = false;
+        }
+        continue;
+      }
       if (gun.painted) continue;
       gun.g.clear();
-      strokeGlow(gun.g, [9, 0, -5, 4.2, -2.4, 0, -5, -4.2], colors.cyan, colors.cyanHot, 1.2);
+      strokeLine(gun.g, [-4, -3.4, 9, 0, -4, 3.4], colors.cyan, colors.cyanHot, 1.15);
       gun.painted = true;
     }
   }

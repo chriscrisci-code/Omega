@@ -1900,16 +1900,18 @@ export class Game {
     const range = assaultShip.turretRange;
     const consider = (body) => {
       if (!body || body.alive === false) return;
+      if (!Number.isFinite(body.x) || !Number.isFinite(body.y)) return;
       const dx = wrapDelta(body.x - this.ship.x, space.width);
       const dy = wrapDelta(body.y - this.ship.y, space.height);
       const dist = Math.hypot(dx, dy);
-      if (dist < range) list.push({ body, dist, dx, dy });
+      if (!Number.isFinite(dist) || dist >= range) return;
+      list.push({ body, dist, dx, dy });
     };
     for (const enemy of this.enemies) consider(enemy);
     if (this.station?.awake) {
       for (const gun of this.station.guns || []) consider(gun);
     }
-    list.sort((a, b) => a.dist - b.dist);
+    list.sort((a, b) => a.dist - b.dist || 0);
     return list;
   }
 
@@ -1931,7 +1933,7 @@ export class Game {
   }
 
   tickAssaultShield(space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
+    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked || this.ship.undockLock > 0) {
       this.ship.autoShield = false;
       return;
     }
@@ -1948,7 +1950,7 @@ export class Game {
   }
 
   tickAssaultTurrets(t, space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
+    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked || this.ship.undockLock > 0) {
       this.ship.drawTurrets();
       return;
     }

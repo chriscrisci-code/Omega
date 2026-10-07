@@ -462,7 +462,7 @@ export class Base {
     ship.view.position.set(ship.x, ship.y);
     ship.view.rotation = ship.rotation;
     ship.view.visible = true;
-    ship.draw();
+    ship.drawMarks();
     for (const jet of Object.values(ship.jets)) jet.update(0, false);
   }
 
