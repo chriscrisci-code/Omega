@@ -2091,14 +2091,14 @@ export class Game {
     }
   }
 
-  assaultThreats(space) {
+  assaultThreats(space, origin = this.ship) {
     const list = [];
     const range = assaultShip.turretRange;
     const consider = (body) => {
       if (!body || body.alive === false) return;
       if (!Number.isFinite(body.x) || !Number.isFinite(body.y)) return;
-      const dx = wrapDelta(body.x - this.ship.x, space.width);
-      const dy = wrapDelta(body.y - this.ship.y, space.height);
+      const dx = wrapDelta(body.x - origin.x, space.width);
+      const dy = wrapDelta(body.y - origin.y, space.height);
       const dist = Math.hypot(dx, dy);
       if (!Number.isFinite(dist) || dist >= range) return;
       list.push({ body, dist, dx, dy });
@@ -2111,12 +2111,12 @@ export class Game {
     return list;
   }
 
-  tickAssaultTurrets(t, space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) return;
-    const threats = this.assaultThreats(space);
+  tickAssaultTurrets(t, space, origin = this.ship) {
+    if (!origin?.alive || !origin.turrets || origin.docked) return;
+    const threats = this.assaultThreats(space, origin);
     const picks = threats.slice(0, 2);
-    const canFire = this.ship.undockLock <= 0;
-    this.ship.turrets.forEach((gun, i) => {
+    const canFire = origin === this.ship ? this.ship.undockLock <= 0 : origin.age > 0.28;
+    origin.turrets.forEach((gun, i) => {
       gun.cool = Math.max(0, gun.cool - t);
       const pick = picks[i] || picks[0] || null;
       let desired = i === 0 ? -0.4 : 0.4;
@@ -2127,7 +2127,7 @@ export class Game {
         const aimX = pick.dx + vx * eta;
         const aimY = pick.dy + vy * eta;
         if (Number.isFinite(aimX) && Number.isFinite(aimY)) {
-          desired = wrapDelta(Math.atan2(aimY, aimX) - this.ship.rotation, Math.PI * 2);
+          desired = wrapDelta(Math.atan2(aimY, aimX) - origin.rotation, Math.PI * 2);
         }
       }
       const next = turnToward(gun.angle, desired, assaultShip.turretTurn * t);
@@ -2137,7 +2137,7 @@ export class Game {
       if (error > assaultShip.turretAim || gun.cool > 0) return;
       const bullet = this.shots.find((shot) => !shot.alive);
       if (!bullet) return;
-      const muzzle = this.ship.turretWorld(gun);
+      const muzzle = origin.turretWorld(gun);
       if (!Number.isFinite(muzzle.x) || !Number.isFinite(muzzle.y) || !Number.isFinite(muzzle.angle)) return;
       bullet.fire(muzzle.x, muzzle.y, muzzle.angle);
       gun.cool = assaultShip.turretCool;
@@ -2146,8 +2146,11 @@ export class Game {
 
   tickAssaultKit(t, space) {
     this.tickAssaultShield(space);
-    this.tickAssaultTurrets(t, space);
     this.tickWingmen(t, space);
+    this.tickAssaultTurrets(t, space, this.ship);
+    for (const wing of this.wingmen) {
+      if (wing.flying()) this.tickAssaultTurrets(t, space, wing);
+    }
   }
 
   fireMissile(force = false) {
@@ -3017,7 +3020,7 @@ export class Game {
     this.ship.view.scale.set(shipBoost);
     this.placeView(this.ship, space.width, space.height);
     for (const wing of this.wingmen) {
-      wing.view.scale.set(shipBoost * 0.92);
+      wing.view.scale.set(shipBoost);
       if (wing.flying()) this.placeView(wing, space.width, space.height);
       else wing.view.visible = false;
     }

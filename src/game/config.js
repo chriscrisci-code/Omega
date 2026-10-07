@@ -128,7 +128,7 @@ export const bullets = {
   speed: 980,
   life: 1.25,
   cooldown: 0.08,
-  max: 48,
+  max: 72,
   radius: 4,
   streak: 16,
   gunSep: 5.5,
@@ -317,10 +317,10 @@ export const assaultShip = {
   autoShieldLead: 0.38,
   autoShieldPad: 28,
   wingHullHits: 2,
-  wingBack: 58,
-  wingSide: 50,
-  wingSkin: 13,
-  wingShield: 24,
+  wingSide: 82,
+  wingAlong: 8,
+  wingLag: 86,
+  wingLead: 32,
 };
 
 /** Career XP. Persists across Continue and new runs. Not run score. */
