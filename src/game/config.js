@@ -305,6 +305,17 @@ export const bloom = {
 
 export const extraLifeEvery = 10000;
 
+/** Assault kit on the DSF-style hull. No extra scale; hull size matches the other ships. */
+export const assaultShip = {
+  shieldMul: 2,
+  turretCool: 0.22,
+  turretRange: 780,
+  turretTurn: 4.4,
+  turretAim: 0.28,
+  autoShieldLead: 0.38,
+  autoShieldPad: 28,
+};
+
 /** Career XP. Persists across Continue and new runs. Not run score. */
 export const xp = {
   orePickup: 5,
