@@ -128,7 +128,7 @@ export const bullets = {
   speed: 980,
   life: 1.25,
   cooldown: 0.08,
-  max: 36,
+  max: 48,
   radius: 4,
   streak: 16,
   gunSep: 5.5,
@@ -304,6 +304,18 @@ export const bloom = {
 };
 
 export const extraLifeEvery = 10000;
+
+/** Assault hull kit. Default DSF 22 is unchanged. */
+export const assaultShip = {
+  scale: 1.5,
+  shieldMul: 2,
+  turretCool: 0.22,
+  turretRange: 780,
+  turretTurn: 4.4,
+  turretAim: 0.28,
+  autoShieldLead: 0.38,
+  autoShieldPad: 28,
+};
 
 /** Career XP. Persists across Continue and new runs. Not run score. */
 export const xp = {

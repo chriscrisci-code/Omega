@@ -47,6 +47,7 @@ export const SHIP_CATALOG = [
   {
     id: "ASSAULT",
     name: "ASSAULT",
+    scale: 1.5,
     hulls: [
       [
         -32, -60, -24, -78, -14, -80, -10, -50, 0, -58, 10, -50, 14, -80, 20, -66, 28, -78, 34, -58, 40, -32, 26, -2, 48, 14,
@@ -153,7 +154,7 @@ export function catalogToGameSkin(spec, target = 17) {
   for (const poly of parts) {
     for (let i = 0; i < poly.length; i += 2) max = Math.max(max, Math.hypot(poly[i], poly[i + 1]));
   }
-  const scale = target / max;
+  const scale = (target * (Number(spec.scale) || 1)) / max;
   const convert = (poly) => {
     const out = [];
     for (let i = 0; i < poly.length; i += 2) {
