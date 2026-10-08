@@ -25,6 +25,7 @@ export class Wingman {
     this.vy = 0;
     this.rotation = 0;
     this.age = 0;
+    this.delay = assaultShip.wingDelayMin;
     this.turrets = [
       { x: 8, y: -10, angle: -0.4, cool: 0 },
       { x: 8, y: 10, angle: 0.4, cool: 0 },
@@ -92,6 +93,10 @@ export class Wingman {
     this.trailWas = 0;
     this.leadPush = 0;
     this.alongHold = 0;
+    this.moveLatch = false;
+    this.seenRot = lead.rotation;
+    this.seenShield = Boolean(lead.shieldOn);
+    this.rollDelay();
     for (const gun of this.turrets) {
       gun.cool = 0.2;
       gun.angle = gun.y < 0 ? -0.4 : 0.4;
@@ -121,6 +126,27 @@ export class Wingman {
   kill() {
     this.alive = false;
     this.park();
+  }
+
+  rollDelay() {
+    const lo = assaultShip.wingDelayMin;
+    const hi = assaultShip.wingDelayMax;
+    this.delay = lo + Math.random() * Math.max(0, hi - lo);
+  }
+
+  noticeMove(lead) {
+    const turning = Math.abs(wrapDelta(lead.rotation - (this.seenRot ?? lead.rotation), Math.PI * 2)) > 0.03;
+    const surge = Math.abs(lead.surge || 0) > 0.18;
+    const strafe = Math.abs(lead.strafe || 0) > 0.18;
+    const driving = turning || surge || strafe;
+    if (driving && !this.moveLatch) {
+      this.rollDelay();
+      this.moveLatch = true;
+    }
+    if (!driving) this.moveLatch = false;
+    if (Boolean(lead.shieldOn) !== Boolean(this.seenShield)) this.rollDelay();
+    this.seenRot = lead.rotation;
+    this.seenShield = Boolean(lead.shieldOn);
   }
 
   snap(lead) {
@@ -201,11 +227,12 @@ export class Wingman {
     this.drawShield();
   }
 
-  update(dt, lead, space) {
+  update(dt, live, ghost, space) {
     if (!this.flying()) {
       this.view.visible = false;
       return;
     }
+    const lead = ghost || live;
     this.age += dt;
     this.invuln = Math.max(0, this.invuln - dt);
 
@@ -228,14 +255,15 @@ export class Wingman {
     const weave = Math.sin(this.age * 0.85 + this.slot * 1.4) * assaultShip.wingAlong;
     this.alongHold = weave - this.trail * assaultShip.wingLag + this.leadPush * assaultShip.wingLead;
 
+    const slotLead = { x: live.x, y: live.y, rotation: lead.rotation };
     const c = Math.cos(lead.rotation);
     const s = Math.sin(lead.rotation);
-    const slot = this.slotWorld(lead);
+    const slot = this.slotWorld(slotLead);
     const dx = wrapDelta(slot.x - this.x, space.width);
     const dy = wrapDelta(slot.y - this.y, space.height);
     const dist = Math.hypot(dx, dy);
-    if (dist > 880 || lead.warping) {
-      this.snap(lead);
+    if (dist > 880 || live.warping) {
+      this.snap(live);
     } else {
       const alongErr = dx * c + dy * s;
       const acrossErr = dx * -s + dy * c;
@@ -273,6 +301,8 @@ export class Wingman {
     this.view.rotation = this.rotation;
     this.view.visible = this.invuln <= 0 || Math.floor(this.invuln * 14) % 2 === 0;
     this.drawMarks();
+    if (lead.shieldOn) this.forceShield(true);
+    else this.forceShield(false);
     this.tickShield(dt);
   }
 }

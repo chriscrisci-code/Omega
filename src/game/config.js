@@ -317,10 +317,12 @@ export const assaultShip = {
   turretAim: 0.28,
   turretHits: 3,
   wingHullHits: 2,
-  wingSide: 82,
+  wingSide: 164,
   wingAlong: 8,
   wingLag: 86,
   wingLead: 32,
+  wingDelayMin: 0.2,
+  wingDelayMax: 1.5,
 };
 
 /** Career XP. Persists across Continue and new runs. Not run score. */

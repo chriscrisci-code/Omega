@@ -71,6 +71,8 @@ export class Game {
 
     this.wingmen = [new Wingman(-1), new Wingman(1)];
     for (const wing of this.wingmen) this.vectors.addChild(wing.view);
+    this.leadTrail = [];
+    this.leadAge = 0;
     this.ship = new Ship();
     this.vectors.addChild(this.ship.view);
     this.bases = createBases(worldConfig.width, worldConfig.height);
@@ -1963,7 +1965,13 @@ export class Game {
     const revive = Boolean(options.revive);
     if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
       for (const wing of this.wingmen) wing.park();
+      this.leadTrail = [];
+      this.leadAge = 0;
       return;
+    }
+    if (revive || !this.leadTrail.length) {
+      this.leadTrail = [];
+      this.leadAge = 0;
     }
     for (const wing of this.wingmen) {
       if (revive || !wing.alive) wing.spawn(this.ship);
@@ -1971,15 +1979,72 @@ export class Game {
     }
   }
 
+  sampleLeadTrail(dt) {
+    this.leadAge += dt;
+    const ship = this.ship;
+    this.leadTrail.push({
+      t: this.leadAge,
+      x: ship.x,
+      y: ship.y,
+      vx: ship.vx || 0,
+      vy: ship.vy || 0,
+      rotation: ship.rotation,
+      surge: ship.surge || 0,
+      strafe: ship.strafe || 0,
+      shieldOn: Boolean(ship.shieldOn),
+      warping: Boolean(ship.warping),
+    });
+    const keep = (assaultShip.wingDelayMax || 1.5) + 0.4;
+    while (this.leadTrail.length > 2 && this.leadAge - this.leadTrail[0].t > keep) this.leadTrail.shift();
+  }
+
+  ghostLead(delay, space) {
+    const trail = this.leadTrail;
+    if (!trail.length) return this.ship;
+    const want = this.leadAge - Math.max(0, delay || 0);
+    let a = trail[0];
+    let b = trail[trail.length - 1];
+    for (let i = 0; i < trail.length; i += 1) {
+      if (trail[i].t >= want) {
+        b = trail[i];
+        a = trail[Math.max(0, i - 1)];
+        break;
+      }
+      a = trail[i];
+    }
+    const span = b.t - a.t;
+    const u = span > 1e-4 ? Math.min(1, Math.max(0, (want - a.t) / span)) : 1;
+    const mix = (p, q) => p + (q - p) * u;
+    return {
+      x: wrapCoord(a.x + wrapDelta(b.x - a.x, space.width) * u, space.width),
+      y: wrapCoord(a.y + wrapDelta(b.y - a.y, space.height) * u, space.height),
+      vx: mix(a.vx, b.vx),
+      vy: mix(a.vy, b.vy),
+      rotation: a.rotation + wrapDelta(b.rotation - a.rotation, Math.PI * 2) * u,
+      surge: mix(a.surge, b.surge),
+      strafe: mix(a.strafe, b.strafe),
+      shieldOn: u < 0.5 ? a.shieldOn : b.shieldOn,
+      warping: a.warping || b.warping,
+    };
+  }
+
   tickWingmen(t, space) {
     if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
       for (const wing of this.wingmen) wing.park();
+      this.leadTrail = [];
+      this.leadAge = 0;
       return;
     }
+    this.sampleLeadTrail(t);
     for (const wing of this.wingmen) {
       if (!wing.alive) continue;
       wing.deployed = true;
-      wing.update(t, this.ship, space);
+      if (this.ship.warping) {
+        wing.snap(this.ship);
+        continue;
+      }
+      wing.noticeMove(this.ship);
+      wing.update(t, this.ship, this.ghostLead(wing.delay, space), space);
     }
   }
 
