@@ -688,6 +688,7 @@ export class Game {
     this.storage.save(this.save);
     this.stopAttract();
     this.audio.unlock();
+    this.enterFullscreen();
     this.mode = PLAYING;
     this.wavePick = null;
     this.startPick = null;
@@ -3261,15 +3262,38 @@ export class Game {
     });
   }
 
+  fullscreenEl() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+
+  enterFullscreen() {
+    if (this.fullscreenEl()) return;
+    const node = document.documentElement;
+    const req = node.requestFullscreen?.bind(node) || node.webkitRequestFullscreen?.bind(node);
+    if (!req) return;
+    Promise.resolve(req())
+      .then(() => {
+        this.save.settings.fullscreen = true;
+        this.storage.save(this.save);
+      })
+      .catch(() => {});
+  }
+
+  exitFullscreen() {
+    if (!this.fullscreenEl()) return;
+    const exit = document.exitFullscreen?.bind(document) || document.webkitExitFullscreen?.bind(document);
+    if (!exit) return;
+    Promise.resolve(exit())
+      .then(() => {
+        this.save.settings.fullscreen = false;
+        this.storage.save(this.save);
+      })
+      .catch(() => {});
+  }
+
   toggleFullscreen() {
-    if (document.fullscreenElement) {
-      document.exitFullscreen?.();
-      this.save.settings.fullscreen = false;
-    } else {
-      document.documentElement.requestFullscreen?.();
-      this.save.settings.fullscreen = true;
-    }
-    this.storage.save(this.save);
+    if (this.fullscreenEl()) this.exitFullscreen();
+    else this.enterFullscreen();
   }
 
   update(dt) {

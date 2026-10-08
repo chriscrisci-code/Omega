@@ -17,10 +17,10 @@ export class MissileBurst {
 
   fire(x, y, options = {}) {
     const count = Math.max(1, Math.floor(options.count ?? missiles.rays ?? 100));
-    const range = options.range ?? missiles.rayRange ?? 280;
-    const speed = options.speed ?? missiles.raySpeed ?? 1400;
-    const lifeMin = options.lifeMin ?? missiles.rayLifeMin ?? 0.12;
-    const lifeMax = options.lifeMax ?? missiles.rayLifeMax ?? 0.55;
+    const range = options.range ?? missiles.rayRange ?? 2800;
+    const speed = options.speed ?? missiles.raySpeed ?? 1150;
+    const lifeMin = options.lifeMin ?? missiles.rayLifeMin ?? 0.4;
+    const lifeMax = options.lifeMax ?? missiles.rayLifeMax ?? 2.08;
     this.alive = true;
     this.x = x;
     this.y = y;

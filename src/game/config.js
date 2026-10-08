@@ -177,10 +177,10 @@ export const missiles = {
   blast: 1,
   arm: 0.5,
   rays: 100,
-  rayRange: 280,
-  raySpeed: 1500,
-  rayLifeMin: 0.1,
-  rayLifeMax: 0.52,
+  rayRange: 2800,
+  raySpeed: 1150,
+  rayLifeMin: 0.4,
+  rayLifeMax: 2.08,
 };
 
 export const castle = {
