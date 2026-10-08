@@ -2375,54 +2375,6 @@ export class Game {
       radius: missile.radius || missiles.radius,
     };
     if (blast) {
-      this.fx.emit(52, {
-        x: src.x,
-        y: src.y,
-        color: glow,
-        speed: 347,
-        speedVar: 187,
-        life: 1.2,
-        lifeVar: 0.4,
-        size: 28,
-        sizeVar: 14,
-        drag: 0.88,
-      });
-      this.fx.emit(32, {
-        x: src.x,
-        y: src.y,
-        color: hot,
-        speed: 227,
-        speedVar: 120,
-        life: 1.45,
-        lifeVar: 0.45,
-        size: 22,
-        sizeVar: 10,
-        drag: 0.9,
-      });
-      this.fx.emit(20, {
-        x: src.x,
-        y: src.y,
-        color: colors.white,
-        speed: 147,
-        speedVar: 73,
-        life: 1.05,
-        lifeVar: 0.3,
-        size: 16,
-        sizeVar: 8,
-        drag: 0.92,
-      });
-      this.fx.emit(24, {
-        x: src.x,
-        y: src.y,
-        color: glow,
-        speed: 47,
-        speedVar: 19,
-        life: 1.8,
-        lifeVar: 0.5,
-        size: 18,
-        sizeVar: 8,
-        drag: 0.96,
-      });
       this.spawnBlastRing(src.x, src.y, blast, glow, hot);
       this.shake = Math.max(this.shake, 12);
     } else {
