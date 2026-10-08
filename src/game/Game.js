@@ -2352,9 +2352,10 @@ export class Game {
     if (ring.alive) ring.kill();
     ring.fire(x, y, radius, {
       follow: false,
-      grow: missiles.ringGrow ?? 0.82,
-      fade: missiles.ringFade ?? 0.52,
-      spin: missiles.ringSpin ?? 1.4,
+      grow: missiles.ringGrow ?? 0.4,
+      fade: missiles.ringFade ?? 0.2,
+      fadeAt: missiles.ringFadeAt ?? 0.22,
+      spin: missiles.ringSpin ?? 1.85,
       start: 10,
       color,
       hot,

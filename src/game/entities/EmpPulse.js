@@ -21,6 +21,7 @@ export class EmpPulse {
     this.follow = true;
     this.growFor = emp.grow;
     this.fadeFor = emp.fade;
+    this.fadeAt = 1;
     this.spinRate = 2.2;
     this.tint = colors.cyan;
     this.tintHot = colors.cyanHot;
@@ -34,6 +35,7 @@ export class EmpPulse {
     this.follow = options.follow !== false;
     this.growFor = options.grow ?? emp.grow;
     this.fadeFor = options.fade ?? emp.fade;
+    this.fadeAt = options.fadeAt ?? 1;
     this.spinRate = options.spin ?? 2.2;
     this.tint = options.color ?? colors.cyan;
     this.tintHot = options.hot ?? colors.cyanHot;
@@ -53,8 +55,9 @@ export class EmpPulse {
     if (!this.alive) return;
     const grow = this.growFor || emp.grow;
     const fadeFor = this.fadeFor || emp.fade;
+    const fadeStart = grow * Math.max(0, Math.min(1, this.fadeAt ?? 1));
     const u = Math.min(1, this.age / grow);
-    const fade = this.age <= grow ? 1 : Math.max(0, 1 - (this.age - grow) / fadeFor);
+    const fade = this.age <= fadeStart ? 1 : Math.max(0, 1 - (this.age - fadeStart) / fadeFor);
     const glow = this.tint ?? colors.cyan;
     const hot = this.tintHot ?? colors.cyanHot;
     strokeGlow(this.view, octagon(this.radius, this.spin), glow, hot, 1.35 + u * 1.4);
@@ -76,7 +79,8 @@ export class EmpPulse {
     const start = this.startRadius ?? shield.radius;
     this.radius = start + (this.maxRadius - start) * ease;
     this.paint();
-    if (this.age >= grow + (this.fadeFor || emp.fade)) this.kill();
+    const fadeStart = grow * Math.max(0, Math.min(1, this.fadeAt ?? 1));
+    if (this.age >= fadeStart + (this.fadeFor || emp.fade)) this.kill();
   }
 
   kill() {
