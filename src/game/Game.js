@@ -8,6 +8,7 @@ import { Bullet } from "./entities/Bullet.js";
 import { EmpPulse } from "./entities/EmpPulse.js";
 import { Enemy, HUNTER } from "./entities/Enemy.js";
 import { Missile } from "./entities/Missile.js";
+import { MissileBurst } from "./entities/MissileBurst.js";
 import { Ore } from "./entities/Ore.js";
 import { HULL, Ship } from "./entities/Ship.js";
 import { Wingman } from "./entities/Wingman.js";
@@ -100,10 +101,10 @@ export class Game {
     });
     this.emp = new EmpPulse();
     this.vectors.addChild(this.emp.view);
-    this.blastRings = Array.from({ length: 8 }, () => {
-      const ring = new EmpPulse();
-      this.vectors.addChild(ring.view);
-      return ring;
+    this.missileBursts = Array.from({ length: 8 }, () => {
+      const burst = new MissileBurst();
+      this.vectors.addChild(burst.view);
+      return burst;
     });
     this.empCool = 0;
     this.warpCool = 0;
@@ -721,7 +722,7 @@ export class Game {
     this.paused = false;
     this.saveFlash = 0;
     this.emp.kill();
-    this.clearBlastRings();
+    this.clearMissileBursts();
     this.empCool = 0;
     this.warpCool = 0;
     for (const base of this.bases) base.resetCombat();
@@ -1113,7 +1114,7 @@ export class Game {
     this.missiles.forEach((missile) => missile.kill(true));
     this.hubMissiles.forEach((missile) => missile.kill(true));
     this.emp.kill();
-    this.clearBlastRings();
+    this.clearMissileBursts();
     this.selected = null;
     this.focusFire = false;
     this.lockMark.visible = false;
@@ -1140,7 +1141,7 @@ export class Game {
     this.hubMissiles.forEach((missile) => missile.kill(true));
     this.castleStars.forEach((star) => star.kill(true));
     this.emp.kill();
-    this.clearBlastRings();
+    this.clearMissileBursts();
     this.selected = null;
     this.focusFire = false;
     this.lockMark.visible = false;
@@ -2312,86 +2313,98 @@ export class Game {
     return null;
   }
 
-  applyMissileBlast(src, space) {
-    const reach = (body) => {
-      if (!body || body.alive === false) return false;
-      const dx = wrapDelta(src.x - body.x, space.width);
-      const dy = wrapDelta(src.y - body.y, space.height);
-      const r = src.blast + (body.radius || 0);
-      return dx * dx + dy * dy <= r * r;
+  clearMissileBursts() {
+    for (const burst of this.missileBursts) burst.kill();
+  }
+
+  spawnMissileBurst(x, y, color, hot) {
+    const burst = this.missileBursts.find((item) => !item.alive) || this.missileBursts[0];
+    if (!burst) return;
+    if (burst.alive) burst.kill();
+    burst.fire(x, y, { color, hot });
+  }
+
+  clipMissileRay(ox, oy, angle, range, space) {
+    const nx = Math.cos(angle);
+    const ny = Math.sin(angle);
+    let best = range;
+    let found = null;
+    const consider = (body, kind) => {
+      if (!body || body.alive === false) return;
+      const dx = wrapDelta(body.x - ox, space.width);
+      const dy = wrapDelta(body.y - oy, space.height);
+      const along = dx * nx + dy * ny;
+      if (along < 2 || along > best) return;
+      const px = dx - along * nx;
+      const py = dy - along * ny;
+      const rad = body.radius || 0;
+      if (px * px + py * py > rad * rad) return;
+      best = along;
+      found = { length: along, body, kind };
     };
-    for (const enemy of this.enemies) {
-      if (enemy.alive && reach(enemy)) this.chipEnemy(enemy, src, missiles.damage, "missile");
-    }
-    for (const star of this.castleStars) {
-      if (reach(star)) this.detonateMissile(star, star);
-    }
-    for (const part of this.stationTargets()) {
-      if (reach(part)) this.chipStationPart(part, src, missiles.damage);
-    }
-    for (const rock of this.asteroids) {
-      if (reach(rock)) this.chipRock(rock, src, missiles.damage);
-    }
+    for (const enemy of this.enemies) consider(enemy, "enemy");
+    for (const star of this.castleStars) consider(star, "star");
+    for (const part of this.stationTargets()) consider(part, "part");
+    for (const rock of this.asteroids) consider(rock, "rock");
     for (const base of this.bases) {
-      if (base.hub || !base.alive) continue;
-      const hit = base.tryHit(src.x, src.y, space.width, space.height);
-      if (!hit) continue;
-      this.strikeCastle(base, hit, src);
-      const again = base.tryHit(src.x, src.y, space.width, space.height);
-      if (again) this.strikeCastle(base, again, src);
+      if (!base.alive) continue;
+      consider(base, base.hub ? "hub" : "base");
+    }
+    return found || { length: range, body: null, kind: "" };
+  }
+
+  strikeMissileRay(hit) {
+    if (!hit?.body) return;
+    const impact = {
+      x: hit.x,
+      y: hit.y,
+      vx: Math.cos(hit.angle) * 220,
+      vy: Math.sin(hit.angle) * 220,
+    };
+    if (hit.kind === "enemy") this.chipEnemy(hit.body, impact, missiles.damage, "missile");
+    else if (hit.kind === "star") this.detonateMissile(hit.body, hit.body);
+    else if (hit.kind === "part") this.chipStationPart(hit.body, impact, missiles.damage);
+    else if (hit.kind === "rock") this.chipRock(hit.body, impact, missiles.damage);
+    else if (hit.kind === "base") {
+      const space = this.space();
+      const at = hit.body.tryHit(hit.x, hit.y, space.width, space.height);
+      if (at) {
+        this.strikeCastle(hit.body, at, impact);
+        const again = hit.body.tryHit(hit.x, hit.y, space.width, space.height);
+        if (again) this.strikeCastle(hit.body, again, impact);
+      }
     }
   }
 
-  clearBlastRings() {
-    for (const ring of this.blastRings) ring.kill();
-  }
-
-  spawnBlastRing(x, y, radius, color, hot) {
-    const ring = this.blastRings.find((item) => !item.alive) || this.blastRings[0];
-    if (!ring) return;
-    if (ring.alive) ring.kill();
-    ring.fire(x, y, radius, {
-      follow: false,
-      grow: missiles.ringGrow ?? 0.4,
-      fade: missiles.ringFade ?? 0.2,
-      fadeAt: missiles.ringFadeAt ?? 0.22,
-      spin: missiles.ringSpin ?? 1.85,
-      start: 10,
-      color,
-      hot,
-    });
+  tickMissileBursts(t, space) {
+    for (const burst of this.missileBursts) {
+      if (!burst.alive) continue;
+      const hits = burst.update(t, (angle, range) => this.clipMissileRay(burst.x, burst.y, angle, range, space));
+      for (const hit of hits) this.strikeMissileRay(hit);
+    }
   }
 
   detonateMissile(missile, at) {
     const glow = missile.tint ?? colors.orange;
     const hot = missile.tintHot ?? colors.amber;
     const blast = missile.blast || 0;
-    const src = {
-      x: missile.x,
-      y: missile.y,
-      vx: missile.vx || 0,
-      vy: missile.vy || 0,
-      blast,
-      radius: missile.radius || missiles.radius,
-    };
     if (blast) {
-      this.spawnBlastRing(src.x, src.y, blast, glow, hot);
+      this.spawnMissileBurst(missile.x, missile.y, glow, hot);
       this.shake = Math.max(this.shake, 12);
     } else {
-      this.fx.burst(src.x, src.y, glow, 16, 180);
-      this.fx.burst(src.x, src.y, hot, 8, 120);
+      this.fx.burst(missile.x, missile.y, glow, 16, 180);
+      this.fx.burst(missile.x, missile.y, hot, 8, 120);
       this.shake = Math.max(this.shake, 6);
+      this.spawnShards(null, { x: missile.x, y: missile.y, vx: 0, vy: 0, rotation: 0, radius: 16 }, {
+        color: glow,
+        hotColor: hot,
+        kick: debrisConfig.rockKick * 0.7,
+        life: 0.45,
+        chips: 6,
+      });
     }
     this.sfx("boom");
     missile.kill();
-    this.spawnShards(null, { x: src.x, y: src.y, vx: 0, vy: 0, rotation: 0, radius: blast ? 44 : 16 }, {
-      color: glow,
-      hotColor: hot,
-      kick: debrisConfig.rockKick * (blast ? 1.1 : 0.7),
-      life: blast ? 0.9 : 0.45,
-      chips: blast ? 18 : 6,
-    });
-    if (blast > 0) this.applyMissileBlast(src, this.space());
   }
 
   pointerAim() {
@@ -3208,8 +3221,8 @@ export class Game {
       if (missile.view.visible) this.placeView(missile, space.width, space.height);
     }
     if (this.emp.view.visible) this.placeView(this.emp, space.width, space.height);
-    for (const ring of this.blastRings) {
-      if (ring.view.visible) this.placeView(ring, space.width, space.height);
+    for (const burst of this.missileBursts) {
+      if (burst.view.visible) this.placeView(burst, space.width, space.height);
     }
     for (const flake of this.ores) {
       flake.view.visible = !mapping && flake.alive;
@@ -3442,7 +3455,7 @@ export class Game {
     }
     for (const missile of [...this.missiles, ...this.hubMissiles, ...this.castleStars]) missile.update(t, space);
     this.emp.update(t, this.ship);
-    for (const ring of this.blastRings) ring.update(t);
+    this.tickMissileBursts(t, space);
     if (this.emp.alive) {
       for (const enemy of this.enemies) {
         if (!enemy.alive || this.emp.hit.has(enemy)) continue;

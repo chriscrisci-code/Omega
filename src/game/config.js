@@ -174,12 +174,13 @@ export const missiles = {
   color: colors.cyan,
   hot: colors.cyanHot,
   fuse: 38,
-  blast: 144,
+  blast: 1,
   arm: 0.5,
-  ringGrow: 0.4,
-  ringFade: 0.2,
-  ringFadeAt: 0.22,
-  ringSpin: 1.85,
+  rays: 100,
+  rayRange: 280,
+  raySpeed: 1500,
+  rayLifeMin: 0.1,
+  rayLifeMax: 0.52,
 };
 
 export const castle = {
