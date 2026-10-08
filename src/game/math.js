@@ -40,10 +40,10 @@ export function wrap(entity, width, height) {
   entity.y = wrapCoord(entity.y, height);
 }
 
-export function hits(a, b, width, height) {
+export function hits(a, b, width, height, extra = 0) {
   const dx = width ? wrapDelta(a.x - b.x, width) : a.x - b.x;
   const dy = height ? wrapDelta(a.y - b.y, height) : a.y - b.y;
-  const r = a.radius + b.radius;
+  const r = (a.radius || 0) + (b.radius || 0) + extra;
   return dx * dx + dy * dy < r * r;
 }
 

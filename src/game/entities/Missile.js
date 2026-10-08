@@ -19,6 +19,9 @@ export class Missile {
     this.star = false;
     this.blind = false;
     this.dropFor = 0;
+    this.fuse = 0;
+    this.blast = 0;
+    this.armAt = 0;
     this.tint = colors.orange;
     this.tintHot = colors.amber;
     this.view.visible = false;
@@ -75,14 +78,18 @@ export class Missile {
       this.body.fill({ color: colors.white, alpha: 0.4 + pulse * 0.45 });
       return;
     }
+    const glow = this.tint ?? colors.orange;
+    const hot = this.tintHot ?? colors.amber;
     this.body.poly(BODY, true);
-    this.body.stroke({ width: 2.6, color: colors.orange, alpha: 0.32, join: "round" });
+    this.body.stroke({ width: 3.8, color: glow, alpha: 0.4, join: "round" });
     this.body.poly(BODY, true);
-    this.body.stroke({ width: 1.1, color: colors.amber, join: "round" });
+    this.body.stroke({ width: 1.55, color: hot, alpha: 1, join: "round" });
+    this.body.poly(BODY, true);
+    this.body.stroke({ width: 0.7, color: colors.white, alpha: 0.95, join: "round" });
     if (this.clock >= this.dropFor) {
       this.body.moveTo(-3.2, 0);
       this.body.lineTo(-7 - Math.random() * 2.5, 0);
-      this.body.stroke({ width: 1.3, color: colors.white, alpha: 0.9, cap: "round" });
+      this.body.stroke({ width: 1.55, color: colors.white, alpha: 1, cap: "round" });
     }
   }
 
@@ -108,6 +115,9 @@ export class Missile {
     this.target = target;
     this.blind = false;
     this.life = options.life ?? missiles.life;
+    this.fuse = options.fuse ?? 0;
+    this.blast = options.blast ?? 0;
+    this.armAt = options.arm ?? 0;
     this.clock = 0;
     this.radius = this.star ? (options.radius ?? 7) : missiles.radius;
     this.points = [{ x, y, t: 0 }];

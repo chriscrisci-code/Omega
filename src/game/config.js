@@ -171,6 +171,11 @@ export const missiles = {
   trailFade: 5,
   trailAlpha: 0.22,
   trailGap: 14,
+  color: colors.cyan,
+  hot: colors.cyanHot,
+  fuse: 38,
+  blast: 72,
+  arm: 0.5,
 };
 
 export const castle = {

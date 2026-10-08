@@ -2228,6 +2228,11 @@ export class Game {
       drop: missiles.drop,
       coastVx: (this.ship.vx || 0) + Math.cos(peel) * kick,
       coastVy: (this.ship.vy || 0) + Math.sin(peel) * kick,
+      color: missiles.color ?? colors.cyan,
+      hot: missiles.hot ?? colors.cyanHot,
+      fuse: missiles.fuse,
+      blast: missiles.blast,
+      arm: missiles.arm ?? missiles.drop,
     });
     this.missileQueued -= 1;
     this.missileCool = missiles.cooldown;
@@ -2236,7 +2241,7 @@ export class Game {
       this.fx.emit(4, {
         x: mark.x,
         y: mark.y,
-        color: colors.amber,
+        color: colors.cyanHot,
         speed: 36,
         speedVar: 16,
         life: 0.18,
@@ -2246,7 +2251,7 @@ export class Game {
     this.fx.emit(10, {
       x: nose.x,
       y: nose.y,
-      color: colors.amber,
+      color: colors.cyanHot,
       speed: 80,
       speedVar: 46,
       life: 0.2,
@@ -2275,21 +2280,86 @@ export class Game {
     this.sfx("emp");
   }
 
+  missileFusePad(missile) {
+    if ((missile.fuse || 0) <= 0) return 0;
+    if (missile.clock < (missile.armAt ?? 0)) return 0;
+    return missile.fuse;
+  }
+
+  missileTrigger(missile, space) {
+    const pad = this.missileFusePad(missile);
+    const touch = (body) => body && body.alive !== false && hits(missile, body, space.width, space.height, pad);
+    for (const enemy of this.enemies) {
+      if (enemy.alive && touch(enemy)) return enemy;
+    }
+    for (const star of this.castleStars) {
+      if (touch(star)) return star;
+    }
+    for (const part of this.stationTargets()) {
+      if (touch(part)) return part;
+    }
+    for (const rock of this.asteroids) {
+      if (touch(rock)) return rock;
+    }
+    return null;
+  }
+
+  applyMissileBlast(src, space) {
+    const reach = (body) => {
+      if (!body || body.alive === false) return false;
+      const dx = wrapDelta(src.x - body.x, space.width);
+      const dy = wrapDelta(src.y - body.y, space.height);
+      const r = src.blast + (body.radius || 0);
+      return dx * dx + dy * dy <= r * r;
+    };
+    for (const enemy of this.enemies) {
+      if (enemy.alive && reach(enemy)) this.chipEnemy(enemy, src, missiles.damage, "missile");
+    }
+    for (const star of this.castleStars) {
+      if (reach(star)) this.detonateMissile(star, star);
+    }
+    for (const part of this.stationTargets()) {
+      if (reach(part)) this.chipStationPart(part, src, missiles.damage);
+    }
+    for (const rock of this.asteroids) {
+      if (reach(rock)) this.chipRock(rock, src, missiles.damage);
+    }
+    for (const base of this.bases) {
+      if (base.hub || !base.alive) continue;
+      const hit = base.tryHit(src.x, src.y, space.width, space.height);
+      if (!hit) continue;
+      this.strikeCastle(base, hit, src);
+      const again = base.tryHit(src.x, src.y, space.width, space.height);
+      if (again) this.strikeCastle(base, again, src);
+    }
+  }
+
   detonateMissile(missile, at) {
-    this.fx.burst(missile.x, missile.y, colors.orange, 16, 180);
-    this.fx.burst(missile.x, missile.y, colors.amber, 8, 120);
-    this.shake = Math.max(this.shake, 6);
+    const glow = missile.tint ?? colors.orange;
+    const hot = missile.tintHot ?? colors.amber;
+    const blast = missile.blast || 0;
+    const src = {
+      x: missile.x,
+      y: missile.y,
+      vx: missile.vx || 0,
+      vy: missile.vy || 0,
+      blast,
+      radius: missile.radius || missiles.radius,
+    };
+    this.fx.burst(src.x, src.y, glow, blast ? 26 : 16, blast ? 260 : 180);
+    this.fx.burst(src.x, src.y, hot, blast ? 16 : 8, blast ? 170 : 120);
+    if (blast) this.fx.burst(src.x, src.y, colors.white, 10, 110);
+    this.shake = Math.max(this.shake, blast ? 8 : 6);
     this.sfx("boom");
     missile.kill();
-    if (at) {
-      this.spawnShards(null, { x: missile.x, y: missile.y, vx: 0, vy: 0, rotation: 0, radius: 16 }, {
-        color: colors.orange,
-        hotColor: colors.amber,
-        kick: debrisConfig.rockKick * 0.7,
-        life: 0.45,
-        chips: 6,
-      });
-    }
+    this.spawnShards(null, { x: src.x, y: src.y, vx: 0, vy: 0, rotation: 0, radius: blast ? 22 : 16 }, {
+      color: glow,
+      hotColor: hot,
+      kick: debrisConfig.rockKick * 0.7,
+      life: 0.45,
+      chips: blast ? 10 : 6,
+    });
+    if (blast > 0) this.applyMissileBlast(src, this.space());
   }
 
   pointerAim() {
@@ -3508,51 +3578,28 @@ export class Game {
 
       for (const missile of [...this.missiles, ...this.hubMissiles]) {
         if (!missile.alive) continue;
-        let struck = false;
-        for (const enemy of [...this.enemies]) {
-          if (hits(missile, enemy, space.width, space.height)) {
-            this.detonateMissile(missile, enemy);
-            this.chipEnemy(enemy, missile, missiles.damage, "missile");
-            struck = true;
-            break;
-          }
+        const at = this.missileTrigger(missile, space);
+        if (at) {
+          const splash = (missile.blast || 0) > 0;
+          this.detonateMissile(missile, at);
+          if (splash) continue;
+          if (this.enemies.includes(at)) this.chipEnemy(at, missile, missiles.damage, "missile");
+          else if (this.castleStars.includes(at)) this.detonateMissile(at, at);
+          else if (this.asteroids.includes(at)) this.chipRock(at, missile, missiles.damage);
+          else this.chipStationPart(at, missile, missiles.damage);
+          continue;
         }
-        if (struck) continue;
-        for (const star of this.castleStars) {
-          if (!star.alive) continue;
-          if (hits(missile, star, space.width, space.height)) {
-            this.detonateMissile(missile, star);
-            this.detonateMissile(star, star);
-            struck = true;
-            break;
-          }
-        }
-        if (struck) continue;
-        for (const part of this.stationTargets()) {
-          if (hits(missile, part, space.width, space.height)) {
-            this.detonateMissile(missile, part);
-            this.chipStationPart(part, missile, missiles.damage);
-            struck = true;
-            break;
-          }
-        }
-        if (struck) continue;
-        for (const rock of [...this.asteroids]) {
-          if (hits(missile, rock, space.width, space.height)) {
-            this.detonateMissile(missile, rock);
-            this.chipRock(rock, missile, missiles.damage);
-            struck = true;
-            break;
-          }
-        }
-        if (struck) continue;
         for (const base of this.bases) {
           const hit = base.tryHit(missile.x, missile.y, space.width, space.height);
           if (hit) {
+            const splash = (missile.blast || 0) > 0;
+            const impact = { x: missile.x, y: missile.y, vx: missile.vx, vy: missile.vy };
             this.detonateMissile(missile, base);
-            this.strikeCastle(base, hit, { x: missile.x, y: missile.y, vx: missile.vx, vy: missile.vy });
-            const again = base.tryHit(missile.x, missile.y, space.width, space.height);
-            if (again) this.strikeCastle(base, again, { x: missile.x, y: missile.y, vx: missile.vx, vy: missile.vy });
+            if (!splash) {
+              this.strikeCastle(base, hit, impact);
+              const again = base.tryHit(impact.x, impact.y, space.width, space.height);
+              if (again) this.strikeCastle(base, again, impact);
+            }
             break;
           }
         }
