@@ -10,7 +10,7 @@ function hudControl(event) {
   if (!(node instanceof Element)) return false;
   return Boolean(
     node.closest(
-      "button, a, input, #dock-bay, #device-pick, #wave-pick, #continue-btn, #ships-link, #controls-link, #controls-page, #music-vol, .touch-layer",
+      "button, a, input, #dock-bay, #device-pick, #wave-pick, #continue-btn, #continue-no, #continue-row, #ships-link, #controls-link, #controls-page, #music-vol, .touch-layer",
     ),
   );
 }

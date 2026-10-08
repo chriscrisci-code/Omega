@@ -161,7 +161,7 @@ export class TouchControls {
 
   touchStart(event) {
     if (!this.active || (event.pointerType === "mouse" && event.button !== 0)) return;
-    if (event.target?.closest?.(".stick, .device-pick, .dock-bay, .continue-btn, .ships-link, #controls-link, #controls-page, #music-vol, .wave-pick, .wave-btn")) return;
+    if (event.target?.closest?.(".stick, .device-pick, .dock-bay, .continue-btn, .continue-row, .ships-link, #controls-link, #controls-page, #music-vol, .wave-pick, .wave-btn")) return;
     if (this.stickIds.has(event.pointerId)) return;
     this.fingers.set(event.pointerId, {
       x: event.clientX,

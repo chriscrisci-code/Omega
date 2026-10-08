@@ -181,6 +181,7 @@ export class Game {
     this.attractScene = 0;
     this.attractAge = 0;
     this.attractCue = null;
+    this.titleHold = 0;
     this.initials = null;
     this.wavePick = null;
     this.startPick = null;
@@ -194,6 +195,7 @@ export class Game {
       this.input._continueClick = true;
       this.acceptContinue();
     };
+    this.hud.onDecline = () => this.endRun("final");
     this.hud.onPickDevice = (id) => this.setControlProfile(id === "phone" ? "phone" : "mouse");
     this.hud.onPickWave = (n) => this.startRun(n);
     this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
@@ -829,6 +831,7 @@ export class Game {
   }
 
   offerStart() {
+    if (this.titleHold > 0) return;
     if (!this.hasCheckpoint()) {
       this.offerWavePick();
       return;
@@ -1034,8 +1037,21 @@ export class Game {
       this.showScoreBoard();
       return;
     }
+    this.mode = TITLE;
     this.attractTimer = ATTRACT_HOLD;
     this.hud.showTitle();
+  }
+
+  goTitle() {
+    this.paused = false;
+    this.initials = null;
+    this.stopAttract();
+    this.hud.hideContinue();
+    this.hud.hideDock();
+    this.mode = TITLE;
+    this.titleHold = 0.45;
+    this.hud.showTitle();
+    this.beginAttractLoop("title");
   }
 
   scoreBoardOf(id) {
@@ -1148,6 +1164,7 @@ export class Game {
           this.attractThenTitle = false;
           this.attractPage = "title";
           this.attractTimer = ATTRACT_HOLD;
+          this.mode = TITLE;
           this.hud.showTitle();
         } else {
           this.attractPage = "demo";
@@ -1157,6 +1174,7 @@ export class Game {
         this.closeAttractDemo();
         this.attractPage = "title";
         this.attractTimer = ATTRACT_HOLD;
+        this.mode = TITLE;
         this.hud.showTitle();
       }
     }
@@ -2858,16 +2876,21 @@ export class Game {
     this.leaveHubSeat();
     this.hud.hideDock();
     const rank = this.rankEntry();
-    if (rank.all || rank.daily || rank.streak) {
-      this.mode = INITIALS;
-      this.initials = { letters: ["A", "A", "A"], i: 0 };
-      const shown = rank.all || rank.daily ? this.score : this.bestStreak;
-      this.hud.showInitials(shown, this.initials, rank.all || rank.daily ? "SCORE" : "STREAK");
+    if (reason === "final" || rank.all || rank.daily || rank.streak) {
+      this.beginInitials();
       return;
     }
-    this.mode = GAMEOVER;
-    this.hud.showGameOver(this.score, reason);
-    this.beginAttractLoop();
+    this.goTitle();
+  }
+
+  beginInitials() {
+    this.mode = INITIALS;
+    this.silenceLasers();
+    this.initials = { letters: ["A", "A", "A"], i: 0 };
+    const rank = this.rankEntry();
+    const shown = rank.all || rank.daily ? this.score : rank.streak ? this.bestStreak : this.score;
+    const label = rank.streak && !rank.all && !rank.daily ? "STREAK" : "SCORE";
+    this.hud.showInitials(shown, this.initials, label);
   }
 
   nudgeInitial(dir) {
@@ -2898,15 +2921,13 @@ export class Game {
     this.save.highScore = this.save.highScores[0]?.score || this.score;
     this.storage.save(this.save);
     this.hud.setHigh(this.save.highScore);
-    this.initials = null;
-    this.mode = GAMEOVER;
-    this.beginAttractLoop("scores", { hold: 3, thenTitle: true });
+    this.goTitle();
   }
 
   tickInitials() {
     if (this.input.letterLeft) this.nudgeInitial(-1);
     if (this.input.letterRight) this.nudgeInitial(1);
-    if (this.input.startPressed || this.input.firePressed) this.lockInitial();
+    if (this.input.startPressed || this.input.firePressed || this.input.selectPressed) this.lockInitial();
     else if (this.input.quitPressed) this.commitInitials();
   }
 
@@ -3140,6 +3161,7 @@ export class Game {
 
     this.touch.tick();
     this.input.fineWheel = this.mode === INITIALS || this.mode === WAVEPICK || this.mode === STARTPICK;
+    if (this.titleHold > 0) this.titleHold = Math.max(0, this.titleHold - t);
     if (this.input.fullscreenPressed) this.toggleFullscreen();
     this.hud.setPad(this.input.padConnected);
     if (this.mode === TITLE || this.mode === GAMEOVER) this.tickAttract(t, space);
@@ -3190,7 +3212,7 @@ export class Game {
       this.acceptContinue();
     } else if (this.mode === CONTINUE && this.input.selectPressed) {
       this.endRun("final");
-    } else if (!this.pickingDevice && (this.mode === TITLE || this.mode === GAMEOVER) && this.mode !== INITIALS && this.input.startPressed) {
+    } else if (!this.pickingDevice && (this.mode === TITLE || this.mode === GAMEOVER) && this.titleHold <= 0 && this.input.startPressed) {
       this.offerStart();
     } else if (this.mode === PLAYING && !this.ship.docked) {
       this.shoot();
@@ -3676,7 +3698,7 @@ export class Game {
   }
 
   musicOutLevel() {
-    if (this.mode === TITLE) return music.titleVol;
+    if (this.mode === TITLE || this.mode === INITIALS || this.mode === GAMEOVER) return music.titleVol;
     if (this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE) {
       return this.save.settings.music ?? music.volume;
     }

@@ -324,9 +324,18 @@ export class GameAudio {
     if (level != null) this._musicLevel = Math.max(0, Math.min(1, Number(level) || 0));
     if (!this.ctx || this.ctx.state !== "running") return;
     this.ensureMusic();
-    if (this.music?.out) this.music.out.gain.value = this._musicLevel ?? 0;
+    const amt = this._musicLevel ?? 0;
+    if (this.music?.out) this.music.out.gain.value = amt;
     const el = this.music?.el;
-    if (!el || !el.paused || this._musicStarting) return;
+    if (!el) return;
+    el.loop = true;
+    el.volume = amt > 0 ? 1 : 0;
+    if (amt <= 0) {
+      this._musicStarting = false;
+      if (!el.paused) el.pause();
+      return;
+    }
+    if (!el.paused || this._musicStarting) return;
     this._musicStarting = true;
     el.play()
       .catch(() => {})

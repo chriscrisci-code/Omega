@@ -616,11 +616,22 @@ body.is-attract .cta {
   display: none;
 }
 
-.continue-btn {
+.continue-row {
   position: absolute;
   left: 50%;
   bottom: 22%;
   transform: translateX(-50%);
+  display: flex;
+  gap: 18px;
+  z-index: 6;
+  pointer-events: auto;
+}
+
+.continue-row.is-hidden {
+  display: none;
+}
+
+.continue-btn {
   margin: 0;
   padding: 10px 22px;
   background: rgba(5, 8, 14, 0.72);
@@ -628,13 +639,14 @@ body.is-attract .cta {
   box-shadow: 0 0 18px rgba(102, 224, 255, 0.28);
   cursor: pointer;
   pointer-events: auto;
-  z-index: 6;
   animation: pulse 1.6s ease-in-out infinite;
   filter: drop-shadow(0 0 12px rgba(142, 246, 255, 0.45));
 }
 
-.continue-btn.is-hidden {
-  display: none;
+.continue-no {
+  border-color: rgba(255, 77, 154, 0.55);
+  box-shadow: 0 0 18px rgba(255, 77, 154, 0.28);
+  filter: drop-shadow(0 0 12px rgba(255, 179, 214, 0.4));
 }
 
 .continue-btn .vector-text {

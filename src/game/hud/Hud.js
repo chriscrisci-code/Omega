@@ -69,12 +69,15 @@ export class Hud {
     this.onPickWave = null;
     this.onPickStart = null;
     this.scoreBoard = document.querySelector("#score-board");
+    this.continueRow = document.querySelector("#continue-row");
     this.continueBtn = document.querySelector("#continue-btn");
+    this.continueNo = document.querySelector("#continue-no");
     this.devicePick = document.querySelector("#device-pick");
     this.deviceTitle = document.querySelector("#device-title");
     this.pickDesktop = document.querySelector("#pick-desktop");
     this.pickPhone = document.querySelector("#pick-phone");
     this.onContinue = null;
+    this.onDecline = null;
     this.onPickDevice = null;
     this.layout = "desktop";
     this.profile = "mouse";
@@ -85,6 +88,11 @@ export class Hud {
       event.preventDefault();
       event.stopPropagation();
       this.onContinue?.();
+    });
+    this.continueNo?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onDecline?.();
     });
     this.paintContinue();
 
@@ -397,7 +405,7 @@ export class Hud {
     this.title.innerHTML = "";
     this.paint(this.tag, `${label}  ${score}`, 14, MAGENTA, PINK, "center");
     this.paintInitials(entry);
-    this.paint(this.credit, "WHEEL OR ARROWS   FIRE NEXT", 8, DIM, CYAN, "center");
+    this.paint(this.credit, "WHEEL OR ARROWS   CLICK NEXT", 8, DIM, CYAN, "center");
     this.cta.innerHTML = "";
     this.shipsPage?.classList.add("is-hidden");
     this.hideContinue();
@@ -499,17 +507,18 @@ export class Hud {
   }
 
   paintContinue() {
-    if (!this.continueBtn) return;
-    this.paint(this.continueBtn, "CONTINUE", 18, CYAN, HOT, "center");
+    if (this.continueBtn) this.paint(this.continueBtn, "YES", 18, CYAN, HOT, "center");
+    if (this.continueNo) this.paint(this.continueNo, "NO", 18, MAGENTA, PINK, "center");
   }
 
   showContinue() {
     this.paintContinue();
-    this.continueBtn?.classList.remove("is-hidden");
+    this.continueRow?.classList.remove("is-hidden");
+    this.setMode("CONTINUE?");
   }
 
   hideContinue() {
-    this.continueBtn?.classList.add("is-hidden");
+    this.continueRow?.classList.add("is-hidden");
   }
 
   hideCenter() {
