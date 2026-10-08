@@ -18,14 +18,28 @@ export class EmpPulse {
     this.alive = false;
     this.radius = 0;
     this.hit = new Set();
+    this.follow = true;
+    this.growFor = emp.grow;
+    this.fadeFor = emp.fade;
+    this.spinRate = 2.2;
+    this.tint = colors.cyan;
+    this.tintHot = colors.cyanHot;
+    this.startRadius = shield.radius;
   }
 
-  fire(x, y, maxRadius) {
+  fire(x, y, maxRadius, options = {}) {
     this.alive = true;
     this.x = x;
     this.y = y;
-    this.radius = shield.radius;
-    this.maxRadius = Math.max(maxRadius, shield.radius * 2);
+    this.follow = options.follow !== false;
+    this.growFor = options.grow ?? emp.grow;
+    this.fadeFor = options.fade ?? emp.fade;
+    this.spinRate = options.spin ?? 2.2;
+    this.tint = options.color ?? colors.cyan;
+    this.tintHot = options.hot ?? colors.cyanHot;
+    this.startRadius = options.start ?? shield.radius;
+    this.radius = this.startRadius;
+    this.maxRadius = Math.max(maxRadius, this.startRadius * 2);
     this.age = 0;
     this.spin = 0;
     this.hit.clear();
@@ -37,24 +51,32 @@ export class EmpPulse {
   paint() {
     this.view.clear();
     if (!this.alive) return;
-    const u = Math.min(1, this.age / emp.grow);
-    const fade = this.age <= emp.grow ? 1 : Math.max(0, 1 - (this.age - emp.grow) / emp.fade);
-    strokeGlow(this.view, octagon(this.radius, this.spin), colors.cyan, colors.cyanHot, 1.35 + u * 1.4);
-    strokeGlow(this.view, octagon(this.radius * 0.72, -this.spin * 0.6), colors.cyan, colors.white, 0.9);
+    const grow = this.growFor || emp.grow;
+    const fadeFor = this.fadeFor || emp.fade;
+    const u = Math.min(1, this.age / grow);
+    const fade = this.age <= grow ? 1 : Math.max(0, 1 - (this.age - grow) / fadeFor);
+    const glow = this.tint ?? colors.cyan;
+    const hot = this.tintHot ?? colors.cyanHot;
+    strokeGlow(this.view, octagon(this.radius, this.spin), glow, hot, 1.35 + u * 1.4);
+    strokeGlow(this.view, octagon(this.radius * 0.72, -this.spin * 0.6), glow, colors.white, 0.9);
     this.view.alpha = 0.28 + fade * 0.72;
   }
 
   update(dt, follow) {
     if (!this.alive) return;
-    this.x = follow.x;
-    this.y = follow.y;
+    if (this.follow !== false && follow) {
+      this.x = follow.x;
+      this.y = follow.y;
+    }
     this.age += dt;
-    this.spin += 2.2 * dt;
-    const u = Math.min(1, this.age / emp.grow);
+    this.spin += (this.spinRate ?? 2.2) * dt;
+    const grow = this.growFor || emp.grow;
+    const u = Math.min(1, this.age / grow);
     const ease = u * u * (3 - 2 * u);
-    this.radius = shield.radius + (this.maxRadius - shield.radius) * ease;
+    const start = this.startRadius ?? shield.radius;
+    this.radius = start + (this.maxRadius - start) * ease;
     this.paint();
-    if (this.age >= emp.grow + emp.fade) this.kill();
+    if (this.age >= grow + (this.fadeFor || emp.fade)) this.kill();
   }
 
   kill() {

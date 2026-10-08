@@ -100,6 +100,11 @@ export class Game {
     });
     this.emp = new EmpPulse();
     this.vectors.addChild(this.emp.view);
+    this.blastRings = Array.from({ length: 8 }, () => {
+      const ring = new EmpPulse();
+      this.vectors.addChild(ring.view);
+      return ring;
+    });
     this.empCool = 0;
     this.warpCool = 0;
     this.hubMissiles = Array.from({ length: 4 }, () => {
@@ -716,6 +721,7 @@ export class Game {
     this.paused = false;
     this.saveFlash = 0;
     this.emp.kill();
+    this.clearBlastRings();
     this.empCool = 0;
     this.warpCool = 0;
     for (const base of this.bases) base.resetCombat();
@@ -1107,6 +1113,7 @@ export class Game {
     this.missiles.forEach((missile) => missile.kill(true));
     this.hubMissiles.forEach((missile) => missile.kill(true));
     this.emp.kill();
+    this.clearBlastRings();
     this.selected = null;
     this.focusFire = false;
     this.lockMark.visible = false;
@@ -1133,6 +1140,7 @@ export class Game {
     this.hubMissiles.forEach((missile) => missile.kill(true));
     this.castleStars.forEach((star) => star.kill(true));
     this.emp.kill();
+    this.clearBlastRings();
     this.selected = null;
     this.focusFire = false;
     this.lockMark.visible = false;
@@ -2334,6 +2342,25 @@ export class Game {
     }
   }
 
+  clearBlastRings() {
+    for (const ring of this.blastRings) ring.kill();
+  }
+
+  spawnBlastRing(x, y, radius, color, hot) {
+    const ring = this.blastRings.find((item) => !item.alive) || this.blastRings[0];
+    if (!ring) return;
+    if (ring.alive) ring.kill();
+    ring.fire(x, y, radius, {
+      follow: false,
+      grow: missiles.ringGrow ?? 1.7,
+      fade: missiles.ringFade ?? 1.1,
+      spin: missiles.ringSpin ?? 0.85,
+      start: 10,
+      color,
+      hot,
+    });
+  }
+
   detonateMissile(missile, at) {
     const glow = missile.tint ?? colors.orange;
     const hot = missile.tintHot ?? colors.amber;
@@ -2346,18 +2373,70 @@ export class Game {
       blast,
       radius: missile.radius || missiles.radius,
     };
-    this.fx.burst(src.x, src.y, glow, blast ? 26 : 16, blast ? 260 : 180);
-    this.fx.burst(src.x, src.y, hot, blast ? 16 : 8, blast ? 170 : 120);
-    if (blast) this.fx.burst(src.x, src.y, colors.white, 10, 110);
-    this.shake = Math.max(this.shake, blast ? 8 : 6);
+    if (blast) {
+      this.fx.emit(52, {
+        x: src.x,
+        y: src.y,
+        color: glow,
+        speed: 520,
+        speedVar: 280,
+        life: 1.2,
+        lifeVar: 0.4,
+        size: 28,
+        sizeVar: 14,
+        drag: 0.88,
+      });
+      this.fx.emit(32, {
+        x: src.x,
+        y: src.y,
+        color: hot,
+        speed: 340,
+        speedVar: 180,
+        life: 1.45,
+        lifeVar: 0.45,
+        size: 22,
+        sizeVar: 10,
+        drag: 0.9,
+      });
+      this.fx.emit(20, {
+        x: src.x,
+        y: src.y,
+        color: colors.white,
+        speed: 220,
+        speedVar: 110,
+        life: 1.05,
+        lifeVar: 0.3,
+        size: 16,
+        sizeVar: 8,
+        drag: 0.92,
+      });
+      this.fx.emit(24, {
+        x: src.x,
+        y: src.y,
+        color: glow,
+        speed: 70,
+        speedVar: 28,
+        life: 1.8,
+        lifeVar: 0.5,
+        size: 18,
+        sizeVar: 8,
+        drag: 0.96,
+      });
+      this.spawnBlastRing(src.x, src.y, blast, glow, hot);
+      this.shake = Math.max(this.shake, 12);
+    } else {
+      this.fx.burst(src.x, src.y, glow, 16, 180);
+      this.fx.burst(src.x, src.y, hot, 8, 120);
+      this.shake = Math.max(this.shake, 6);
+    }
     this.sfx("boom");
     missile.kill();
-    this.spawnShards(null, { x: src.x, y: src.y, vx: 0, vy: 0, rotation: 0, radius: blast ? 22 : 16 }, {
+    this.spawnShards(null, { x: src.x, y: src.y, vx: 0, vy: 0, rotation: 0, radius: blast ? 44 : 16 }, {
       color: glow,
       hotColor: hot,
-      kick: debrisConfig.rockKick * 0.7,
-      life: 0.45,
-      chips: blast ? 10 : 6,
+      kick: debrisConfig.rockKick * (blast ? 1.1 : 0.7),
+      life: blast ? 0.9 : 0.45,
+      chips: blast ? 18 : 6,
     });
     if (blast > 0) this.applyMissileBlast(src, this.space());
   }
@@ -3176,6 +3255,9 @@ export class Game {
       if (missile.view.visible) this.placeView(missile, space.width, space.height);
     }
     if (this.emp.view.visible) this.placeView(this.emp, space.width, space.height);
+    for (const ring of this.blastRings) {
+      if (ring.view.visible) this.placeView(ring, space.width, space.height);
+    }
     for (const flake of this.ores) {
       flake.view.visible = !mapping && flake.alive;
       if (!mapping) this.placeView(flake, space.width, space.height);
@@ -3407,6 +3489,7 @@ export class Game {
     }
     for (const missile of [...this.missiles, ...this.hubMissiles, ...this.castleStars]) missile.update(t, space);
     this.emp.update(t, this.ship);
+    for (const ring of this.blastRings) ring.update(t);
     if (this.emp.alive) {
       for (const enemy of this.enemies) {
         if (!enemy.alive || this.emp.hit.has(enemy)) continue;

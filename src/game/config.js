@@ -174,8 +174,11 @@ export const missiles = {
   color: colors.cyan,
   hot: colors.cyanHot,
   fuse: 38,
-  blast: 72,
+  blast: 144,
   arm: 0.5,
+  ringGrow: 1.7,
+  ringFade: 1.1,
+  ringSpin: 0.85,
 };
 
 export const castle = {
