@@ -311,6 +311,7 @@ export const assaultShip = {
   hullHits: 3,
   hullIFrames: 0.55,
   speedMul: 0.5,
+  empCap: 3,
   turretCool: 0.44,
   turretRange: 780,
   turretTurn: 4.4,

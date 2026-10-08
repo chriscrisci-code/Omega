@@ -1247,9 +1247,13 @@ export class Game {
     return Math.max(0, Math.min(6, (this.levels?.missile || 1) - 1));
   }
 
+  empCap() {
+    return this.ship?.isAssault?.() ? assaultShip.empCap : shipLevels.emp;
+  }
+
   empTier() {
     if (this.attractOnDemo) return 2;
-    return Math.max(1, Math.min(4, this.levels?.emp || 1));
+    return Math.max(1, Math.min(this.empCap(), this.levels?.emp || 1));
   }
 
   shieldPool() {
@@ -1260,7 +1264,7 @@ export class Game {
   }
 
   upgradeCost(id) {
-    const max = shipLevels[id];
+    const max = id === "emp" ? this.empCap() : shipLevels[id];
     const level = this.levels[id] || 1;
     if (!max || level >= max) return 0;
     return shipLevels.cost[id][level - 1] || 0;
@@ -1269,7 +1273,10 @@ export class Game {
   refreshDock() {
     this.hud.bay.setUpgrades({
       points: this.points,
-      levels: this.levels,
+      levels: {
+        ...this.levels,
+        emp: Math.min(this.levels?.emp || 1, this.empCap()),
+      },
       costs: {
         gun: this.upgradeCost("gun"),
         missile: this.upgradeCost("missile"),
@@ -1279,7 +1286,7 @@ export class Game {
       max: {
         gun: shipLevels.gun,
         missile: shipLevels.missile,
-        emp: shipLevels.emp,
+        emp: this.empCap(),
         shield: shipLevels.shield,
       },
     });
@@ -1303,6 +1310,7 @@ export class Game {
 
   buyUpgrade(id) {
     if (this.mode !== PLAYING || !this.ship.docked) return;
+    if (id === "emp" && (this.levels.emp || 1) >= this.empCap()) return;
     const cost = this.upgradeCost(id);
     if (!cost || this.points < cost) return;
     this.points -= cost;
@@ -2105,6 +2113,7 @@ export class Game {
     this.applyShipSkin();
     this.applyShieldLevel(true);
     this.persistLoadout();
+    this.refreshDock();
     this.hud.bay.setState(this.shipId);
   }
 
