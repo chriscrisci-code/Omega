@@ -10,6 +10,7 @@ export class Bullet {
     this.angle = 0;
     this.ignore = null;
     this.ignoreFor = 0;
+    this.kit = "";
     this.alive = false;
     this.view.visible = false;
   }
@@ -43,6 +44,7 @@ export class Bullet {
     this.life = options.life ?? bullets.life;
     this.ignore = null;
     this.ignoreFor = 0;
+    this.kit = options.kit || "";
     this.paint(options.color ?? colors.cyan, options.hot ?? colors.white);
     this.view.visible = true;
     this.view.alpha = 1;
@@ -67,6 +69,7 @@ export class Bullet {
 
   kill() {
     this.alive = false;
+    this.kit = "";
     this.view.visible = false;
   }
 }

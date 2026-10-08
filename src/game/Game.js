@@ -1980,16 +1980,6 @@ export class Game {
       if (!wing.alive) continue;
       wing.deployed = true;
       wing.update(t, this.ship, space);
-      const threat = this.missileAboutToHit(space, wing);
-      if (threat && wing.shieldEnergy > 0.06) {
-        if (!wing.shieldOn) {
-          wing.forceShield(true);
-          wing.autoShield = true;
-        }
-      } else if (wing.autoShield) {
-        wing.forceShield(false);
-        wing.autoShield = false;
-      }
     }
   }
 
@@ -2053,66 +2043,29 @@ export class Game {
     this.hud.bay.setState(this.shipId);
   }
 
-  missileAboutToHit(space, body = this.ship) {
-    if (!body?.alive) return false;
-    const reach = (body.shieldRadius?.() || shieldConfig.radius) + assaultShip.autoShieldPad;
-    for (const star of this.castleStars) {
-      if (!star.alive) continue;
-      if (!Number.isFinite(star.x) || !Number.isFinite(star.y)) continue;
-      const dx = wrapDelta(star.x - body.x, space.width);
-      const dy = wrapDelta(star.y - body.y, space.height);
-      const dist = Math.hypot(dx, dy);
-      if (!Number.isFinite(dist)) continue;
-      if (dist < reach) return true;
-      const vx = Number.isFinite(star.vx) ? star.vx : 0;
-      const vy = Number.isFinite(star.vy) ? star.vy : 0;
-      const relx = vx - (body.vx || 0);
-      const rely = vy - (body.vy || 0);
-      const closing = dist > 1 ? (dx * relx + dy * rely) / dist : 0;
-      if (closing < -40 && dist / -closing < assaultShip.autoShieldLead) return true;
-    }
-    return false;
-  }
-
-  tickAssaultShield(space) {
-    if (!this.ship.isAssault() || !this.ship.alive || this.ship.docked) {
-      this.ship.autoShield = false;
-      return;
-    }
-    const threat = this.missileAboutToHit(space);
-    if (threat && this.ship.shieldEnergy > 0.06) {
-      if (!this.ship.shieldOn) {
-        this.ship.forceShield(true);
-        this.ship.autoShield = true;
-      }
-    } else if (this.ship.autoShield) {
-      this.ship.forceShield(false);
-      this.ship.autoShield = false;
-    }
-  }
-
   assaultThreats(space, origin = this.ship) {
     const list = [];
     const range = assaultShip.turretRange;
-    const consider = (body) => {
+    const consider = (body, missile = false) => {
       if (!body || body.alive === false) return;
       if (!Number.isFinite(body.x) || !Number.isFinite(body.y)) return;
       const dx = wrapDelta(body.x - origin.x, space.width);
       const dy = wrapDelta(body.y - origin.y, space.height);
       const dist = Math.hypot(dx, dy);
       if (!Number.isFinite(dist) || dist >= range) return;
-      list.push({ body, dist, dx, dy });
+      list.push({ body, dist, dx, dy, missile });
     };
+    for (const star of this.castleStars) consider(star, true);
     for (const enemy of this.enemies) consider(enemy);
     if (this.station?.awake) {
       for (const gun of this.station.guns || []) consider(gun);
     }
-    list.sort((a, b) => a.dist - b.dist || 0);
+    list.sort((a, b) => (a.missile === b.missile ? 0 : a.missile ? -1 : 1) || a.dist - b.dist || 0);
     return list;
   }
 
   tickAssaultTurrets(t, space, origin = this.ship) {
-    if (!origin?.alive || !origin.turrets || origin.docked) return;
+    if (!this.ship.isAssault() || !origin?.alive || !origin.turrets || origin.docked) return;
     const threats = this.assaultThreats(space, origin);
     const picks = threats.slice(0, 2);
     const canFire = origin === this.ship ? this.ship.undockLock <= 0 : origin.age > 0.28;
@@ -2139,13 +2092,17 @@ export class Game {
       if (!bullet) return;
       const muzzle = origin.turretWorld(gun);
       if (!Number.isFinite(muzzle.x) || !Number.isFinite(muzzle.y) || !Number.isFinite(muzzle.angle)) return;
-      bullet.fire(muzzle.x, muzzle.y, muzzle.angle);
+      bullet.fire(muzzle.x, muzzle.y, muzzle.angle, { kit: "assault" });
       gun.cool = assaultShip.turretCool;
     });
   }
 
   tickAssaultKit(t, space) {
-    this.tickAssaultShield(space);
+    if (!this.ship.isAssault()) {
+      this.ship.autoShield = false;
+      for (const wing of this.wingmen) wing.park();
+      return;
+    }
     this.tickWingmen(t, space);
     this.tickAssaultTurrets(t, space, this.ship);
     for (const wing of this.wingmen) {
@@ -2328,7 +2285,14 @@ export class Game {
       else this.sfx("hit");
       return;
     }
-    enemy.hp -= amount;
+    const hits = assaultShip.turretHits || 3;
+    const fromTurret = impact?.kit === "assault" && (enemy.role === "hunter" || enemy.role === "raider");
+    if (fromTurret) {
+      enemy.hp -= (enemy.maxHp || hits) / hits;
+      if (enemy.hp < 0.02) enemy.hp = 0;
+    } else {
+      enemy.hp -= amount;
+    }
     this.spawnShards(null, enemy, {
       color: enemy.color,
       hotColor: enemy.hotColor,

@@ -52,6 +52,7 @@ export class Enemy {
     this.rotation = 0;
     this.radius = this.role === "raider" ? 13 : this.role === "destroyer" ? 56 : 11;
     this.hp = this.role === "raider" ? raid.hits : this.role === "destroyer" ? destroyerConfig.hits : castle.hunterHits;
+    this.maxHp = this.hp;
     this.cooldown = this.role === "raider" ? 0.9 : this.role === "destroyer" ? 1.25 : 0.6;
     this.ramCool = 0;
     this.dodgeUntil = 0;

@@ -247,8 +247,8 @@ export class Wingman {
       this.vx += ((lead.vx || 0) - this.vx) * match * dt;
       this.vy += ((lead.vy || 0) - this.vy) * match * dt;
       if (alongErr > 48) {
-        this.vx += c * 460 * dt;
-        this.vy += s * 460 * dt;
+        this.vx += c * shipConfig.thrust * assaultShip.speedMul * dt;
+        this.vy += s * shipConfig.thrust * assaultShip.speedMul * dt;
       }
     }
 
@@ -257,7 +257,8 @@ export class Wingman {
     this.vy *= drag;
     const speed = Math.hypot(this.vx, this.vy);
     const behind = dist > 70;
-    const cap = behind ? shipConfig.maxSpeed * 1.2 : shipConfig.maxSpeed * 1.05;
+    const cruise = shipConfig.maxSpeed * assaultShip.speedMul;
+    const cap = behind ? cruise * 1.2 : cruise * 1.05;
     if (speed > cap) {
       this.vx *= cap / speed;
       this.vy *= cap / speed;

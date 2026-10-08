@@ -181,8 +181,8 @@ export class Ship {
     this.strafe = input.strafe;
     const c = Math.cos(this.rotation);
     const s = Math.sin(this.rotation);
-    this.vx = (c * this.surge + -s * this.strafe) * 220;
-    this.vy = (s * this.surge + c * this.strafe) * 220;
+    this.vx = (c * this.surge + -s * this.strafe) * 220 * this.speedMul();
+    this.vy = (s * this.surge + c * this.strafe) * 220 * this.speedMul();
   }
 
   nose() {
@@ -203,6 +203,18 @@ export class Ship {
     return this.kit === "assault";
   }
 
+  speedMul() {
+    return this.isAssault() ? assaultShip.speedMul : 1;
+  }
+
+  thrust() {
+    return shipConfig.thrust * this.speedMul();
+  }
+
+  maxSpeed() {
+    return shipConfig.maxSpeed * this.speedMul();
+  }
+
   shieldRadius() {
     return shieldConfig.radius;
   }
@@ -213,6 +225,7 @@ export class Ship {
     this.radius = shipConfig.radius;
     this.hullMax = this.kit === "assault" ? assaultShip.hullHits : 1;
     this.hullHp = this.hullMax;
+    this.autoShield = false;
     this.draw();
     this.drawShield();
   }
@@ -422,7 +435,7 @@ export class Ship {
 
     const c = Math.cos(this.rotation);
     const s = Math.sin(this.rotation);
-    const accel = shipConfig.thrust * dt;
+    const accel = this.thrust() * dt;
     this.vx += (c * this.surge + -s * this.strafe) * accel;
     this.vy += (s * this.surge + c * this.strafe) * accel;
 
@@ -431,8 +444,9 @@ export class Ship {
     this.vy *= drag;
 
     const speed = Math.hypot(this.vx, this.vy);
-    if (speed > shipConfig.maxSpeed) {
-      const scale = shipConfig.maxSpeed / speed;
+    const cap = this.maxSpeed();
+    if (speed > cap) {
+      const scale = cap / speed;
       this.vx *= scale;
       this.vy *= scale;
     }
@@ -479,7 +493,7 @@ export class Ship {
     const facing = Math.abs(wrapDelta(this.rotation - desired, Math.PI * 2));
     if (dist > 220 && facing < 0.55) {
       this.surge = 1;
-      const accel = shipConfig.thrust * dt;
+      const accel = this.thrust() * dt;
       this.vx += Math.cos(desired) * accel;
       this.vy += Math.sin(desired) * accel;
     } else {
@@ -492,7 +506,7 @@ export class Ship {
     this.vx *= drag;
     this.vy *= drag;
     const speed = Math.hypot(this.vx, this.vy);
-    const cap = dist < 260 ? 90 : shipConfig.maxSpeed;
+    const cap = dist < 260 ? 90 * this.speedMul() : this.maxSpeed();
     if (speed > cap) {
       this.vx *= cap / speed;
       this.vy *= cap / speed;
