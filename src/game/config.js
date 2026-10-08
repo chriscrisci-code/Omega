@@ -176,9 +176,9 @@ export const missiles = {
   fuse: 38,
   blast: 144,
   arm: 0.5,
-  ringGrow: 1.7,
-  ringFade: 1.1,
-  ringSpin: 0.85,
+  ringGrow: 0.82,
+  ringFade: 0.52,
+  ringSpin: 1.4,
 };
 
 export const castle = {
