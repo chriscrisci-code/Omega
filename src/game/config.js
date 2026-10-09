@@ -60,7 +60,7 @@ export const music = {
   dead: 0.18,
 };
 
-/** Gun hold-fire: 1 slow / 2 / 3 / 4 original stream / 5 twin. Missiles = level-1, cap 6. EMP 1 off / 2 stun / 3 long / 4 kill. Shield 4 = 2x time. */
+/** Gun hold-fire: 1 slow / 2 / 3 / 4 original stream / 5 twin. Missiles = ammo, +6 per level, reload at hub. EMP 1 off / 2 stun / 3 long / 4 kill. Shield 4 = 2x time. */
 export const shipLevels = {
   gun: 5,
   missile: 7,
@@ -164,6 +164,7 @@ export const missiles = {
   cooldown: 1 / 3,
   max: 24,
   volley: 8,
+  ammoPerLevel: 6,
   radius: 5,
   turn: 4.6,
   cone: 0.62,

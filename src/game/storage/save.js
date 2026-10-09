@@ -1,4 +1,4 @@
-import { shipLevels } from "../config.js";
+import { missiles, shipLevels } from "../config.js";
 import { guessProfile, normalizeBinds } from "../input/bindings.js";
 import { DEFAULT_SHIP_ID, resolveShipId } from "../ships/catalog.js";
 
@@ -51,6 +51,7 @@ const empty = {
     shield: 1,
     points: 0,
     bank: 0,
+    ammo: 6,
   },
   checkpoint: null,
   settings: {
@@ -154,15 +155,27 @@ function clampLevel(value, max) {
   return Math.max(1, Math.min(max, Math.floor(Number(value) || 1)));
 }
 
+export function missileAmmoCap(level) {
+  const n = clampLevel(level, shipLevels.missile || 7);
+  return n * (missiles.ammoPerLevel || 6);
+}
+
 export function normalizeLoadout(data) {
   const src = data && typeof data === "object" ? data : {};
+  const missile = clampLevel(src.missile, shipLevels.missile || 7);
+  const cap = missileAmmoCap(missile);
+  const ammo =
+    src.ammo == null || src.ammo === ""
+      ? cap
+      : Math.max(0, Math.min(cap, Math.floor(Number(src.ammo) || 0)));
   return {
     gun: clampLevel(src.gun, shipLevels.gun || 5),
-    missile: clampLevel(src.missile, shipLevels.missile || 7),
+    missile,
     emp: clampLevel(src.emp, shipLevels.emp || 4),
     shield: clampLevel(src.shield, shipLevels.shield || 4),
     points: Math.max(0, Math.floor(Number(src.points) || 0)),
     bank: Math.max(0, Math.floor(Number(src.bank) || 0) % 3),
+    ammo,
   };
 }
 

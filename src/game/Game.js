@@ -24,7 +24,7 @@ import { LockCam } from "./render/LockCam.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, normalizeCheckpoint, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, missileAmmoCap, normalizeCheckpoint, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrapCoord, wrapDelta } from "./math.js";
 import { SHIP_CATALOG, resolveShipId } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -153,6 +153,7 @@ export class Game {
     this.fireWasOn = false;
     this.missileCool = 0;
     this.missileQueued = 0;
+    this.missileAmmo = 0;
     this.missileDropSide = 1;
     this.paused = false;
     this.saveFlash = 0;
@@ -745,13 +746,15 @@ export class Game {
     this.hub.forceDock(this.ship, 0);
     this.snapCamera();
     this.applyShieldLevel(true);
+    if (!resumed) this.reloadMissiles();
+    else this.clampMissileAmmo();
     this.hud.setScore(this.score);
     this.hud.setXp(this.xp);
     this.hud.setPoints(this.points);
     this.hud.setLives(this.lives);
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
     this.refreshDock();
-    this.hud.setSpecial("WARP EMP MSL");
+    this.syncMissileHud();
     this.hubThreat = 0;
     this.hubThreatClose = false;
     this.hubAlertOn = false;
@@ -1059,6 +1062,7 @@ export class Game {
     this.mode = TITLE;
     this.titleHold = 0.45;
     this.hud.showTitle();
+    this.syncMissileHud();
     this.beginAttractLoop("title");
   }
 
@@ -1270,9 +1274,23 @@ export class Game {
     return Math.max(1, Math.min(5, this.levels?.gun || 1));
   }
 
-  missileVolley() {
-    if (this.attractOnDemo) return missiles.volley ?? 8;
-    return Math.max(0, Math.min(6, (this.levels?.missile || 1) - 1));
+  missileCap() {
+    return missileAmmoCap(this.levels?.missile || 1);
+  }
+
+  clampMissileAmmo() {
+    this.missileAmmo = Math.max(0, Math.min(this.missileCap(), Math.floor(Number(this.missileAmmo) || 0)));
+  }
+
+  reloadMissiles() {
+    this.missileAmmo = this.missileCap();
+    this.syncMissileHud();
+  }
+
+  syncMissileHud() {
+    if (this.attractOnDemo) return;
+    const playing = this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE;
+    this.hud.setSpecial(playing ? `MSL  ${this.missileAmmo}` : "WARP EMP MSL");
   }
 
   empCap() {
@@ -1345,12 +1363,13 @@ export class Game {
     this.levels[id] = (this.levels[id] || 1) + 1;
     this.addXp(xpAwards.upgrade);
     if (id === "shield") this.applyShieldLevel(true);
+    if (id === "missile") this.reloadMissiles();
     this.hud.setPoints(this.points);
     this.refreshDock();
     this.runDirty = true;
     this.writeCheckpoint();
     this.sfx("up");
-    this.hud.setMode(`${id === "missile" ? "MSL" : id === "shield" ? "SHD" : id.toUpperCase()}  ${this.levels[id]}`);
+    this.hud.setMode(id === "missile" ? `MSL  ${this.missileAmmo}` : `${id === "shield" ? "SHD" : id.toUpperCase()}  ${this.levels[id]}`);
   }
 
   shoot() {
@@ -1862,6 +1881,7 @@ export class Game {
       shield: this.levels?.shield,
       points: this.points,
       bank: this.loadoutBank,
+      ammo: this.missileAmmo,
     };
     const cp = normalizeCheckpoint({
       active: true,
@@ -1924,6 +1944,8 @@ export class Game {
     };
     this.points = Math.max(0, Math.floor(Number(cp.loadout.points) || 0));
     this.loadoutBank = Math.max(0, Math.floor(Number(cp.loadout.bank) || 0));
+    this.missileAmmo = Math.max(0, Math.floor(Number(cp.loadout.ammo) || 0));
+    this.clampMissileAmmo();
     this.score = 0;
     this.lives = Math.max(1, Math.floor(Number(cp.lives) || 0) || shipConfig.lives);
     this.cargo = Math.max(0, Math.floor(Number(cp.cargo) || 0));
@@ -2212,16 +2234,10 @@ export class Game {
     }
   }
 
-  fireMissile(force = false) {
+  fireMissile() {
     if (!this.ship.alive || this.ship.docked) return;
-    if (!force && this.missileCool > 0) return;
-    const volley = this.missileVolley();
-    if (volley <= 0) return;
-    if (!force) {
-      if (this.missileQueued > 0) return;
-      this.missileQueued = volley;
-    }
-    if (this.missileCool > 0 || this.missileQueued <= 0) return;
+    if (this.missileCool > 0) return;
+    if (!this.attractOnDemo && this.missileAmmo <= 0) return;
     const missile = this.missiles.find((item) => !item.alive);
     if (!missile) return;
     const space = this.space();
@@ -2244,7 +2260,10 @@ export class Game {
       blast: missiles.blast,
       arm: missiles.arm ?? missiles.drop,
     });
-    this.missileQueued -= 1;
+    if (!this.attractOnDemo) {
+      this.missileAmmo = Math.max(0, this.missileAmmo - 1);
+      this.syncMissileHud();
+    }
     this.missileCool = missiles.cooldown;
     this.sfx("missile");
     if (mark) {
@@ -2973,6 +2992,7 @@ export class Game {
     this.ship.reset(this.ship.x, this.ship.y);
     this.applyShipSkin();
     this.snapCamera();
+    this.syncMissileHud();
     this.writeCheckpoint({ force: true });
   }
 
@@ -3369,10 +3389,6 @@ export class Game {
     this.missileCool = Math.max(0, this.missileCool - t);
     this.empCool = Math.max(0, this.empCool - t);
     this.warpCool = Math.max(0, this.warpCool - t);
-    if ((this.mode === PLAYING || this.attractOnDemo) && !this.ship.docked && this.missileQueued > 0 && this.missileCool <= 0) {
-      this.fireMissile(true);
-    }
-
     this.input.aim =
       this.mode === PLAYING && !this.ship.docked && !this.input.mapHeld && !this.homeOn && this.input.aimMode === "mouse"
         ? this.pointerAim()
@@ -3399,6 +3415,7 @@ export class Game {
         if (!this.dockOpen) {
           this.dockOpen = true;
           this.depositOre();
+          this.reloadMissiles();
           this.refreshDock();
           this.hud.showDock(this.shipId);
           if (this.runDirty) this.writeCheckpoint();
