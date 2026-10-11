@@ -50,6 +50,12 @@ export class Game {
     this.hud = new Hud();
     this.pickingDevice = false;
     this.audio = new GameAudio();
+    const holdMusic = () => {
+      this.audio.tickMusic(this.musicOutLevel());
+      this.audio.holdMusic();
+    };
+    document.addEventListener("fullscreenchange", holdMusic);
+    document.addEventListener("webkitfullscreenchange", holdMusic);
 
     this.world = new Container();
     this.vectors = new Container();
@@ -3295,6 +3301,8 @@ export class Game {
       .then(() => {
         this.save.settings.fullscreen = true;
         this.storage.save(this.save);
+        this.audio.tickMusic(this.musicOutLevel());
+        this.audio.holdMusic();
       })
       .catch(() => {});
   }

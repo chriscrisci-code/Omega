@@ -320,9 +320,23 @@ export class GameAudio {
     this.music = { el, out };
   }
 
+  holdMusic() {
+    this.unlock();
+    const el = this.music?.el;
+    if (el && (this._musicLevel ?? 0) > 0) {
+      this._musicStarting = true;
+      el.play()
+        .catch(() => {})
+        .finally(() => {
+          this._musicStarting = false;
+        });
+    }
+  }
+
   tickMusic(level) {
     if (level != null) this._musicLevel = Math.max(0, Math.min(1, Number(level) || 0));
-    if (!this.ctx || this.ctx.state !== "running") return;
+    if (!this.ctx) return;
+    if (this.ctx.state !== "running") this.ctx.resume().catch(() => {});
     this.ensureMusic();
     const amt = this._musicLevel ?? 0;
     if (this.music?.out) this.music.out.gain.value = amt;
