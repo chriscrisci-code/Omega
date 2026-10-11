@@ -334,6 +334,29 @@ export class GameAudio {
     this.playElement();
   }
 
+  restartMusic(level) {
+    if (level != null) this._musicLevel = Math.max(0, Math.min(1, Number(level) || 0));
+    this.ensureMusic();
+    const el = this.music?.el;
+    if (!el) return;
+    const amt = this._musicLevel > 0 ? this._musicLevel : 0.2;
+    this._musicLevel = amt;
+    el.loop = true;
+    el.volume = amt;
+    this._musicStarting = true;
+    try {
+      if (!el.paused) el.pause();
+      el.currentTime = 0;
+    } catch {
+      /* ignore seek errors */
+    }
+    el.play()
+      .catch(() => {})
+      .finally(() => {
+        this._musicStarting = false;
+      });
+  }
+
   tickMusic(level) {
     if (level != null) this._musicLevel = Math.max(0, Math.min(1, Number(level) || 0));
     this.ensureMusic();

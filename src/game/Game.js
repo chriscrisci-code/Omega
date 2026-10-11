@@ -696,8 +696,8 @@ export class Game {
     this.stopAttract();
     this.audio.unlock();
     this.mode = PLAYING;
-    this.audio.tickMusic(this.musicOutLevel());
-    this.audio.holdMusic();
+    if (!(this.save.settings.music > 0)) this.applyMusicVol(music.volume);
+    this.audio.restartMusic(this.musicOutLevel());
     this.enterFullscreen();
     this.wavePick = null;
     this.startPick = null;
@@ -3851,7 +3851,8 @@ export class Game {
   musicOutLevel() {
     if (this.mode === TITLE || this.mode === INITIALS || this.mode === GAMEOVER) return music.titleVol;
     if (this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE) {
-      return this.save.settings.music ?? music.volume;
+      const vol = Number(this.save.settings.music);
+      return vol > 0 ? vol : music.volume;
     }
     return music.menuVol;
   }
