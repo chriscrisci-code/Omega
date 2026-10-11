@@ -177,7 +177,7 @@ export class HudMarkers {
     const visible = targets.filter((target) => this.filters[target.kind] !== false);
     this.ensure(visible.length);
 
-    const pad = extras.hubAlert ? 92 : 34;
+    const pad = extras.hubAlert ? (extras.compact ? 52 : 92) : extras.compact ? 22 : 34;
     const halfW = screen.width * 0.5 - pad;
     const halfH = screen.height * 0.5 - pad;
     const cos = Math.cos(camRot);
@@ -220,7 +220,8 @@ export class HudMarkers {
       pip.node.position.set(screen.width * 0.5 + pinned.x, screen.height * 0.5 + pinned.y);
       pip.node.rotation = Math.atan2(sy, sx);
       const alert = target.kind === "hub" && extras.hubAlert;
-      pip.node.scale.set(alert ? 1.08 : 1 - fade * 0.3);
+      const pipScale = extras.compact ? 0.55 : 1;
+      pip.node.scale.set((alert ? 1.08 : 1 - fade * 0.3) * pipScale);
       pip.node.alpha = alert ? 1 : rangeAlpha(target.kind, fade);
       drawGlyph(pip.mark, target.kind, target.color, target.hotColor, {
         alert,
