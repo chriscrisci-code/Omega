@@ -70,6 +70,7 @@ export class Hud {
     this.onPickStart = null;
     this.scoreBoard = document.querySelector("#score-board");
     this.continueRow = document.querySelector("#continue-row");
+    this.continueTitle = document.querySelector("#continue-title");
     this.continueBtn = document.querySelector("#continue-btn");
     this.continueNo = document.querySelector("#continue-no");
     this.devicePick = document.querySelector("#device-pick");
@@ -507,6 +508,7 @@ export class Hud {
   }
 
   paintContinue() {
+    this.paint(this.continueTitle, "CONTINUE", 20, CYAN, HOT, "center");
     if (this.continueBtn) this.paint(this.continueBtn, "YES", 18, CYAN, HOT, "center");
     if (this.continueNo) this.paint(this.continueNo, "NO", 18, MAGENTA, PINK, "center");
   }
@@ -514,7 +516,6 @@ export class Hud {
   showContinue() {
     this.paintContinue();
     this.continueRow?.classList.remove("is-hidden");
-    this.setMode("CONTINUE?");
   }
 
   hideContinue() {

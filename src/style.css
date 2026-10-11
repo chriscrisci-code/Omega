@@ -622,9 +622,26 @@ body.is-attract .cta {
   bottom: 22%;
   transform: translateX(-50%);
   display: flex;
-  gap: 18px;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
   z-index: 6;
   pointer-events: auto;
+}
+
+.continue-title {
+  filter: drop-shadow(0 0 14px rgba(142, 246, 255, 0.5));
+}
+
+.continue-title .vector-text {
+  width: min(220px, 70vw);
+  height: auto;
+  display: block;
+}
+
+.continue-btns {
+  display: flex;
+  gap: 18px;
 }
 
 .continue-row.is-hidden {
