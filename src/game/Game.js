@@ -856,6 +856,8 @@ export class Game {
       return;
     }
     this.stopAttract();
+    this.audio.unlock();
+    this.enterFullscreen();
     this.mode = STARTPICK;
     this.startPick = "continue";
     this.hud.showStartPick(this.checkpointLabel(), "continue");
@@ -887,6 +889,8 @@ export class Game {
       return;
     }
     this.stopAttract();
+    this.audio.unlock();
+    this.enterFullscreen();
     this.mode = WAVEPICK;
     this.wavePick = { max, selected: max };
     this.hud.showWavePick(max, max);
