@@ -13,6 +13,7 @@ export class GameAudio {
     this.musicVol = 0.2;
     this._musicStarting = false;
     this._musicLevel = 0;
+    this._musicLoading = false;
   }
 
   setMusicVol(value) {
@@ -309,53 +310,107 @@ export class GameAudio {
   }
 
   ensureMusic() {
-    if (this.music || !this.ctx) return;
-    const el = new Audio(SUNLIGHT);
-    el.loop = true;
-    el.preload = "auto";
-    const out = this.ctx.createGain();
-    out.gain.value = 0;
-    this.ctx.createMediaElementSource(el).connect(out);
-    out.connect(this.ctx.destination);
-    this.music = { el, out };
-  }
-
-  holdMusic() {
-    this.unlock();
-    const el = this.music?.el;
-    if (el && (this._musicLevel ?? 0) > 0) {
-      this._musicStarting = true;
-      el.play()
-        .catch(() => {})
-        .finally(() => {
-          this._musicStarting = false;
-        });
+    if (!this.music) this.music = { el: null, out: null, data: null, src: null };
+    if (!this.music.el) {
+      const el = new Audio(SUNLIGHT);
+      el.loop = true;
+      el.preload = "auto";
+      el.volume = 0;
+      this.music.el = el;
     }
+    if (!this.ctx || this.music.data || this._musicLoading) return;
+    this._musicLoading = true;
+    fetch(SUNLIGHT)
+      .then((res) => res.arrayBuffer())
+      .then((buf) => this.ctx.decodeAudioData(buf))
+      .then((data) => {
+        const out = this.ctx.createGain();
+        out.gain.value = this._musicLevel ?? 0;
+        out.connect(this.ctx.destination);
+        this.music.data = data;
+        this.music.out = out;
+        this.tickMusic();
+      })
+      .catch(() => {
+        this._musicLoading = false;
+      });
   }
 
-  tickMusic(level) {
-    if (level != null) this._musicLevel = Math.max(0, Math.min(1, Number(level) || 0));
-    if (!this.ctx) return;
+  startBed() {
+    if (!this.ctx || !this.music?.data || this.music.src) return;
     if (this.ctx.state !== "running") this.ctx.resume().catch(() => {});
-    this.ensureMusic();
-    const amt = this._musicLevel ?? 0;
-    if (this.music?.out) this.music.out.gain.value = amt;
-    const el = this.music?.el;
-    if (!el) return;
-    el.loop = true;
-    el.volume = amt > 0 ? 1 : 0;
-    if (amt <= 0) {
-      this._musicStarting = false;
-      if (!el.paused) el.pause();
+    const src = this.ctx.createBufferSource();
+    src.buffer = this.music.data;
+    src.loop = true;
+    src.connect(this.music.out);
+    const from = this.music.el && !this.music.el.paused ? this.music.el.currentTime : 0;
+    try {
+      src.start(0, from % this.music.data.duration);
+    } catch {
       return;
     }
-    if (!el.paused || this._musicStarting) return;
+    this.music.src = src;
+    const el = this.music.el;
+    if (el && !el.paused) el.pause();
+  }
+
+  stopBed() {
+    const src = this.music?.src;
+    if (!src) return;
+    try {
+      src.stop();
+    } catch {
+      /* already stopped */
+    }
+    try {
+      src.disconnect();
+    } catch {
+      /* already disconnected */
+    }
+    this.music.src = null;
+  }
+
+  playElement() {
+    const el = this.music?.el;
+    if (!el || this._musicStarting) return;
     this._musicStarting = true;
     el.play()
       .catch(() => {})
       .finally(() => {
         this._musicStarting = false;
       });
+  }
+
+  holdMusic() {
+    this.unlock();
+    if ((this._musicLevel ?? 0) <= 0) return;
+    if (this.music?.data) this.startBed();
+    else this.playElement();
+  }
+
+  tickMusic(level) {
+    if (level != null) this._musicLevel = Math.max(0, Math.min(1, Number(level) || 0));
+    this.ensureMusic();
+    if (this.ctx && this.ctx.state !== "running") this.ctx.resume().catch(() => {});
+    const amt = this._musicLevel ?? 0;
+    if (this.music?.out) this.music.out.gain.value = amt;
+    const el = this.music?.el;
+    if (el) {
+      el.loop = true;
+      el.volume = this.music.data ? 0 : amt;
+    }
+    if (amt <= 0) {
+      this._musicStarting = false;
+      this.stopBed();
+      if (el && !el.paused) el.pause();
+      return;
+    }
+    if (this.music?.data) {
+      this.startBed();
+      return;
+    }
+    if (!el || !el.paused || this._musicStarting) return;
+    this.playElement();
   }
 }
 

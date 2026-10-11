@@ -695,8 +695,10 @@ export class Game {
     this.storage.save(this.save);
     this.stopAttract();
     this.audio.unlock();
-    this.enterFullscreen();
     this.mode = PLAYING;
+    this.audio.tickMusic(this.musicOutLevel());
+    this.audio.holdMusic();
+    this.enterFullscreen();
     this.wavePick = null;
     this.startPick = null;
     this.runDirty = false;
