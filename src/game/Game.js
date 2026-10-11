@@ -277,7 +277,7 @@ export class Game {
 
   playZoom() {
     const zoom = cameraConfig.zoom;
-    return this.input.layout === "phone" ? zoom / 1.25 : zoom;
+    return this.input.layout === "phone" ? zoom / 2.5 : zoom;
   }
 
   viewRadius() {
