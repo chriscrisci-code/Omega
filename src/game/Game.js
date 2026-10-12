@@ -2602,6 +2602,9 @@ export class Game {
     if (blast) {
       this.spawnMissileBurst(missile.x, missile.y, glow, hot);
       this.shake = Math.max(this.shake, 12);
+    } else if (missile.star) {
+      this.fx.burst(missile.x, missile.y, glow, 5, 90);
+      this.shake = Math.max(this.shake, 3);
     } else {
       this.fx.burst(missile.x, missile.y, glow, 16, 180);
       this.fx.burst(missile.x, missile.y, hot, 8, 120);
@@ -2614,8 +2617,11 @@ export class Game {
         chips: 6,
       });
     }
-    this.sfx("boom");
-    missile.kill();
+    if (!missile.star || !this._starBoom || this.timer - this._starBoom > 0.08) {
+      this.sfx("boom");
+      this._starBoom = this.timer;
+    }
+    missile.kill(Boolean(missile.star));
   }
 
   pointerAim() {
@@ -3700,7 +3706,15 @@ export class Game {
       const dy = wrapDelta(shot.y - this.camY, space.height);
       if (dx * dx + dy * dy > shotRange2) shot.kill();
     }
-    for (const missile of [...this.missiles, ...this.hubMissiles, ...this.castleStars]) missile.update(t, space);
+    const see = this.viewRadius() * 1.25;
+    const see2 = see * see;
+    for (const list of [this.missiles, this.hubMissiles, this.castleStars]) {
+      for (const missile of list) {
+        const dx = wrapDelta(missile.x - this.camX, space.width);
+        const dy = wrapDelta(missile.y - this.camY, space.height);
+        missile.update(t, space, dx * dx + dy * dy <= see2);
+      }
+    }
     this.emp.update(t, this.ship);
     this.tickMissileBursts(t, space);
     if (this.emp.alive) {
