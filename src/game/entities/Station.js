@@ -509,9 +509,14 @@ export class Station {
     }
   }
 
+  brokenHolds(slot) {
+    return this.holdsFor(slot).filter((part) => !this.holdLive(part)).length;
+  }
+
   checkBreaks(space) {
+    const need = cfg.breakNeed ?? 2;
     for (const arc of this.arcs) {
-      if (!arc.installed || !arc.wasHeld || this.arcHeld(arc.slot)) continue;
+      if (!arc.installed || !arc.wasHeld || this.brokenHolds(arc.slot) < need) continue;
       this.releaseArc(arc, space, 78);
     }
   }
