@@ -269,7 +269,7 @@ export const crane = {
   score: 100,
 };
 
-/** Wave 5 enemy station. Half the ring starts loose; hull stays once built. */
+/** Wave 5 enemy station. Half the ring starts loose. Blow both edge joints and the spoke clamp to drop a section. */
 export const station = {
   fromWave: 5,
   hub: 220,
@@ -278,6 +278,8 @@ export const station = {
   spin: 0.016,
   gunHits: 4,
   moduleHits: 30,
+  jointHits: 18,
+  clampHits: 18,
   gunCool: 1.45,
   gunRange: 1180,
   gunSpeed: 680,
@@ -285,6 +287,7 @@ export const station = {
   fireMax: 2,
   scoreGun: 80,
   scoreModule: 55,
+  scoreJoint: 80,
   alpha: [0.38, 0.16],
   scale: [0.86, 0.7],
   parallax: [0.84, 0.68],

@@ -158,6 +158,25 @@ function arcMid(slot) {
   return ((slot + 0.5) / cfg.spokes) * Math.PI * 2;
 }
 
+function paintJoint(g, color, hot) {
+  g.clear();
+  strokeGlow(g, boxPts(22, 56), color, hot, 1.15);
+  strokeGlow(g, [0, -22, 14, 0, 0, 22, -14, 0], color, hot, 1.05);
+  strokeLine(g, [-10, -18, 10, 18], color, hot, 0.8);
+  strokeLine(g, [10, -18, -10, 18], color, hot, 0.8);
+  strokeLine(g, [-16, 0, 16, 0], color, colors.white, 0.75);
+}
+
+function paintClamp(g, color, hot) {
+  g.clear();
+  strokeGlow(g, boxPts(20, 48), color, hot, 1.05);
+  strokeLine(g, [-7, -18, -7, 18], color, hot, 0.8);
+  strokeLine(g, [7, -18, 7, 18], color, hot, 0.8);
+  strokeLine(g, [-11, -10, 11, -10], color, colors.white, 0.7);
+  strokeLine(g, [-11, 10, 11, 10], color, colors.white, 0.7);
+  strokeLine(g, [-9, 0, 9, 0], color, hot, 0.75);
+}
+
 function paintArc(g, color, hot, width, slot, origin) {
   g.clear();
   const ring = cfg.ring;
@@ -226,6 +245,8 @@ export class Station {
 
     this.guns = [];
     this.modules = [];
+    this.joints = [];
+    this.clamps = [];
     this.arcs = [];
     this.buildArcs();
     this.buildParts();
@@ -248,6 +269,7 @@ export class Station {
         ly: Math.sin(mid) * cfg.ring,
         graphic: g,
         installed: true,
+        wasHeld: false,
         towedBy: null,
         x: this.x,
         y: this.y,
@@ -283,6 +305,8 @@ export class Station {
       } else {
         this.addModule(Math.cos(bay) * (ring + 96), Math.sin(bay) * (ring + 96), bay, 62, 34, { spoke: i, needsArc: true, startWelded: false });
       }
+      this.addHold("joint", Math.cos(angle) * cfg.ring, Math.sin(angle) * cfg.ring, angle, { spoke: i, needsArc: false });
+      this.addHold("clamp", Math.cos(bay) * ((cfg.hub + cfg.ring) * 0.38), Math.sin(bay) * ((cfg.hub + cfg.ring) * 0.38), bay, { spoke: i, needsArc: true });
     }
   }
 
@@ -325,6 +349,34 @@ export class Station {
         { name: "GUN", part: "gun" },
       ),
     );
+  }
+
+  addHold(kind, lx, ly, angle, extra = {}) {
+    const joint = kind === "joint";
+    const g = new Graphics();
+    if (joint) paintJoint(g, this.color, this.hotColor);
+    else paintClamp(g, this.color, this.hotColor);
+    g.position.set(lx, ly);
+    g.rotation = angle;
+    this.combat.addChild(g);
+    const part = this.stamp(
+      {
+        lx,
+        ly,
+        graphic: g,
+        radius: joint ? 38 : 30,
+        hp: joint ? cfg.jointHits : cfg.clampHits,
+        maxHp: joint ? cfg.jointHits : cfg.clampHits,
+        welded: extra.startWelded !== false,
+        joint,
+        clamp: !joint,
+        ...extra,
+      },
+      { name: joint ? "JOINT" : "CLAMP", part: kind },
+    );
+    this.modules.push(part);
+    if (joint) this.joints[part.spoke] = part;
+    else this.clamps[part.spoke] = part;
   }
 
   addModule(lx, ly, angle, w, h, extra = {}) {
@@ -396,19 +448,21 @@ export class Station {
     arc.graphic.rotation = 0;
     this.paintArcGraphic(arc, "hub");
     this.applyArcParts(arc.slot, true);
+    arc.wasHeld = this.arcHeld(arc.slot);
   }
 
-  releaseArc(arc, space) {
+  releaseArc(arc, space, kick = 12) {
     const at = this.slotWorld(arc);
-    const out = 240;
+    const out = kick > 20 ? 160 : 240;
     arc.installed = false;
+    arc.wasHeld = false;
     arc.towedBy = null;
     arc.x = at.x + Math.cos(arc.mid + this.rotation) * out;
     arc.y = at.y + Math.sin(arc.mid + this.rotation) * out;
     arc.rot = this.rotation;
-    arc.vx = Math.cos(arc.mid + this.rotation) * 12;
-    arc.vy = Math.sin(arc.mid + this.rotation) * 12;
-    arc.spin = (arc.slot % 2 === 0 ? 1 : -1) * 0.08;
+    arc.vx = Math.cos(arc.mid + this.rotation) * kick;
+    arc.vy = Math.sin(arc.mid + this.rotation) * kick;
+    arc.spin = (arc.slot % 2 === 0 ? 1 : -1) * (kick > 20 ? 0.22 : 0.08);
     this.paintArcGraphic(arc, "mid");
     this.worldLayer?.addChild(arc.graphic);
     arc.graphic.position.set(arc.x, arc.y);
@@ -433,6 +487,37 @@ export class Station {
     part.alive = on && arcOk;
     part.graphic.visible = part.alive;
     if (part.alive) part.hp = part.maxHp;
+    this.refreshHeld();
+  }
+
+  holdLive(part) {
+    return Boolean(part?.alive && part.welded);
+  }
+
+  holdsFor(slot) {
+    const n = cfg.spokes;
+    return [this.joints[slot], this.joints[(slot + 1) % n], this.clamps[slot]];
+  }
+
+  arcHeld(slot) {
+    return this.holdsFor(slot).every((part) => this.holdLive(part));
+  }
+
+  refreshHeld() {
+    for (const arc of this.arcs) {
+      if (arc.installed && this.arcHeld(arc.slot)) arc.wasHeld = true;
+    }
+  }
+
+  checkBreaks(space) {
+    for (const arc of this.arcs) {
+      if (!arc.installed || !arc.wasHeld || this.arcHeld(arc.slot)) continue;
+      this.releaseArc(arc, space, 78);
+    }
+  }
+
+  needsYard() {
+    return this.looseArcs().length > 0 || this.weldJobs().length > 0;
   }
 
   unfinished() {
@@ -440,10 +525,18 @@ export class Station {
     for (const part of [...this.guns, ...this.modules]) {
       part.welded = part.startWelded !== false;
       if (part.needsArc && part.spoke % 2 !== 0) part.welded = false;
+      if (part.joint) part.welded = false;
     }
     for (const arc of this.arcs) {
       if (arc.slot % 2 === 0) this.seatArc(arc);
       else this.releaseArc(arc);
+      arc.wasHeld = false;
+    }
+    for (const part of [...this.guns, ...this.modules]) {
+      const arcOk = !part.needsArc || this.arcs[part.spoke]?.installed;
+      part.alive = part.welded && arcOk;
+      part.graphic.visible = part.alive;
+      if (part.alive) part.hp = part.maxHp;
     }
   }
 
@@ -451,11 +544,13 @@ export class Station {
     this.built = true;
     for (const arc of this.arcs) this.seatArc(arc);
     for (const part of [...this.guns, ...this.modules]) this.setPartLive(part, true);
+    for (const arc of this.arcs) arc.wasHeld = true;
   }
 
   setBuild(wave, force = false) {
-    if (wave >= 7) this.complete();
-    else if (wave >= 5 && (force || !this.awake)) this.unfinished();
+    if (wave >= 7) {
+      if (!this.built || force) this.complete();
+    } else if (wave >= 5 && (force || !this.awake)) this.unfinished();
   }
 
   looseArcs() {
@@ -463,9 +558,14 @@ export class Station {
   }
 
   weldJobs() {
+    const n = cfg.spokes;
     return [...this.guns, ...this.modules].filter((part) => {
       if (part.welded) return false;
       if (part.needsArc && !this.arcs[part.spoke]?.installed) return false;
+      if (part.joint) {
+        const a = (part.spoke + n - 1) % n;
+        if (!this.arcs[a]?.installed || !this.arcs[part.spoke]?.installed) return false;
+      }
       return true;
     });
   }

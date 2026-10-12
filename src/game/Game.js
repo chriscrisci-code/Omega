@@ -618,7 +618,9 @@ export class Game {
     const n = this.assaultIndex;
     if (n === 5 && !this.station.built) return craneCfg.wave5Count;
     if (n === 6 && !this.station.built) return craneCfg.wave6Count;
+    if (n >= 7 && n < 9) return 0;
     if (n >= battleshipCfg.fromWave && this.battleship.building) return craneCfg.wave9Count;
+    if (this.station.needsYard()) return craneCfg.wave5Count;
     return 0;
   }
 
@@ -673,7 +675,6 @@ export class Game {
     if (this.assaultIndex >= battleshipCfg.fromWave && this.battleship.building) {
       const plate = this.battleship.loosePlates().find((item) => !item.towedBy && !claimed.has(item));
       if (plate) return { kind: "tow", piece: plate, yard: this.battleship, phase: "goto", t: 0 };
-      return null;
     }
     const arc = this.station.looseArcs().find((item) => !item.towedBy && !claimed.has(item));
     if (arc) return { kind: "tow", piece: arc, yard: this.station, phase: "goto", t: 0 };
@@ -2748,7 +2749,7 @@ export class Game {
     const y = impact?.y ?? part.y;
     part.hp -= amount;
     const dead = part.hp <= 0;
-    const building = part.part === "module";
+    const building = part.part !== "gun";
     const hunk = { x, y, vx: 0, vy: 0, rotation: this.station.rotation, radius: Math.max(22, part.radius || 24) };
     if (building) {
       this.spawnShards(null, hunk, {
@@ -2781,8 +2782,9 @@ export class Game {
       return;
     }
     part.alive = false;
+    part.welded = false;
     part.graphic.visible = false;
-    this.addScore(part.part === "gun" ? stationCfg.scoreGun : stationCfg.scoreModule);
+    this.addScore(part.part === "gun" ? stationCfg.scoreGun : part.joint || part.clamp ? stationCfg.scoreJoint : stationCfg.scoreModule);
     this.fx.burst(part.x, part.y, this.station.color, building ? 26 : 14, building ? 220 : 160);
     if (building) {
       this.spawnShards(null, { x: part.x, y: part.y, vx: 0, vy: 0, rotation: this.station.rotation, radius: Math.max(36, part.radius * 1.35) }, {
@@ -2796,6 +2798,7 @@ export class Game {
     this.shake = Math.max(this.shake, building ? 7 : 5);
     this.sfx("pop");
     this.noteLockDeath(part);
+    if (part.joint || part.clamp) this.station.checkBreaks(this.space());
   }
 
   bounceShot(shot, enemy, space) {
