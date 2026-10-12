@@ -42,47 +42,42 @@ export class Missile {
     const fadeFor = (point) => Math.max(0, 1 - (this.clock - point.t) / this.trailFade);
     const glow = this.tint ?? colors.orange;
     const hot = this.tintHot ?? colors.amber;
-    if (this.star) {
-      const from = Math.max(1, this.points.length - 3);
-      for (let i = from; i < this.points.length; i += 1) {
-        const fade = fadeFor(this.points[i]);
-        if (fade <= 0) continue;
-        const a = this.toLocal(this.points[i - 1].x, this.points[i - 1].y, space.width, space.height);
-        const b = this.toLocal(this.points[i].x, this.points[i].y, space.width, space.height);
-        this.trailG.moveTo(a.x, a.y);
-        this.trailG.lineTo(b.x, b.y);
-        this.trailG.stroke({ width: 2.2, color: hot, alpha: missiles.trailAlpha * fade, cap: "round" });
-      }
-      return;
-    }
     for (let i = 1; i < this.points.length; i += 1) {
       const fade = fadeFor(this.points[i]);
       if (fade <= 0) continue;
       const a = this.toLocal(this.points[i - 1].x, this.points[i - 1].y, space.width, space.height);
       const b = this.toLocal(this.points[i].x, this.points[i].y, space.width, space.height);
-      const alpha = missiles.trailAlpha * fade;
+      const alpha = missiles.trailAlpha * fade * (this.star ? 0.7 : 1);
       this.trailG.moveTo(a.x, a.y);
       this.trailG.lineTo(b.x, b.y);
-      this.trailG.stroke({ width: 5.2, color: glow, alpha: alpha * 0.45, cap: "round" });
+      this.trailG.stroke({ width: this.star ? 6.4 : 5.2, color: glow, alpha: alpha * 0.45, cap: "round" });
       this.trailG.moveTo(a.x, a.y);
       this.trailG.lineTo(b.x, b.y);
-      this.trailG.stroke({ width: 1.35, color: hot, alpha, cap: "round" });
+      this.trailG.stroke({ width: this.star ? 1.6 : 1.35, color: hot, alpha, cap: "round" });
     }
   }
 
   paintBody() {
     this.body.clear();
     if (this.star) {
+      const pulse = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(this.clock * 17));
+      const flicker = 0.72 + Math.random() * 0.28;
+      const r = 7.8 * flicker;
+      const inner = 2.5 * flicker;
       const pts = [];
-      for (let i = 0; i < 8; i += 1) {
-        const a = (i / 8) * Math.PI * 2;
-        const rad = i % 2 === 0 ? 7.2 : 2.8;
+      for (let i = 0; i < 16; i += 1) {
+        const a = this.clock * 1.6 + (i / 16) * Math.PI * 2;
+        const rad = i % 2 === 0 ? r : inner;
         pts.push(Math.cos(a) * rad, Math.sin(a) * rad);
       }
       this.body.poly(pts, true);
-      this.body.stroke({ width: 2.1, color: this.tint, alpha: 0.5, join: "round" });
+      this.body.stroke({ width: 6.2, color: this.tint, alpha: 0.16 * pulse, join: "round" });
       this.body.poly(pts, true);
-      this.body.stroke({ width: 1, color: this.tintHot, alpha: 0.95, join: "round" });
+      this.body.stroke({ width: 2.6, color: this.tint, alpha: 0.55 * pulse, join: "round" });
+      this.body.poly(pts, true);
+      this.body.stroke({ width: 1.05, color: this.tintHot, alpha: 0.95, join: "round" });
+      this.body.circle(0, 0, 1.7 * flicker);
+      this.body.fill({ color: colors.white, alpha: 0.4 + pulse * 0.45 });
       return;
     }
     const glow = this.tint ?? colors.orange;
@@ -127,8 +122,8 @@ export class Missile {
     this.armAt = options.arm ?? 0;
     this.clock = 0;
     this.radius = this.star ? (options.radius ?? 7) : missiles.radius;
-    this.trailFade = this.star ? 0.32 : missiles.trailFade;
-    this.trailGap = this.star ? 36 : missiles.trailGap;
+    this.trailFade = missiles.trailFade;
+    this.trailGap = missiles.trailGap;
     this.points = [{ x, y, t: 0 }];
     this.view.visible = true;
     this.view.alpha = 1;
@@ -202,10 +197,10 @@ export class Missile {
         const last = this.points[this.points.length - 1];
         const gap = Math.hypot(wrapDelta(this.x - last.x, space.width), wrapDelta(this.y - last.y, space.height));
         if (gap >= this.trailGap) this.points.push({ x: this.x, y: this.y, t: this.clock });
-        this.body.rotation = this.star ? this.clock * 4 : this.angle;
+        this.body.rotation = this.star ? 0 : this.angle;
         const fade = this.life < 0.35 ? this.life / 0.35 : 1;
         this.body.alpha = this.blind ? fade * (0.32 + 0.4 * (0.5 + 0.5 * Math.sin(this.clock * 14))) : fade;
-        if (!this.star) this.paintBody();
+        if (draw) this.paintBody();
       }
     }
 
