@@ -5,7 +5,14 @@ import { strokeGlow, strokeLine } from "../render/textures.js";
 
 export const HUNTER = [12, 0, -8, 6, -4, 0, -8, -6];
 export const RAIDER = [15, 0, -5, 8, -11, 0, -5, -8];
-export const CRANE = [18, 7, -16, 9, -22, 0, -16, -9, 18, -7];
+const CRANE_BARGE = [18, 7, -16, 9, -22, 0, -16, -9, 18, -7];
+export const CRANE = [78, 58, -54, 52, -64, 0, -54, -52, 58, -38];
+
+function shiftPoly(pts, dx, dy, scale = 1) {
+  const out = [];
+  for (let i = 0; i < pts.length; i += 2) out.push(pts[i] * scale + dx, pts[i + 1] * scale + dy);
+  return out;
+}
 export const DESTROYER = [
   40, 13,
   52, 6,
@@ -52,7 +59,7 @@ export class Enemy {
     this.vx = 0;
     this.vy = 0;
     this.rotation = 0;
-    this.radius = this.role === "raider" ? 13 : this.role === "destroyer" ? 56 : this.role === "crane" ? 16 : 11;
+    this.radius = this.role === "raider" ? 13 : this.role === "destroyer" ? 56 : this.role === "crane" ? 52 : 11;
     this.hp = this.role === "raider" ? raid.hits : this.role === "destroyer" ? destroyerConfig.hits : this.role === "crane" ? craneCfg.hp : castle.hunterHits;
     this.job = null;
     this.maxHp = this.hp;
@@ -132,13 +139,42 @@ export class Enemy {
   paintHull() {
     this.g.clear();
     if (this.role === "crane") {
-      strokeGlow(this.g, this.hull, this.color, this.hotColor, 1.45);
-      strokeGlow(this.g, [18, 2.4, 46, 1.2, 46, -1.2, 18, -2.4], this.color, this.hotColor, 1.2);
-      this.g.moveTo(46, 0);
-      this.g.lineTo(46, 16);
-      this.g.stroke({ width: 1.1, color: this.hotColor, cap: "round" });
-      this.g.circle(46, 18, 2.4);
-      this.g.stroke({ width: 1, color: colors.white, alpha: 0.85 });
+      const g = this.g;
+      const color = this.color;
+      const hot = this.hotColor;
+      const scale = 1.55;
+      const spread = 32;
+      strokeGlow(g, shiftPoly(CRANE_BARGE, 0, -spread, scale), color, hot, 1.5);
+      strokeGlow(g, shiftPoly(CRANE_BARGE, 0, spread, scale), color, hot, 1.5);
+      strokeGlow(g, shiftPoly([16, 2.2, -14, 3, -14, -3, 16, -2.2], 0, -spread, scale), color, hot, 1.05);
+      strokeGlow(g, shiftPoly([16, 2.2, -14, 3, -14, -3, 16, -2.2], 0, spread, scale), color, hot, 1.05);
+      for (const y of [-12, 0, 12]) strokeLine(g, [-26, y, 26, y], color, hot, 1.05);
+      for (const x of [-18, 0, 18]) strokeLine(g, [x, -28, x, 28], color, hot, 1);
+      strokeLine(g, [-26, -12, 26, 12], color, hot, 0.95);
+      strokeLine(g, [-26, 12, 26, -12], color, hot, 0.95);
+      g.circle(0, 0, 9);
+      g.stroke({ width: 2.2, color, alpha: 0.2 });
+      g.circle(0, 0, 9);
+      g.stroke({ width: 1.25, color: hot });
+      g.circle(0, 0, 4);
+      g.stroke({ width: 1, color: colors.white, alpha: 0.8 });
+      strokeLine(g, [-8, 6, 6, 58], color, hot, 1.45);
+      strokeLine(g, [8, 6, 18, 58], color, hot, 1.45);
+      strokeLine(g, [-8, 6, 8, 6], color, hot, 1.15);
+      for (let i = 1; i <= 5; i += 1) {
+        const t = i / 6;
+        strokeLine(
+          g,
+          [-8 + 14 * t, 6 + 52 * t, 8 + 10 * t, 6 + 52 * t],
+          color,
+          hot,
+          0.95,
+        );
+      }
+      strokeLine(g, [6, 58, 18, 58], color, hot, 1.35);
+      strokeLine(g, [12, 58, 12, 78], color, hot, 1.25);
+      g.circle(12, 82, 3.6);
+      g.stroke({ width: 1.2, color: colors.white, alpha: 0.9 });
       return;
     }
     if (this.role !== "destroyer") {
@@ -294,7 +330,7 @@ export class Enemy {
     const s = Math.sin(-this.rotation);
     const lx = dx * c - dy * s;
     const ly = dx * s + dy * c;
-    this.laserG.moveTo(46, 18);
+    this.laserG.moveTo(12, 82);
     this.laserG.lineTo(lx, ly);
     this.laserG.stroke({ width: 1.35, color: this.hotColor, alpha: 0.7, cap: "round" });
   }

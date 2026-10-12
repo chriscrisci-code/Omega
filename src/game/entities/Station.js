@@ -484,7 +484,7 @@ export class Station {
       if (arc.installed) continue;
       if (arc.towedBy?.alive) {
         const crane = arc.towedBy;
-        const back = 88;
+        const back = 140;
         arc.x = crane.x - Math.cos(crane.rotation) * back;
         arc.y = crane.y - Math.sin(crane.rotation) * back;
         arc.rot += arc.spin * dt * 0.25;

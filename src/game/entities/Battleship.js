@@ -178,8 +178,8 @@ export class Battleship {
       if (plate.installed) continue;
       if (plate.towedBy?.alive) {
         const crane = plate.towedBy;
-        plate.x = crane.x - Math.cos(crane.rotation) * 78;
-        plate.y = crane.y - Math.sin(crane.rotation) * 78;
+        plate.x = crane.x - Math.cos(crane.rotation) * 140;
+        plate.y = crane.y - Math.sin(crane.rotation) * 140;
         plate.rot += plate.spin * dt * 0.2;
         plate.vx = crane.vx;
         plate.vy = crane.vy;

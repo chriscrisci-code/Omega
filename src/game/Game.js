@@ -704,13 +704,13 @@ export class Game {
       const slot = job.yard.slotWorld(piece);
       if (job.phase === "goto") {
         const dist = Math.hypot(wrapDelta(piece.x - enemy.x, space.width), wrapDelta(piece.y - enemy.y, space.height));
-        if (dist < 56 && !piece.towedBy) {
+        if (dist < 90 && !piece.towedBy) {
           piece.towedBy = enemy;
           job.phase = "haul";
         }
       } else if (job.phase === "haul") {
         const dist = Math.hypot(wrapDelta(slot.x - enemy.x, space.width), wrapDelta(slot.y - enemy.y, space.height));
-        if (dist < 70) job.phase = "dock";
+        if (dist < 110) job.phase = "dock";
       } else {
         job.t += t * rate;
         if (job.t >= craneCfg.dockTime) {
@@ -724,7 +724,7 @@ export class Game {
     }
     const part = job.part;
     const dist = Math.hypot(wrapDelta(part.x - enemy.x, space.width), wrapDelta(part.y - enemy.y, space.height));
-    if (dist < 64) {
+    if (dist < 88) {
       job.t += t * rate;
       if (Math.random() < 0.12) this.fx.emit(1, { x: part.x, y: part.y, color: colors.white, speed: 40, speedVar: 20, life: 0.12, size: 3 });
       if (job.t >= craneCfg.weldTime) {

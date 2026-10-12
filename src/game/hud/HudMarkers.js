@@ -101,14 +101,21 @@ function drawGlyph(g, kind, color, hot, extras = {}) {
   }
 
   if (kind === "crane") {
-    g.rect(-8, -3, 12, 6);
-    g.stroke({ width: 1.15, color: hot });
-    g.moveTo(4, 0);
-    g.lineTo(11, 0);
-    g.lineTo(11, 7);
-    g.stroke({ width: 1.1, color: hot, cap: "round" });
-    g.circle(11, 8, 1.4);
-    g.stroke({ width: 0.9, color });
+    g.rect(-9, -7, 11, 5);
+    g.stroke({ width: 1.1, color: hot });
+    g.rect(-9, 2, 11, 5);
+    g.stroke({ width: 1.1, color: hot });
+    g.moveTo(-2, -2);
+    g.lineTo(-2, 2);
+    g.moveTo(2, -7);
+    g.lineTo(2, 7);
+    g.stroke({ width: 0.95, color });
+    g.moveTo(2, 0);
+    g.lineTo(11, 8);
+    g.lineTo(11, 11);
+    g.stroke({ width: 1.05, color: hot, cap: "round" });
+    g.circle(11, 12, 1.3);
+    g.stroke({ width: 0.85, color });
     return;
   }
 
