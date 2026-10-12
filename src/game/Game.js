@@ -1,8 +1,9 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
-import { applyDifficulty, assault, assaultShip, camera as cameraConfig, castle, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, assaultShip, battleship as battleshipCfg, camera as cameraConfig, castle, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
+import { Battleship } from "./entities/Battleship.js";
 import { Station } from "./entities/Station.js";
 import { Bullet } from "./entities/Bullet.js";
 import { EmpPulse } from "./entities/EmpPulse.js";
@@ -85,7 +86,13 @@ export class Game {
     this.bases = createBases(worldConfig.width, worldConfig.height);
     this.hub = this.bases[0];
     this.station = new Station(worldConfig.width * 0.5 + 3900, worldConfig.height * 0.5 + 3600);
+    this.battleship = new Battleship(this.station);
+    this.station.combat.addChild(this.battleship.view);
+    this.station.mount(this.vectors);
+    this.battleship.mount(this.vectors);
     this.vectors.addChildAt(this.station.view, 0);
+    this.craneWait = 0;
+    this.yardWarn = 0;
     for (const base of this.bases) this.vectors.addChild(base.view);
     this.pendingBases = [];
     this.baseUnlockIn = castle.arriveEvery;
@@ -95,7 +102,7 @@ export class Game {
       this.vectors.addChild(bullet.view);
       return bullet;
     });
-    this.hostileShots = Array.from({ length: 48 }, () => {
+    this.hostileShots = Array.from({ length: 96 }, () => {
       const bullet = new Bullet();
       this.vectors.addChild(bullet.view);
       return bullet;
@@ -419,6 +426,11 @@ export class Game {
     }
     if (!silent) this.sfx("warn");
     this.syncStation();
+    this.station.setBuild(this.assaultIndex);
+    this.battleship.setBuild(this.assaultIndex);
+    if (this.assaultIndex === 9) this.yardWarn = 6.5;
+    if (this.assaultIndex >= 7 && this.assaultIndex < 9) this.clearCranes();
+    if (this.assaultIndex === 8) this.cullRole("hunter");
   }
 
   syncStation() {
@@ -454,6 +466,28 @@ export class Game {
         hunterEvery: castle.spawnEvery,
         raidMax: Math.max(each, castles * each),
         raidEvery: castle.spawnEvery,
+        stars: true,
+      };
+    }
+    if (n === 7) {
+      return {
+        hunterGlobal: Infinity,
+        hunterPerCastle: castle.spawnMax * assault.hunterBoost,
+        hunterEvery: castle.spawnEvery / assault.hunterBoost,
+        raidMax: raid.max,
+        raidEvery: raid.every,
+        stars: false,
+      };
+    }
+    if (n === 8) {
+      return {
+        hunterGlobal: 0,
+        hunterPerCastle: 0,
+        hunterEvery: 99,
+        raidMax: raid.max,
+        raidEvery: raid.every,
+        stars: true,
+        starEvery: castle.starEvery / assault.starBoost,
       };
     }
     return {
@@ -462,6 +496,7 @@ export class Game {
       hunterEvery: castle.spawnEvery,
       raidMax: raid.max,
       raidEvery: raid.every,
+      stars: true,
     };
   }
 
@@ -480,6 +515,7 @@ export class Game {
 
   tickCastleWatch(t, space) {
     if (!this.ship.alive || this.input.mapHeld) return;
+    if ((this.assaultPlan().hunterPerCastle || 0) <= 0) return;
     const reach = this.viewRadius();
     for (const base of this.bases) {
       if (base.hub || !base.alive) continue;
@@ -503,7 +539,7 @@ export class Game {
   tickDestroyerLasers(t, space) {
     for (const enemy of this.enemies) {
       if (!enemy.alive || enemy.role !== "destroyer") {
-        enemy.laserG?.clear();
+        if (enemy.role !== "crane") enemy.laserG?.clear();
         continue;
       }
       if (enemy.stunned > 0 || this.mode !== PLAYING) {
@@ -571,6 +607,148 @@ export class Game {
     this.enemies.push(enemy);
     this.vectors.addChild(enemy.view);
     return enemy;
+  }
+
+  craneCount() {
+    return this.enemies.filter((enemy) => enemy.alive && enemy.role === "crane").length;
+  }
+
+  craneWanted() {
+    if (!this.station.awake || this.attractOnDemo) return 0;
+    const n = this.assaultIndex;
+    if (n === 5 && !this.station.built) return craneCfg.wave5Count;
+    if (n === 6 && !this.station.built) return craneCfg.wave6Count;
+    if (n >= battleshipCfg.fromWave && this.battleship.building) return craneCfg.wave9Count;
+    return 0;
+  }
+
+  craneRate() {
+    const n = this.assaultIndex;
+    if (n === 6) return craneCfg.wave6Rate;
+    if (n >= battleshipCfg.fromWave) return craneCfg.wave9Rate;
+    return craneCfg.wave5Rate;
+  }
+
+  spawnCrane() {
+    const st = this.station;
+    const angle = rand(0, Math.PI * 2);
+    const reach = 320 + rand(0, 90);
+    const enemy = new Enemy(
+      wrapCoord(st.x + Math.cos(angle) * reach, worldConfig.width),
+      wrapCoord(st.y + Math.sin(angle) * reach, worldConfig.height),
+      st,
+      st.color,
+      { role: "crane" },
+    );
+    this.enemies.push(enemy);
+    this.vectors.addChild(enemy.view);
+    return enemy;
+  }
+
+  clearCranes() {
+    for (const enemy of [...this.enemies]) {
+      if (enemy.role !== "crane") continue;
+      this.station.dropTow(enemy);
+      this.battleship.dropTow(enemy);
+      enemy.destroy();
+      this.enemies.splice(this.enemies.indexOf(enemy), 1);
+    }
+  }
+
+  cullRole(role) {
+    for (const enemy of [...this.enemies]) {
+      if (enemy.role !== role) continue;
+      enemy.destroy();
+      this.enemies.splice(this.enemies.indexOf(enemy), 1);
+    }
+  }
+
+  pickYardJob(crane) {
+    const claimed = new Set();
+    for (const other of this.enemies) {
+      if (!other.alive || other.role !== "crane" || other === crane || !other.job) continue;
+      if (other.job.piece) claimed.add(other.job.piece);
+      if (other.job.part) claimed.add(other.job.part);
+    }
+    if (this.assaultIndex >= battleshipCfg.fromWave && this.battleship.building) {
+      const plate = this.battleship.loosePlates().find((item) => !item.towedBy && !claimed.has(item));
+      if (plate) return { kind: "tow", piece: plate, yard: this.battleship, phase: "goto", t: 0 };
+      return null;
+    }
+    const arc = this.station.looseArcs().find((item) => !item.towedBy && !claimed.has(item));
+    if (arc) return { kind: "tow", piece: arc, yard: this.station, phase: "goto", t: 0 };
+    const part = this.station.weldJobs().find((item) => !claimed.has(item));
+    if (part) return { kind: "weld", part, t: 0 };
+    return null;
+  }
+
+  craneAim(enemy, space) {
+    const job = enemy.job;
+    if (job?.kind === "tow" && job.piece) {
+      if (job.phase === "goto") return job.piece;
+      return job.yard.slotWorld(job.piece);
+    }
+    if (job?.kind === "weld" && job.part) return job.part;
+    return this.station;
+  }
+
+  runCraneJob(enemy, t, space) {
+    if (!enemy.job || (enemy.job.piece && enemy.job.piece.installed) || (enemy.job.part && enemy.job.part.welded)) {
+      enemy.job = this.pickYardJob(enemy);
+    }
+    const job = enemy.job;
+    if (!job) return;
+    const rate = this.craneRate();
+    if (job.kind === "tow") {
+      const piece = job.piece;
+      const slot = job.yard.slotWorld(piece);
+      if (job.phase === "goto") {
+        const dist = Math.hypot(wrapDelta(piece.x - enemy.x, space.width), wrapDelta(piece.y - enemy.y, space.height));
+        if (dist < 56 && !piece.towedBy) {
+          piece.towedBy = enemy;
+          job.phase = "haul";
+        }
+      } else if (job.phase === "haul") {
+        const dist = Math.hypot(wrapDelta(slot.x - enemy.x, space.width), wrapDelta(slot.y - enemy.y, space.height));
+        if (dist < 70) job.phase = "dock";
+      } else {
+        job.t += t * rate;
+        if (job.t >= craneCfg.dockTime) {
+          if (job.yard === this.battleship) job.yard.seat(piece);
+          else job.yard.seatArc(piece);
+          enemy.job = null;
+          this.fx.burst(slot.x, slot.y, this.station.color, 10, 90);
+        }
+      }
+      return;
+    }
+    const part = job.part;
+    const dist = Math.hypot(wrapDelta(part.x - enemy.x, space.width), wrapDelta(part.y - enemy.y, space.height));
+    if (dist < 64) {
+      job.t += t * rate;
+      if (Math.random() < 0.12) this.fx.emit(1, { x: part.x, y: part.y, color: colors.white, speed: 40, speedVar: 20, life: 0.12, size: 3 });
+      if (job.t >= craneCfg.weldTime) {
+        this.station.setPartLive(part, true);
+        enemy.job = null;
+        this.fx.burst(part.x, part.y, this.station.hotColor, 8, 70);
+      }
+    }
+  }
+
+  tickCranes(t, space) {
+    const want = this.craneWanted();
+    if (this.craneCount() > want) this.clearCranes();
+    if (want > 0 && this.craneCount() < want) {
+      this.craneWait -= t;
+      if (this.craneWait <= 0) {
+        this.spawnCrane();
+        this.craneWait = this.craneCount() < want ? 1.2 : craneCfg.respawn;
+      }
+    } else this.craneWait = craneCfg.respawn;
+    for (const enemy of this.enemies) {
+      if (enemy.role !== "crane" || !enemy.alive) continue;
+      this.runCraneJob(enemy, t, space);
+    }
   }
 
   spawnRaider(base) {
@@ -774,7 +952,8 @@ export class Game {
     this.lockCam.clear();
     this.hangar.view.visible = false;
     this.pips.view.visible = true;
-    this.station.reset();
+    this.station.reset(this.assaultIndex);
+    this.battleship.setBuild(this.assaultIndex, true);
     this.syncStation();
     this.hud.setHubAlert(null);
     this.hud.setOre(this.cargo, this.hub.ore, this.hub.upgradeName());
@@ -2692,7 +2871,11 @@ export class Game {
       life: 0.9,
     });
     this.fx.burst(enemy.x, enemy.y, enemy.color, 12, 150);
-    this.addScore(enemy.role === "raider" ? 150 : enemy.role === "destroyer" ? 250 : 75);
+    if (enemy.role === "crane") {
+      this.station.dropTow(enemy);
+      this.battleship.dropTow(enemy);
+    }
+    this.addScore(enemy.role === "raider" ? 150 : enemy.role === "destroyer" ? 250 : enemy.role === "crane" ? craneCfg.score : 75);
     this.noteKill();
     this.addXp(via === "emp" ? xpAwards.killEmp : via === "missile" ? xpAwards.killMissile : xpAwards.killGun);
     this.shake = Math.max(this.shake, 4);
@@ -2894,7 +3077,8 @@ export class Game {
       life: castle.starLife,
       radius: castle.starRadius,
     });
-    base.missileCool = castle.starEvery + rand(-1.2, 1.6);
+    const every = this.assaultPlan().starEvery ?? castle.starEvery;
+    base.missileCool = every + rand(-every * 0.2, every * 0.25);
   }
 
   sparkShield(x, y, cost, host = this.ship) {
@@ -3239,6 +3423,13 @@ export class Game {
     if (this.station.awake) {
       this.placeView(this.station, space.width, space.height);
       this.station.tickParallax(this.camX, this.camY, space, mapping);
+      for (const piece of [...this.station.looseArcs(), ...this.battleship.loosePlates()]) {
+        piece.graphic.visible = !mapping;
+        if (!mapping) {
+          this.placeView({ view: piece.graphic, x: piece.x, y: piece.y }, space.width, space.height);
+          piece.graphic.rotation = piece.rot;
+        }
+      }
     }
     for (const enemy of this.enemies) {
       enemy.view.scale.set(foeBoost);
@@ -3268,7 +3459,7 @@ export class Game {
     this.drawLock();
     this.drawLead(mapping);
     if (this.lockMark.visible) {
-      const shipLike = this.selected?.kind === "enemy" || this.selected?.kind === "raider" || this.selected?.kind === "destroyer";
+      const shipLike = this.selected?.kind === "enemy" || this.selected?.kind === "raider" || this.selected?.kind === "destroyer" || this.selected?.kind === "crane";
       this.lockMark.scale.set(mapping && shipLike ? 14 : 1);
     }
 
@@ -3487,7 +3678,8 @@ export class Game {
             : this.assaultRest
               ? "CLEAR"
               : `WAVE  ${this.assaultIndex}`;
-      this.hud.setMode(this.saveFlash > 0 ? "SAVED" : modeLabel);
+      if (this.yardWarn > 0) this.yardWarn = Math.max(0, this.yardWarn - t);
+      this.hud.setMode(this.saveFlash > 0 ? "SAVED" : this.yardWarn > 0 ? "BATTLESHIP BEING BUILT" : modeLabel);
     } else if (this.mode === DYING) {
       this.leaveHubSeat();
       this.hud.hideDock();
@@ -3582,13 +3774,19 @@ export class Game {
         this.tickCastleWatch(t, space);
       }
 
+      this.tickCranes(t, space);
       for (const enemy of this.enemies) {
+        if (enemy.role === "crane") {
+          enemy.update(t, this.craneAim(enemy, space), space, false);
+          continue;
+        }
         const prey = this.pickHunt(enemy, space) || this.ship;
         enemy.hunt = prey;
         enemy.update(t, prey, space, this.aimedAt(enemy, space));
         if (enemy.wantsShot(prey, space)) this.fireHostile(enemy);
       }
       this.tickStation(t, space);
+      this.battleship.tickLoose(t, space);
       this.tickDestroyerLasers(t, space);
       if (this.hub.alive && this.hub.armed) {
         this.hub.missileCool = Math.max(0, this.hub.missileCool - t);
@@ -3603,7 +3801,7 @@ export class Game {
           if (this.hub.missileCool <= 0) this.fireHubMissile(prey, space);
         }
       }
-      if (this.castlesArmed && !this.assaultRest && (this.mode === PLAYING || this.attractOnDemo) && this.ship.alive) {
+      if (this.castlesArmed && !this.assaultRest && (this.mode === PLAYING || this.attractOnDemo) && this.ship.alive && this.assaultPlan().stars !== false) {
         for (const base of this.bases) {
           if (base.hub || !base.alive || !base.armed) continue;
           base.missileCool = Math.max(0, base.missileCool - t);

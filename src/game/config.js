@@ -108,6 +108,7 @@ export const hudFilters = {
   enemy: true,
   raider: true,
   destroyer: true,
+  crane: true,
   station: true,
 };
 
@@ -202,7 +203,7 @@ export const castle = {
   starTurn: 1.65,
   starLife: 22,
   starEvery: 6.4,
-  starMax: 16,
+  starMax: 48,
   starRadius: 7,
 };
 
@@ -245,9 +246,30 @@ export const assault = {
   w1RaidMax: 12,
   w1RaidEvery: 5.2,
   w2PerCastle: 2,
+  hunterBoost: 10,
+  starBoost: 10,
 };
 
-/** Wave 5 enemy station. Hull stays; guns and ring modules can die. */
+/** Unarmed yard tugs. Waves 5–6 assemble the station; wave 9 a battleship. */
+export const crane = {
+  hp: 4,
+  speed: 96,
+  turn: 1.35,
+  towSpeed: 48,
+  hold: 70,
+  wave5Count: 2,
+  wave6Count: 3,
+  wave9Count: 3,
+  wave5Rate: 1,
+  wave6Rate: 1.7,
+  wave9Rate: 1,
+  respawn: 20,
+  dockTime: 7.5,
+  weldTime: 10,
+  score: 100,
+};
+
+/** Wave 5 enemy station. Half the ring starts loose; hull stays once built. */
 export const station = {
   fromWave: 5,
   hub: 220,
@@ -267,6 +289,14 @@ export const station = {
   scale: [0.86, 0.7],
   parallax: [0.84, 0.68],
   shift: [70, 95],
+};
+
+/** Wave 9 scaffold on the station. Construction only. */
+export const battleship = {
+  fromWave: 9,
+  plates: 6,
+  startPlates: 2,
+  score: 0,
 };
 
 export const ore = {

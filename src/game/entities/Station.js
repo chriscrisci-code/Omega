@@ -1,6 +1,6 @@
 import { Container, Graphics } from "pixi.js";
 import { colors, station as cfg } from "../config.js";
-import { wrapDelta } from "../math.js";
+import { wrap, wrapDelta } from "../math.js";
 import { strokeGlow, strokeLine } from "../render/textures.js";
 
 function ringPts(sides, radius, turn = 0) {
@@ -138,15 +138,8 @@ function paintDeck(g, color, hot, width, kind) {
       return;
     }
     paintSpokes(g, hub, ring, spokes);
+    if (kind === "top") return;
     paintRing(g, ring);
-    if (kind === "top") {
-      for (let i = 0; i < spokes; i += 1) {
-        const a = (i / spokes) * Math.PI * 2 + Math.PI / spokes;
-        const dist = ring + (i % 2 === 0 ? 58 : 34);
-        hangarAt(g, Math.cos(a) * dist, Math.sin(a) * dist, a, i % 2 === 0 ? 1 : 0.52);
-      }
-      return;
-    }
     for (let i = 0; i < 16; i += 1) {
       const a = (i / 16) * Math.PI * 2 + 0.07;
       boxAt(g, Math.cos(a) * (ring + 36), Math.sin(a) * (ring + 36), a, 18, 10);
@@ -159,6 +152,41 @@ function paintDeck(g, color, hot, width, kind) {
   strokeGlow(g, ringPts(8, hub), color, hot, width * 1.2);
   strokeGlow(g, ringPts(6, hub * 0.64, Math.PI / 6), color, hot, width);
   strokeGlow(g, ringPts(4, hub * 0.28, Math.PI / 4), colors.white, colors.white, width * 0.9);
+}
+
+function arcMid(slot) {
+  return ((slot + 0.5) / cfg.spokes) * Math.PI * 2;
+}
+
+function paintArc(g, color, hot, width, slot, origin) {
+  g.clear();
+  const ring = cfg.ring;
+  const a0 = (slot / cfg.spokes) * Math.PI * 2;
+  const a1 = ((slot + 1) / cfg.spokes) * Math.PI * 2;
+  const mid = arcMid(slot);
+  const ox = origin === "mid" ? Math.cos(mid) * ring : 0;
+  const oy = origin === "mid" ? Math.sin(mid) * ring : 0;
+  const steps = 8;
+  const draw = () => {
+    for (const r of [ring - 44, ring - 22, ring, ring + 22]) {
+      g.moveTo(Math.cos(a0) * r - ox, Math.sin(a0) * r - oy);
+      for (let i = 1; i <= steps; i += 1) {
+        const a = a0 + (a1 - a0) * (i / steps);
+        g.lineTo(Math.cos(a) * r - ox, Math.sin(a) * r - oy);
+      }
+    }
+    for (let i = 0; i <= steps; i += 1) {
+      const a = a0 + (a1 - a0) * (i / steps);
+      g.moveTo(Math.cos(a) * (ring - 44) - ox, Math.sin(a) * (ring - 44) - oy);
+      g.lineTo(Math.cos(a) * (ring + 22) - ox, Math.sin(a) * (ring + 22) - oy);
+    }
+    const dist = ring + (slot % 2 === 0 ? 58 : 34);
+    hangarAt(g, Math.cos(mid) * dist - ox, Math.sin(mid) * dist - oy, mid, slot % 2 === 0 ? 1 : 0.52);
+  };
+  draw();
+  g.stroke({ width: width * 3, color, alpha: 0.16, cap: "round", join: "round" });
+  draw();
+  g.stroke({ width, color: hot, alpha: 0.92, cap: "round", join: "round" });
 }
 
 export class Station {
@@ -193,10 +221,42 @@ export class Station {
     this.combat.addChild(this.lattice);
     this.view.addChild(this.depth2, this.depth1, this.combat);
     this.view.visible = false;
+    this.worldLayer = null;
+    this.built = false;
 
     this.guns = [];
     this.modules = [];
+    this.arcs = [];
+    this.buildArcs();
     this.buildParts();
+  }
+
+  mount(layer) {
+    this.worldLayer = layer;
+  }
+
+  buildArcs() {
+    for (let i = 0; i < cfg.spokes; i += 1) {
+      const g = new Graphics();
+      paintArc(g, this.color, this.hotColor, 1.15, i, "hub");
+      this.combat.addChild(g);
+      const mid = arcMid(i);
+      this.arcs.push({
+        slot: i,
+        mid,
+        lx: Math.cos(mid) * cfg.ring,
+        ly: Math.sin(mid) * cfg.ring,
+        graphic: g,
+        installed: true,
+        towedBy: null,
+        x: this.x,
+        y: this.y,
+        rot: 0,
+        vx: 0,
+        vy: 0,
+        spin: 0,
+      });
+    }
   }
 
   buildParts() {
@@ -205,23 +265,23 @@ export class Station {
     const inner = cfg.hub + 52;
     for (let i = 0; i < cfg.spokes; i += 1) {
       const angle = (i / cfg.spokes) * Math.PI * 2;
-      this.addGun(Math.cos(angle) * ring, Math.sin(angle) * ring, angle, "ring");
+      this.addGun(Math.cos(angle) * ring, Math.sin(angle) * ring, angle, "ring", { spoke: i, needsArc: true });
       if (i % 2 === 0) {
-        this.addGun(Math.cos(angle) * (cfg.hub + 10), Math.sin(angle) * (cfg.hub + 10), angle, "hub");
+        this.addGun(Math.cos(angle) * (cfg.hub + 10), Math.sin(angle) * (cfg.hub + 10), angle, "hub", { spoke: i, needsArc: false });
       }
       const bay = angle + Math.PI / cfg.spokes;
-      this.addModule(Math.cos(bay) * (ring + 58), Math.sin(bay) * (ring + 58), bay, 108, 64);
-      this.addModule(Math.cos(bay) * (ring + 8), Math.sin(bay) * (ring + 8), bay, 56, 32);
-      this.addModule(Math.cos(bay) * (ring - 78), Math.sin(bay) * (ring - 78), bay, 48, 28);
-      this.addModule(Math.cos(angle) * mid, Math.sin(angle) * mid, angle, 38, 22);
-      this.addModule(Math.cos(angle) * (mid + 150), Math.sin(angle) * (mid + 150), angle, 30, 18);
-      this.addModule(Math.cos(angle) * inner, Math.sin(angle) * inner, angle, 28, 18);
+      this.addModule(Math.cos(bay) * (ring + 58), Math.sin(bay) * (ring + 58), bay, 108, 64, { spoke: i, needsArc: true, startWelded: false });
+      this.addModule(Math.cos(bay) * (ring + 8), Math.sin(bay) * (ring + 8), bay, 56, 32, { spoke: i, needsArc: true, startWelded: i % 2 === 0 });
+      this.addModule(Math.cos(bay) * (ring - 78), Math.sin(bay) * (ring - 78), bay, 48, 28, { spoke: i, needsArc: true, startWelded: i % 2 === 0 });
+      this.addModule(Math.cos(angle) * mid, Math.sin(angle) * mid, angle, 38, 22, { spoke: i, needsArc: false, startWelded: i % 2 === 0 });
+      this.addModule(Math.cos(angle) * (mid + 150), Math.sin(angle) * (mid + 150), angle, 30, 18, { spoke: i, needsArc: false, startWelded: true });
+      this.addModule(Math.cos(angle) * inner, Math.sin(angle) * inner, angle, 28, 18, { spoke: i, needsArc: false, startWelded: true });
       if (i % 2 === 0) {
-        this.addModule(Math.cos(bay) * (ring + 118), Math.sin(bay) * (ring + 118), bay, 76, 42);
-        this.addModule(Math.cos(bay + 0.14) * (ring + 74), Math.sin(bay + 0.14) * (ring + 74), bay, 40, 24);
-        this.addModule(Math.cos(bay - 0.14) * (ring + 74), Math.sin(bay - 0.14) * (ring + 74), bay, 40, 24);
+        this.addModule(Math.cos(bay) * (ring + 118), Math.sin(bay) * (ring + 118), bay, 76, 42, { spoke: i, needsArc: true, startWelded: false });
+        this.addModule(Math.cos(bay + 0.14) * (ring + 74), Math.sin(bay + 0.14) * (ring + 74), bay, 40, 24, { spoke: i, needsArc: true, startWelded: false });
+        this.addModule(Math.cos(bay - 0.14) * (ring + 74), Math.sin(bay - 0.14) * (ring + 74), bay, 40, 24, { spoke: i, needsArc: true, startWelded: false });
       } else {
-        this.addModule(Math.cos(bay) * (ring + 96), Math.sin(bay) * (ring + 96), bay, 62, 34);
+        this.addModule(Math.cos(bay) * (ring + 96), Math.sin(bay) * (ring + 96), bay, 62, 34, { spoke: i, needsArc: true, startWelded: false });
       }
     }
   }
@@ -241,7 +301,7 @@ export class Station {
     return part;
   }
 
-  addGun(lx, ly, angle, seat) {
+  addGun(lx, ly, angle, seat, extra = {}) {
     const g = new Graphics();
     paintTurret(g);
     g.position.set(lx, ly);
@@ -259,13 +319,15 @@ export class Station {
           hp: cfg.gunHits,
           maxHp: cfg.gunHits,
           cool: Math.random() * cfg.gunCool,
+          welded: true,
+          ...extra,
         },
         { name: "GUN", part: "gun" },
       ),
     );
   }
 
-  addModule(lx, ly, angle, w, h) {
+  addModule(lx, ly, angle, w, h, extra = {}) {
     const g = new Graphics();
     strokeGlow(g, boxPts(w, h), this.color, this.hotColor, 1.05);
     strokeLine(g, [-w * 0.28, -h * 0.22, w * 0.28, -h * 0.22, w * 0.28, h * 0.22, -w * 0.28, h * 0.22], this.color, colors.white, 0.75);
@@ -281,6 +343,8 @@ export class Station {
           radius: Math.max(w, h) * 0.48,
           hp: cfg.moduleHits,
           maxHp: cfg.moduleHits,
+          welded: extra.startWelded !== false,
+          ...extra,
         },
         { name: "MOD", part: "module" },
       ),
@@ -310,7 +374,132 @@ export class Station {
   }
 
   parts() {
-    return [...this.guns, ...this.modules].filter((part) => part.alive);
+    return [...this.guns, ...this.modules].filter((part) => part.alive && part.welded);
+  }
+
+  slotWorld(arc) {
+    return this.localToWorld(arc.lx, arc.ly);
+  }
+
+  paintArcGraphic(arc, origin) {
+    paintArc(arc.graphic, this.color, this.hotColor, 1.15, arc.slot, origin);
+  }
+
+  seatArc(arc) {
+    arc.installed = true;
+    arc.towedBy = null;
+    arc.vx = 0;
+    arc.vy = 0;
+    arc.spin = 0;
+    this.combat.addChild(arc.graphic);
+    arc.graphic.position.set(0, 0);
+    arc.graphic.rotation = 0;
+    this.paintArcGraphic(arc, "hub");
+    this.applyArcParts(arc.slot, true);
+  }
+
+  releaseArc(arc, space) {
+    const at = this.slotWorld(arc);
+    const out = 240;
+    arc.installed = false;
+    arc.towedBy = null;
+    arc.x = at.x + Math.cos(arc.mid + this.rotation) * out;
+    arc.y = at.y + Math.sin(arc.mid + this.rotation) * out;
+    arc.rot = this.rotation;
+    arc.vx = Math.cos(arc.mid + this.rotation) * 12;
+    arc.vy = Math.sin(arc.mid + this.rotation) * 12;
+    arc.spin = (arc.slot % 2 === 0 ? 1 : -1) * 0.08;
+    this.paintArcGraphic(arc, "mid");
+    this.worldLayer?.addChild(arc.graphic);
+    arc.graphic.position.set(arc.x, arc.y);
+    arc.graphic.rotation = arc.rot;
+    this.applyArcParts(arc.slot, false);
+    if (space) wrap(arc, space.width, space.height);
+  }
+
+  applyArcParts(spoke, installed) {
+    for (const part of [...this.guns, ...this.modules]) {
+      if (part.spoke !== spoke || !part.needsArc) continue;
+      const on = installed && part.welded;
+      part.alive = on;
+      part.graphic.visible = on;
+      if (on) part.hp = part.maxHp;
+    }
+  }
+
+  setPartLive(part, on) {
+    part.welded = on;
+    const arcOk = !part.needsArc || this.arcs[part.spoke]?.installed;
+    part.alive = on && arcOk;
+    part.graphic.visible = part.alive;
+    if (part.alive) part.hp = part.maxHp;
+  }
+
+  unfinished() {
+    this.built = false;
+    for (const part of [...this.guns, ...this.modules]) {
+      part.welded = part.startWelded !== false;
+      if (part.needsArc && part.spoke % 2 !== 0) part.welded = false;
+    }
+    for (const arc of this.arcs) {
+      if (arc.slot % 2 === 0) this.seatArc(arc);
+      else this.releaseArc(arc);
+    }
+  }
+
+  complete() {
+    this.built = true;
+    for (const arc of this.arcs) this.seatArc(arc);
+    for (const part of [...this.guns, ...this.modules]) this.setPartLive(part, true);
+  }
+
+  setBuild(wave, force = false) {
+    if (wave >= 7) this.complete();
+    else if (wave >= 5 && (force || !this.awake)) this.unfinished();
+  }
+
+  looseArcs() {
+    return this.arcs.filter((arc) => !arc.installed);
+  }
+
+  weldJobs() {
+    return [...this.guns, ...this.modules].filter((part) => {
+      if (part.welded) return false;
+      if (part.needsArc && !this.arcs[part.spoke]?.installed) return false;
+      return true;
+    });
+  }
+
+  dropTow(crane) {
+    for (const arc of this.arcs) {
+      if (arc.towedBy !== crane) continue;
+      arc.towedBy = null;
+      arc.vx += Math.cos(crane.rotation) * 40;
+      arc.vy += Math.sin(crane.rotation) * 40;
+    }
+  }
+
+  tickLoose(dt, space) {
+    for (const arc of this.arcs) {
+      if (arc.installed) continue;
+      if (arc.towedBy?.alive) {
+        const crane = arc.towedBy;
+        const back = 88;
+        arc.x = crane.x - Math.cos(crane.rotation) * back;
+        arc.y = crane.y - Math.sin(crane.rotation) * back;
+        arc.rot += arc.spin * dt * 0.25;
+        arc.vx = crane.vx;
+        arc.vy = crane.vy;
+      } else {
+        arc.towedBy = null;
+        arc.x += arc.vx * dt;
+        arc.y += arc.vy * dt;
+        arc.rot += arc.spin * dt;
+        arc.vx *= 0.992;
+        arc.vy *= 0.992;
+      }
+      wrap(arc, space.width, space.height);
+    }
   }
 
   sleep() {
@@ -324,21 +513,18 @@ export class Station {
     this.view.visible = true;
   }
 
-  reset() {
+  reset(wave = 1) {
+    this.rotation = 0;
     for (const gun of this.guns) {
-      gun.alive = true;
       gun.hp = gun.maxHp;
       gun.cool = Math.random() * cfg.gunCool;
-      gun.graphic.visible = true;
       gun.graphic.alpha = 1;
     }
     for (const mod of this.modules) {
-      mod.alive = true;
       mod.hp = mod.maxHp;
-      mod.graphic.visible = true;
       mod.graphic.alpha = 1;
     }
-    this.rotation = 0;
+    this.setBuild(wave, true);
   }
 
   tickParallax(camX, camY, space, frozen = false) {
@@ -361,6 +547,7 @@ export class Station {
     if (!this.awake) return;
     this.rotation += cfg.spin * dt;
     this.view.rotation = this.rotation;
+    this.tickLoose(dt, space);
     this.syncParts();
     if (!ship?.alive) return;
     for (const gun of this.guns) {

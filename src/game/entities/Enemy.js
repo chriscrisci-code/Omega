@@ -1,10 +1,11 @@
 import { Container, Graphics } from "pixi.js";
-import { castle, colors, destroyer as destroyerConfig, raid } from "../config.js";
+import { castle, colors, crane as craneCfg, destroyer as destroyerConfig, raid } from "../config.js";
 import { turnToward, wrap, wrapDelta } from "../math.js";
 import { strokeGlow, strokeLine } from "../render/textures.js";
 
 export const HUNTER = [12, 0, -8, 6, -4, 0, -8, -6];
 export const RAIDER = [15, 0, -5, 8, -11, 0, -5, -8];
+export const CRANE = [18, 7, -16, 9, -22, 0, -16, -9, 18, -7];
 export const DESTROYER = [
   40, 13,
   52, 6,
@@ -33,6 +34,7 @@ const DESTROYER_LINES = [
 function roleOf(options) {
   if (options.role === "raider") return "raider";
   if (options.role === "destroyer") return "destroyer";
+  if (options.role === "crane") return "crane";
   return "hunter";
 }
 
@@ -42,16 +44,17 @@ export class Enemy {
     this.color = color;
     this.hotColor = home.hotColor;
     this.role = roleOf(options);
-    this.kind = this.role === "raider" ? "raider" : this.role === "destroyer" ? "destroyer" : "enemy";
-    this.name = this.role === "raider" ? "RAIDER" : this.role === "destroyer" ? "DESTROYER" : "HUNTER";
-    this.hull = this.role === "raider" ? RAIDER : this.role === "destroyer" ? DESTROYER : HUNTER;
+    this.kind = this.role === "raider" ? "raider" : this.role === "destroyer" ? "destroyer" : this.role === "crane" ? "crane" : "enemy";
+    this.name = this.role === "raider" ? "RAIDER" : this.role === "destroyer" ? "DESTROYER" : this.role === "crane" ? "CRANE" : "HUNTER";
+    this.hull = this.role === "raider" ? RAIDER : this.role === "destroyer" ? DESTROYER : this.role === "crane" ? CRANE : HUNTER;
     this.x = x;
     this.y = y;
     this.vx = 0;
     this.vy = 0;
     this.rotation = 0;
-    this.radius = this.role === "raider" ? 13 : this.role === "destroyer" ? 56 : 11;
-    this.hp = this.role === "raider" ? raid.hits : this.role === "destroyer" ? destroyerConfig.hits : castle.hunterHits;
+    this.radius = this.role === "raider" ? 13 : this.role === "destroyer" ? 56 : this.role === "crane" ? 16 : 11;
+    this.hp = this.role === "raider" ? raid.hits : this.role === "destroyer" ? destroyerConfig.hits : this.role === "crane" ? craneCfg.hp : castle.hunterHits;
+    this.job = null;
     this.maxHp = this.hp;
     this.cooldown = this.role === "raider" ? 0.9 : this.role === "destroyer" ? 1.25 : 0.6;
     this.ramCool = 0;
@@ -128,6 +131,16 @@ export class Enemy {
 
   paintHull() {
     this.g.clear();
+    if (this.role === "crane") {
+      strokeGlow(this.g, this.hull, this.color, this.hotColor, 1.45);
+      strokeGlow(this.g, [18, 2.4, 46, 1.2, 46, -1.2, 18, -2.4], this.color, this.hotColor, 1.2);
+      this.g.moveTo(46, 0);
+      this.g.lineTo(46, 16);
+      this.g.stroke({ width: 1.1, color: this.hotColor, cap: "round" });
+      this.g.circle(46, 18, 2.4);
+      this.g.stroke({ width: 1, color: colors.white, alpha: 0.85 });
+      return;
+    }
     if (this.role !== "destroyer") {
       strokeGlow(this.g, this.hull, this.color, this.hotColor, this.role === "raider" ? 1.55 : 1.4);
       return;
@@ -210,11 +223,12 @@ export class Enemy {
     const dy = wrapDelta(target.y - this.y, space.height);
     const dist = Math.hypot(dx, dy) || 1;
     const toTarget = Math.atan2(dy, dx);
-    const turn = this.role === "raider" ? 2.2 : this.role === "destroyer" ? destroyerConfig.turn : 2.8;
-    const hold = this.role === "raider" ? 210 : this.role === "destroyer" ? 420 : 220;
-    const chase = this.role === "raider" ? 400 : this.role === "destroyer" ? 170 : 320;
-    const back = this.role === "raider" ? 220 : this.role === "destroyer" ? 90 : 260;
-    const cap = this.role === "raider" ? 400 : this.role === "destroyer" ? 110 : 340;
+    const turn = this.role === "raider" ? 2.2 : this.role === "destroyer" ? destroyerConfig.turn : this.role === "crane" ? craneCfg.turn : 2.8;
+    const craneHold = this.job?.kind === "weld" || this.job?.phase === "haul" || this.job?.phase === "dock" ? 22 : craneCfg.hold;
+    const hold = this.role === "raider" ? 210 : this.role === "destroyer" ? 420 : this.role === "crane" ? craneHold : 220;
+    const chase = this.role === "raider" ? 400 : this.role === "destroyer" ? 170 : this.role === "crane" ? craneCfg.speed : 320;
+    const back = this.role === "raider" ? 220 : this.role === "destroyer" ? 90 : this.role === "crane" ? 40 : 260;
+    const cap = this.role === "raider" ? 400 : this.role === "destroyer" ? 110 : this.role === "crane" ? craneCfg.speed : 340;
     let ax = 0;
     let ay = 0;
     if (this.role === "destroyer") {
@@ -239,7 +253,7 @@ export class Enemy {
       }
     }
 
-    if (aimedAt && this.role !== "destroyer") {
+    if (aimedAt && this.role !== "destroyer" && this.role !== "crane") {
       if (this.dodgeUntil <= 0) {
         this.dodgeSign *= -1;
         this.dodgeUntil = 0.28 + Math.random() * 0.2;
@@ -267,9 +281,26 @@ export class Enemy {
     this.ramCool = Math.max(0, this.ramCool - dt);
     this.view.rotation = this.rotation;
     this.tickFlashes(dt);
+    this.paintCable(target, space);
+  }
+
+  paintCable(target, space) {
+    this.laserG.clear();
+    if (this.role !== "crane" || !this.job?.piece || this.job.piece.towedBy !== this) return;
+    const piece = this.job.piece;
+    const dx = wrapDelta(piece.x - this.x, space.width);
+    const dy = wrapDelta(piece.y - this.y, space.height);
+    const c = Math.cos(-this.rotation);
+    const s = Math.sin(-this.rotation);
+    const lx = dx * c - dy * s;
+    const ly = dx * s + dy * c;
+    this.laserG.moveTo(46, 18);
+    this.laserG.lineTo(lx, ly);
+    this.laserG.stroke({ width: 1.35, color: this.hotColor, alpha: 0.7, cap: "round" });
   }
 
   wantsShot(target, space) {
+    if (this.role === "crane") return false;
     if (this.stunned > 0 || this.cooldown > 0 || !target) return false;
     const dx = wrapDelta(target.x - this.x, space.width);
     const dy = wrapDelta(target.y - this.y, space.height);
