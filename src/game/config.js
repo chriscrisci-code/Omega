@@ -350,26 +350,7 @@ export const bloom = {
 
 export const extraLifeEvery = 10000;
 
-/** Assault kit. AI guns fire with no turret art. No DSF 22 nose cannon. */
-export const assaultShip = {
-  shieldMul: 2,
-  hullHits: 3,
-  hullIFrames: 0.55,
-  speedMul: 0.5,
-  empCap: 3,
-  turretCool: 0.44,
-  turretRange: 780,
-  turretTurn: 4.4,
-  turretAim: 0.28,
-  turretHits: 3,
-  wingHullHits: 2,
-  wingSide: 164,
-  wingAlong: 8,
-  wingLag: 86,
-  wingLead: 32,
-  wingDelayMin: 0.2,
-  wingDelayMax: 1.5,
-};
+/** Ship stats and specials live in ships/kits.js. */
 
 /** Career XP. Persists across Continue and new runs. Not run score. */
 export const xp = {

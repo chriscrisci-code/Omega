@@ -57,6 +57,19 @@ export const SHIP_CATALOG = [
     details: [[-3, -8, 3, -8, 3, 6, -3, 6]],
   },
   {
+    id: "SABRE",
+    name: "SABRE",
+    hulls: [
+      [
+        0, -86, 7, -70, 12, -50, 15, -30, 16, -14, 30, -12, 30, -4, 44, 0, 44, 12, 56, 12, 56, 22, 40, 24, 22, 28, 18, 36,
+        26, 42, 26, 56, 34, 62, 14, 66, 14, 46, -14, 46, -14, 66, -34, 62, -26, 56, -26, 42, -18, 36, -22, 28, -40, 24,
+        -56, 22, -56, 12, -44, 12, -44, 0, -30, -4, -30, -12, -16, -14, -15, -30, -12, -50, -7, -70,
+      ],
+    ],
+    lines: [],
+    details: [[0, -54, -4.5, -41, 4.5, -41]],
+  },
+  {
     id: "DSF23",
     name: "DSF23",
     hulls: [
@@ -169,7 +182,10 @@ export function catalogToGameSkin(spec, target = 17) {
 export const WEDGE_ID = "WEDGE";
 export const DEFAULT_SHIP_ID = "DSF22";
 export const ASSAULT_ID = "ASSAULT";
-export const PLAYABLE_SHIP_IDS = [DEFAULT_SHIP_ID, ASSAULT_ID];
+export const SABRE_ID = "SABRE";
+export const PLAYABLE_SHIP_IDS = [DEFAULT_SHIP_ID, ASSAULT_ID, SABRE_ID];
+
+export { kitFor, SHIP_KITS } from "./kits.js";
 
 export function resolveShipId(id) {
   return PLAYABLE_SHIP_IDS.includes(id) ? id : DEFAULT_SHIP_ID;

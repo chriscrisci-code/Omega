@@ -1,5 +1,6 @@
 import { Container, Graphics } from "pixi.js";
-import { assaultShip, colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
+import { colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
+import { kitFor, kitStat } from "../ships/kits.js";
 import { strokeGlow, strokeLine } from "../render/textures.js";
 import { ASSAULT_ID, SHIP_CATALOG, catalogToGameSkin } from "../ships/catalog.js";
 import { damp, turnToward, wrap, wrapCoord, wrapDelta } from "../math.js";
@@ -25,7 +26,8 @@ export class Wingman {
     this.vy = 0;
     this.rotation = 0;
     this.age = 0;
-    this.delay = assaultShip.wingDelayMin;
+    this.kitDef = kitFor("ASSAULT");
+    this.delay = this.wing().delayMin;
     this.turrets = [
       { x: 8, y: -10, angle: -0.4, cool: 0 },
       { x: 8, y: 10, angle: 0.4, cool: 0 },
@@ -38,6 +40,14 @@ export class Wingman {
 
   flying() {
     return this.alive && this.deployed;
+  }
+
+  wing() {
+    return this.kitDef?.wing || {};
+  }
+
+  speedMul() {
+    return kitStat(this.kitDef, "speedMul", 0.5);
   }
 
   shieldRadius() {
@@ -65,7 +75,7 @@ export class Wingman {
     const c = Math.cos(lead.rotation);
     const s = Math.sin(lead.rotation);
     const along = this.alongHold;
-    const side = this.slot * (assaultShip.wingSide + Math.sin(this.age * 0.72 + this.slot) * 7);
+    const side = this.slot * ((this.wing().side || 164) + Math.sin(this.age * 0.72 + this.slot) * 7);
     return {
       x: lead.x + c * along - s * side,
       y: lead.y + s * along + c * side,
@@ -76,7 +86,10 @@ export class Wingman {
     this.alive = true;
     this.deployed = true;
     this.age = Math.random() * 8;
-    this.hullMax = assaultShip.wingHullHits;
+    this.kitDef = lead?.kitDef || kitFor("ASSAULT");
+    const mounts = this.kitDef?.weapons?.turrets?.mounts;
+    if (mounts) this.turrets = mounts.map((gun) => ({ ...gun, cool: 0.2 }));
+    this.hullMax = this.wing().hullHits || 2;
     this.hullHp = this.hullMax;
     this.shieldMax = shieldConfig.max;
     this.shieldEnergy = this.shieldMax;
@@ -129,8 +142,8 @@ export class Wingman {
   }
 
   rollDelay() {
-    const lo = assaultShip.wingDelayMin;
-    const hi = assaultShip.wingDelayMax;
+    const lo = this.wing().delayMin || 0.2;
+    const hi = this.wing().delayMax || 1.5;
     this.delay = lo + Math.random() * Math.max(0, hi - lo);
   }
 
@@ -252,8 +265,9 @@ export class Wingman {
       dropping ? 0.22 : 0.55,
       dt,
     );
-    const weave = Math.sin(this.age * 0.85 + this.slot * 1.4) * assaultShip.wingAlong;
-    this.alongHold = weave - this.trail * assaultShip.wingLag + this.leadPush * assaultShip.wingLead;
+    const wing = this.wing();
+    const weave = Math.sin(this.age * 0.85 + this.slot * 1.4) * (wing.along || 8);
+    this.alongHold = weave - this.trail * (wing.lag || 86) + this.leadPush * (wing.lead || 32);
 
     const slotLead = { x: live.x, y: live.y, rotation: lead.rotation };
     const c = Math.cos(lead.rotation);
@@ -275,8 +289,8 @@ export class Wingman {
       this.vx += ((lead.vx || 0) - this.vx) * match * dt;
       this.vy += ((lead.vy || 0) - this.vy) * match * dt;
       if (alongErr > 48) {
-        this.vx += c * shipConfig.thrust * assaultShip.speedMul * dt;
-        this.vy += s * shipConfig.thrust * assaultShip.speedMul * dt;
+        this.vx += c * shipConfig.thrust * this.speedMul() * dt;
+        this.vy += s * shipConfig.thrust * this.speedMul() * dt;
       }
     }
 
@@ -285,7 +299,7 @@ export class Wingman {
     this.vy *= drag;
     const speed = Math.hypot(this.vx, this.vy);
     const behind = dist > 70;
-    const cruise = shipConfig.maxSpeed * assaultShip.speedMul;
+    const cruise = shipConfig.maxSpeed * this.speedMul();
     const cap = behind ? cruise * 1.2 : cruise * 1.05;
     if (speed > cap) {
       this.vx *= cap / speed;

@@ -1,5 +1,6 @@
 import { Container, Graphics } from "pixi.js";
-import { assaultShip, bullets, colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
+import { bullets, colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
+import { kitFor, kitHas, kitStat, kitWeapon } from "../ships/kits.js";
 import { ThrustFlame } from "../particles/ThrustFlame.js";
 import { createGlowTexture, strokeGlow, strokeLine } from "../render/textures.js";
 import { catalogToGameSkin } from "../ships/catalog.js";
@@ -111,13 +112,10 @@ export class Ship {
       this.jets.right.container,
     );
     this.radius = shipConfig.radius;
-    this.kit = "";
+    this.kitDef = kitFor("DSF22");
     this.hullMax = 1;
     this.hullHp = 1;
-    this.turrets = [
-      { x: 8, y: -10, angle: -0.4, cool: 0 },
-      { x: 8, y: 10, angle: 0.4, cool: 0 },
-    ];
+    this.turrets = [];
     this.surge = 0;
     this.strafe = 0;
     this.docked = false;
@@ -199,12 +197,39 @@ export class Ship {
     };
   }
 
-  isAssault() {
-    return this.kit === "assault";
+  has(special) {
+    return kitHas(this.kitDef, special);
+  }
+
+  can(weapon) {
+    return Boolean(kitWeapon(this.kitDef, weapon));
+  }
+
+  missileVolley() {
+    const spec = kitWeapon(this.kitDef, "missiles");
+    const n = spec && typeof spec === "object" ? spec.volley : 1;
+    return Math.max(1, n || 1);
+  }
+
+  stat(name, fallback) {
+    return kitStat(this.kitDef, name, fallback);
+  }
+
+  turretsCfg() {
+    return kitWeapon(this.kitDef, "turrets") || null;
+  }
+
+  bindTurrets() {
+    const mounts = this.turretsCfg()?.mounts;
+    this.turrets = mounts ? mounts.map((gun) => ({ ...gun, cool: 0 })) : [];
   }
 
   speedMul() {
-    return this.isAssault() ? assaultShip.speedMul : 1;
+    return this.stat("speedMul", 1);
+  }
+
+  turnSpeed() {
+    return shipConfig.turnSpeed * this.stat("turnMul", 1);
   }
 
   thrust() {
@@ -220,12 +245,13 @@ export class Ship {
   }
 
   setSkin(spec) {
-    this.kit = spec?.id === "ASSAULT" ? "assault" : "";
+    this.kitDef = kitFor(spec?.id);
     this.skin = spec ? catalogToGameSkin(spec) : null;
     this.radius = shipConfig.radius;
-    this.hullMax = this.kit === "assault" ? assaultShip.hullHits : 1;
+    this.hullMax = this.stat("hullHits", 1);
     this.hullHp = this.hullMax;
     this.autoShield = false;
+    this.bindTurrets();
     this.draw();
     this.drawShield();
   }
@@ -267,7 +293,7 @@ export class Ship {
   }
 
   drawShield() {
-    if (this.isAssault()) {
+    if (this.has("pulseShield")) {
       paintAssaultShield(this.shieldG, {
         on: this.shieldOn,
         radius: this.shieldRadius(),
@@ -427,7 +453,7 @@ export class Ship {
     }
 
     this.undockLock = Math.max(0, this.undockLock - dt);
-    const step = shipConfig.turnSpeed * dt;
+    const step = this.turnSpeed() * dt;
     if (input.aim != null) this.rotation = turnToward(this.rotation, input.aim, step);
     this.rotation += input.rotate * step;
     this.surge = input.surge;
@@ -487,7 +513,7 @@ export class Ship {
     }
     const dist = Math.hypot(dx, dy) || 1;
     const desired = Math.atan2(dy, dx);
-    this.rotation = turnToward(this.rotation, desired, shipConfig.turnSpeed * dt);
+    this.rotation = turnToward(this.rotation, desired, this.turnSpeed() * dt);
     this.strafe = 0;
 
     const facing = Math.abs(wrapDelta(this.rotation - desired, Math.PI * 2));

@@ -1,8 +1,8 @@
 import { world as worldConfig } from "./config.js";
 import { pick, rand, wrapCoord } from "./math.js";
-import { ASSAULT_ID, DEFAULT_SHIP_ID, SHIP_CATALOG } from "./ships/catalog.js";
+import { ASSAULT_ID, DEFAULT_SHIP_ID, SABRE_ID, SHIP_CATALOG } from "./ships/catalog.js";
 
-export const DEMO_SHIPS = [DEFAULT_SHIP_ID, ASSAULT_ID];
+export const DEMO_SHIPS = [DEFAULT_SHIP_ID, ASSAULT_ID, SABRE_ID];
 
 export const ATTRACT_HOLD = 14;
 export const ATTRACT_PLAY = 10;
