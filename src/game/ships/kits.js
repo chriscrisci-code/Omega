@@ -38,8 +38,8 @@ export const SHIP_KITS = {
         aim: 0.28,
         hits: 3,
         mounts: [
-          { x: 8, y: -10, angle: -0.4 },
-          { x: 8, y: 10, angle: 0.4 },
+          { x: 5, y: -11, angle: -0.4 },
+          { x: 5, y: 11, angle: 0.4 },
         ],
       },
     },

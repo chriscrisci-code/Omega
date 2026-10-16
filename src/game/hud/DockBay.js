@@ -13,6 +13,7 @@ function paint(node, text, size, color, hot, align = "center") {
 export class DockBay {
   constructor() {
     this.root = document.querySelector("#dock-bay");
+    this.hero = document.querySelector("#dock-hero");
     this.ships = document.querySelector("#dock-ships");
     this.ups = document.querySelector("#dock-ups");
     this.onPickShip = null;
@@ -135,6 +136,20 @@ export class DockBay {
       node.classList.toggle("is-on", node.dataset.id === this.seat);
     });
     this.setHint(this.seat === "laser" ? "laser" : this.seat ? "gun" : "bay");
+    this.paintHero();
+  }
+
+  paintHero() {
+    if (!this.hero) return;
+    const open = this.root && !this.root.classList.contains("is-hidden") && !this.seat;
+    if (!open) {
+      this.hero.classList.add("is-hidden");
+      this.hero.innerHTML = "";
+      return;
+    }
+    const spec = SHIP_CATALOG.find((item) => item.id === this.shipId) || null;
+    this.hero.innerHTML = catalogMiniSvg(spec, 280);
+    this.hero.classList.remove("is-hidden");
   }
 
   setState(shipId) {
@@ -142,15 +157,16 @@ export class DockBay {
     this.ships?.querySelectorAll(".dock-ship").forEach((node) => {
       node.classList.toggle("is-on", node.dataset.id === shipId);
     });
+    this.paintHero();
   }
 
   show(shipId) {
-    this.setState(shipId);
     this.root?.classList.remove("is-hidden");
+    this.setState(shipId);
   }
 
   hide() {
-    this.setSeat(null);
     this.root?.classList.add("is-hidden");
+    this.setSeat(null);
   }
 }
