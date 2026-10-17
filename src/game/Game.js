@@ -26,7 +26,7 @@ import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
 import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, missileAmmoCap, normalizeCheckpoint, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
-import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrapCoord, wrapDelta } from "./math.js";
+import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
 import { SHIP_CATALOG, resolveShipId } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
 
@@ -138,6 +138,9 @@ export class Game {
     this.shards = [];
     this.selected = null;
     this.railPrey = null;
+    this.railShot = null;
+    this.railLock = null;
+    this.railHold = 0;
     this.focusFire = false;
     this.lockMark = new Graphics();
     this.lockMark.visible = false;
@@ -950,6 +953,9 @@ export class Game {
     this.starBeepWait = 0;
     this.selected = null;
     this.railPrey = null;
+    this.railShot = null;
+    this.railLock = null;
+    this.railHold = 0;
     this.focusFire = false;
     this.lockMark.visible = false;
     this.lockCam.clear();
@@ -1615,6 +1621,9 @@ export class Game {
       hits: spec.hits,
       kit: "rail",
     });
+    this.railShot = bullet;
+    this.railLock = this.railPrey?.alive ? this.railPrey : null;
+    this.railHold = 0;
     const gun = this.gunTier();
     this.cooldown = (shipLevels.gunCool[gun - 1] ?? bullets.cooldown) * (spec.coolMul || 1);
     this.ship.clearRail();
@@ -1764,7 +1773,7 @@ export class Game {
 
   railSightTarget(space) {
     const spec = this.ship.noseGunCfg?.();
-    const reach = spec ? (spec.speed || 1200) * (spec.life || 2.4) : 2400;
+    const reach = spec ? (spec.speed || 1200) * (spec.life || 10000 / 1200) : 10000;
     const nx = Math.cos(this.ship.rotation);
     const ny = Math.sin(this.ship.rotation);
     const ox = this.ship.x;
@@ -3809,6 +3818,10 @@ export class Game {
               : this.ship.railReady
                 ? "RAIL  READY"
                 : "RAIL"
+          : this.railShot || this.railHold > 0
+            ? this.railLock?.alive
+              ? `RAIL  ${this.railLock.name || this.railLock.kind || "TARGET"}`
+              : "RAIL"
           : this.selected?.alive
             ? `LOCK  ${this.selected.name || this.selected.kind}`
             : this.assaultRest
@@ -3832,6 +3845,11 @@ export class Game {
     for (const shot of [...this.shots, ...this.hostileShots]) {
       shot.update(t);
       if (!shot.alive) continue;
+      if (shot.kit === "rail") {
+        wrap(shot, space.width, space.height);
+        shot.view.position.set(shot.x, shot.y);
+        continue;
+      }
       const dx = wrapDelta(shot.x - this.camX, space.width);
       const dy = wrapDelta(shot.y - this.camY, space.height);
       if (dx * dx + dy * dy > shotRange2) shot.kill();
@@ -3978,7 +3996,7 @@ export class Game {
     if (this.mode === PLAYING || this.attractOnDemo) {
       for (const rock of [...this.asteroids]) {
         for (const shot of this.shots) {
-          if (shot.alive && hitsBeam(shot, rock, shot.streak || bullets.streak)) {
+          if (shot.alive && hitsBeam(shot, rock, shot.streak || bullets.streak, space.width, space.height)) {
             const rail = shot.kit === "rail";
             const dmg = shot.hits || 1;
             const at = { x: shot.x, y: shot.y };
@@ -3993,7 +4011,7 @@ export class Game {
       for (const enemy of [...this.enemies]) {
         for (const shot of this.shots) {
           if (!shot.alive || shot.ignore === enemy) continue;
-          if (!hitsBeam(shot, enemy, shot.streak || bullets.streak)) continue;
+          if (!hitsBeam(shot, enemy, shot.streak || bullets.streak, space.width, space.height)) continue;
           if (shot.kit !== "rail" && enemy.role === "destroyer" && enemy.shieldHp > 0 && Math.random() < destroyerConfig.ricochet) {
             this.chipEnemy(enemy, shot, shot.hits || 1);
             this.bounceShot(shot, enemy, space);
@@ -4012,7 +4030,7 @@ export class Game {
       for (const part of this.stationTargets()) {
         for (const shot of this.shots) {
           if (!shot.alive) continue;
-          if (!hitsBeam(shot, part, shot.streak || bullets.streak)) continue;
+          if (!hitsBeam(shot, part, shot.streak || bullets.streak, space.width, space.height)) continue;
           const rail = shot.kit === "rail";
           const dmg = shot.hits || 1;
           const at = { x: shot.x, y: shot.y };
@@ -4120,7 +4138,7 @@ export class Game {
         }
         if (!flyer.alive || struck) continue;
         for (const shot of this.hostileShots) {
-          if (shot.alive && hitsBeam(shot, body, bullets.streak)) {
+          if (shot.alive && hitsBeam(shot, body, bullets.streak, space.width, space.height)) {
             shot.kill();
             if (flyer.shieldOn) this.sparkShield(shot.x, shot.y, shieldConfig.hitShot, flyer);
             else this.hurtFriendly(flyer);
@@ -4223,11 +4241,31 @@ export class Game {
     }
   }
 
+  pointRailCam() {
+    const live = this.railLock?.alive ? this.railLock : null;
+    if (live) {
+      this.lockCam.follow(live);
+      return;
+    }
+    if (this.railLock) {
+      this.lockCam.stick(this.railLock.x, this.railLock.y);
+      return;
+    }
+    if (this.railShot?.alive) {
+      this.lockCam.stick(this.railShot.x, this.railShot.y);
+      return;
+    }
+    this.lockCam.stick(this.lockCam.x, this.lockCam.y);
+  }
+
   tickLockCam(dt) {
     const playing = this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE || this.attractOnDemo;
     if (!playing) {
       this.lockCam.clear();
       this.railPrey = null;
+      this.railShot = null;
+      this.railLock = null;
+      this.railHold = 0;
       return;
     }
     if (this.ship.alive && !this.ship.docked && (this.ship.railT || 0) > 0) {
@@ -4247,6 +4285,19 @@ export class Game {
       return;
     }
     this.railPrey = null;
+    if (this.railShot && !this.railShot.alive) {
+      this.railShot = null;
+      this.railHold = 3;
+    }
+    if (this.railShot || this.railHold > 0) {
+      if (!this.railShot && this.railHold > 0) this.railHold = Math.max(0, this.railHold - dt);
+      if (this.railShot || this.railHold > 0) {
+        this.pointRailCam();
+        return;
+      }
+      this.railLock = null;
+      this.lockCam.clear();
+    }
     const live = this.focusShip();
     if (live) {
       this.lockCam.follow(live);
@@ -4270,7 +4321,7 @@ export class Game {
       compact: this.input.layout === "phone",
       placedX,
       placedY,
-      radius: this.lockCam.sight ? Math.max(28, sightR + 10) : this.lockCam.target?.radius || 20,
+      radius: this.lockCam.sight ? Math.max(28, sightR + 10) : this.lockCam.target?.radius || this.railLock?.radius || 20,
       hide: [this.far.view, this.lockMark, this.leadMark, this.sightMark],
       scales: [this.ship, ...this.enemies].filter((item) => item?.view),
       rotation: this.lockCam.sight ? this.headingUp() : 0,

@@ -61,11 +61,11 @@ export function rayAlong(ox, oy, angle, range, body, width, height, fat = 0) {
   return along;
 }
 
-export function hitsBeam(shot, rock, length) {
+export function hitsBeam(shot, rock, length, width = 0, height = 0) {
   const nx = Math.cos(shot.angle);
   const ny = Math.sin(shot.angle);
-  const rx = rock.x - shot.x;
-  const ry = rock.y - shot.y;
+  const rx = width ? wrapDelta(rock.x - shot.x, width) : rock.x - shot.x;
+  const ry = height ? wrapDelta(rock.y - shot.y, height) : rock.y - shot.y;
   const along = -(rx * nx + ry * ny);
   const t = Math.max(0, Math.min(length, along));
   const px = -nx * t;

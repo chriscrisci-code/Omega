@@ -48,6 +48,14 @@ export class LockCam {
     this.y = y;
   }
 
+  stick(x, y) {
+    this.sight = false;
+    this.target = null;
+    this.hold = 1;
+    this.x = x;
+    this.y = y;
+  }
+
   noteDeath(body) {
     if (!body) return;
     if (this.target !== body) return;
