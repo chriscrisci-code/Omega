@@ -11,23 +11,26 @@ export class Bullet {
     this.ignore = null;
     this.ignoreFor = 0;
     this.kit = "";
+    this.hits = 1;
+    this.streak = bullets.streak;
     this.alive = false;
     this.view.visible = false;
   }
 
-  paint(color = colors.cyan, hot = colors.white) {
-    const tip = bullets.streak;
+  paint(color = colors.cyan, hot = colors.white, streak = bullets.streak) {
+    const tip = streak;
+    const fat = streak > bullets.streak ? 1.35 : 1;
     this.view.clear();
     this.view.moveTo(-2, 0);
     this.view.lineTo(tip + 2, 0);
-    this.view.stroke({ width: 9, color, alpha: 0.14, cap: "round" });
+    this.view.stroke({ width: 9 * fat, color, alpha: 0.14, cap: "round" });
     this.view.moveTo(0, 0);
     this.view.lineTo(tip, 0);
-    this.view.stroke({ width: 4.4, color, alpha: 0.38, cap: "round" });
+    this.view.stroke({ width: 4.4 * fat, color, alpha: 0.38, cap: "round" });
     this.view.moveTo(0, 0);
     this.view.lineTo(tip, 0);
-    this.view.stroke({ width: 1.55, color: hot, alpha: 1, cap: "round" });
-    this.view.circle(tip, 0, 2.4);
+    this.view.stroke({ width: 1.55 * fat, color: hot, alpha: 1, cap: "round" });
+    this.view.circle(tip, 0, 2.4 * fat);
     this.view.fill({ color: hot, alpha: 0.85 });
   }
 
@@ -42,10 +45,12 @@ export class Bullet {
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
     this.life = options.life ?? bullets.life;
+    this.hits = Math.max(1, options.hits || 1);
+    this.streak = this.hits > 1 ? bullets.streak * 1.55 : bullets.streak;
     this.ignore = null;
     this.ignoreFor = 0;
     this.kit = options.kit || "";
-    this.paint(options.color ?? colors.cyan, options.hot ?? colors.white);
+    this.paint(options.color ?? colors.cyan, options.hot ?? colors.white, this.streak);
     this.view.visible = true;
     this.view.alpha = 1;
     this.view.position.set(x, y);
@@ -70,6 +75,8 @@ export class Bullet {
   kill() {
     this.alive = false;
     this.kit = "";
+    this.hits = 1;
+    this.streak = bullets.streak;
     this.view.visible = false;
   }
 }

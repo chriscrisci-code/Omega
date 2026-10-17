@@ -1425,7 +1425,7 @@ export class Game {
     this.ship.update(t, { aim: heading, rotate: 0, surge: 0.86, strafe: sway * 0.78 }, space);
     if (!this.ship.shieldOn && this.ship.shieldEnergy > 0.35) this.ship.tickShield(t, true);
     else this.ship.tickShield(t, false);
-    this.shoot();
+    this.shoot(t);
     this.tickAssaultKit(t, space);
     if (this.attractAge > 0.2) this.fireMissile();
     this.ship.view.visible = true;
@@ -1564,10 +1564,61 @@ export class Game {
     this.hud.setMode(id === "missile" ? `MSL  ${this.missileAmmo}` : `${id === "shield" ? "SHD" : id.toUpperCase()}  ${this.levels[id]}`);
   }
 
-  shoot() {
-    if (!this.ship.alive || this.ship.docked || !this.ship.can("noseGun")) return;
+  shoot(dt = 0) {
+    const spec = this.ship.noseGunCfg?.();
+    const rail = spec && spec.charge > 0;
+    if (!this.ship.alive || this.ship.docked || !this.ship.can("noseGun")) {
+      this.ship.clearRail?.();
+      this.fireWasOn = this.input.fireHeld;
+      return;
+    }
+    if (rail) {
+      this.tickRailGun(dt, spec);
+      return;
+    }
+    this.ship.clearRail?.();
     const held = this.attractOnDemo || this.input.fireHeld;
+    this.fireWasOn = this.input.fireHeld;
     if (!held || this.cooldown > 0) return;
+    this.fireGunShot();
+  }
+
+  tickRailGun(dt, spec) {
+    const cooling = this.cooldown > 0;
+    if (this.attractOnDemo) {
+      if (cooling) this.ship.clearRail();
+      else {
+        this.ship.tickRail(dt, true);
+        if (this.ship.railReady) this.fireRailShot(spec);
+      }
+      this.fireWasOn = true;
+      return;
+    }
+    const held = this.input.fireHeld;
+    const released = this.fireWasOn && !held;
+    if (cooling) this.ship.clearRail();
+    else if (held) this.ship.tickRail(dt, true);
+    else if (released && this.ship.railReady) this.fireRailShot(spec);
+    else this.ship.clearRail();
+    this.fireWasOn = held;
+  }
+
+  fireRailShot(spec) {
+    const bullet = this.shots.find((shot) => !shot.alive);
+    if (!bullet) return;
+    const muzzle = this.ship.muzzle(0);
+    bullet.fire(muzzle.x, muzzle.y, this.ship.rotation, {
+      speed: spec.speed,
+      life: spec.life,
+      hits: spec.hits,
+    });
+    const gun = this.gunTier();
+    this.cooldown = (shipLevels.gunCool[gun - 1] ?? bullets.cooldown) * (spec.coolMul || 1);
+    this.ship.clearRail();
+    this.sfx("thud");
+  }
+
+  fireGunShot() {
     const gun = this.gunTier();
     const bullet = this.shots.find((shot) => !shot.alive);
     if (!bullet) return;
@@ -2712,12 +2763,12 @@ export class Game {
       if (enemy.shieldHp > 0) {
         const cost = via === "missile"
           ? Math.round(destroyerConfig.shieldHits / destroyerConfig.shieldMissileHits)
-          : 1;
+          : Math.max(1, amount);
         enemy.shieldHp = Math.max(0, enemy.shieldHp - cost);
         this.sfx(enemy.shieldHp > 0 ? "block" : "pop");
         return;
       }
-      enemy.hp -= via === "missile" ? amount : 1;
+      enemy.hp -= amount;
       if (impact) {
         const mag = Math.hypot(impact.vx, impact.vy) || 1;
         enemy.vx += (impact.vx / mag) * 8;
@@ -3608,7 +3659,9 @@ export class Game {
     } else if (!this.pickingDevice && (this.mode === TITLE || this.mode === GAMEOVER) && this.titleHold <= 0 && this.input.startPressed) {
       this.offerStart();
     } else if (this.mode === PLAYING && !this.ship.docked) {
-      this.shoot();
+      this.shoot(t);
+    } else {
+      this.ship.clearRail?.();
     }
     if (this.mode === PLAYING && this.input.warpPressed) this.fireWarp();
     if (this.mode === PLAYING && !this.ship.docked && this.input.empPressed) this.fireEmp();
@@ -3868,9 +3921,9 @@ export class Game {
     if (this.mode === PLAYING || this.attractOnDemo) {
       for (const rock of [...this.asteroids]) {
         for (const shot of this.shots) {
-          if (shot.alive && hitsBeam(shot, rock, bullets.streak)) {
+          if (shot.alive && hitsBeam(shot, rock, shot.streak || bullets.streak)) {
             shot.kill();
-            this.chipRock(rock, shot);
+            this.chipRock(rock, shot, shot.hits || 1);
             break;
           }
         }
@@ -3879,14 +3932,14 @@ export class Game {
       for (const enemy of [...this.enemies]) {
         for (const shot of this.shots) {
           if (!shot.alive || shot.ignore === enemy) continue;
-          if (!hitsBeam(shot, enemy, bullets.streak)) continue;
+          if (!hitsBeam(shot, enemy, shot.streak || bullets.streak)) continue;
           if (enemy.role === "destroyer" && enemy.shieldHp > 0 && Math.random() < destroyerConfig.ricochet) {
-            this.chipEnemy(enemy, shot);
+            this.chipEnemy(enemy, shot, shot.hits || 1);
             this.bounceShot(shot, enemy, space);
             continue;
           }
           shot.kill();
-          this.chipEnemy(enemy, shot);
+          this.chipEnemy(enemy, shot, shot.hits || 1);
           break;
         }
       }
@@ -3894,9 +3947,9 @@ export class Game {
       for (const part of this.stationTargets()) {
         for (const shot of this.shots) {
           if (!shot.alive) continue;
-          if (!hitsBeam(shot, part, bullets.streak)) continue;
+          if (!hitsBeam(shot, part, shot.streak || bullets.streak)) continue;
           shot.kill();
-          this.chipStationPart(part, shot);
+          this.chipStationPart(part, shot, shot.hits || 1);
           break;
         }
       }

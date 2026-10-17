@@ -101,11 +101,13 @@ export class Ship {
     this.shieldG = new Graphics();
     this.cargoG = new Graphics();
     this.markG = new Graphics();
+    this.railG = new Graphics();
     this.view.addChild(
       this.shieldG,
       this.cargoG,
       this.g,
       this.markG,
+      this.railG,
       this.jets.rear.container,
       this.jets.nose.container,
       this.jets.left.container,
@@ -154,6 +156,7 @@ export class Ship {
     this.hullHp = this.hullMax;
     for (const gun of this.turrets || []) gun.cool = 0;
     this.warping = false;
+    this.clearRail();
     this.view.visible = true;
     this.draw();
     this.drawShield();
@@ -219,6 +222,93 @@ export class Ship {
     return kitWeapon(this.kitDef, "turrets") || null;
   }
 
+  noseGunCfg() {
+    const spec = kitWeapon(this.kitDef, "noseGun");
+    return spec && typeof spec === "object" ? spec : null;
+  }
+
+  clearRail() {
+    this.railT = 0;
+    this.railReady = false;
+    this.railSpin = 0;
+    this.railSparks = [];
+    this.railG?.clear();
+  }
+
+  tickRail(dt, held) {
+    const gun = this.noseGunCfg();
+    if (!gun?.charge || !held || this.docked || !this.alive) {
+      this.clearRail();
+      return;
+    }
+    const need = Math.max(0.12, gun.charge);
+    this.railT = Math.min(need, (this.railT || 0) + dt);
+    this.railReady = this.railT >= need;
+    if (this.railReady) this.railSparks = [];
+    this.drawRail(dt);
+  }
+
+  drawRail(dt) {
+    const g = this.railG;
+    if (!g) return;
+    g.clear();
+    const gun = this.noseGunCfg();
+    if (!gun?.charge || (!this.railReady && !(this.railT > 0))) return;
+    const need = Math.max(0.12, gun.charge);
+    const u = Math.min(1, this.railT / need);
+
+    if (!this.railReady) {
+      const spawn = 1 + Math.floor(u * 5);
+      this.railSparks = this.railSparks || [];
+      for (let i = 0; i < spawn; i += 1) {
+        if (Math.random() > 0.65 + u * 0.25) continue;
+        const a = Math.random() * Math.PI * 2;
+        this.railSparks.push({
+          a,
+          r: 26 + Math.random() * 16,
+          len: 5 + Math.random() * 6,
+          life: 0.16 + Math.random() * 0.1,
+        });
+      }
+      if (this.railSparks.length > 36) this.railSparks.splice(0, this.railSparks.length - 36);
+      const keep = [];
+      for (const spark of this.railSparks) {
+        spark.r -= (42 + u * 38) * dt;
+        spark.life -= dt;
+        if (spark.life <= 0 || spark.r < 9) continue;
+        keep.push(spark);
+        const x0 = Math.cos(spark.a) * spark.r;
+        const y0 = Math.sin(spark.a) * spark.r;
+        const inner = Math.max(8, spark.r - spark.len);
+        const x1 = Math.cos(spark.a) * inner;
+        const y1 = Math.sin(spark.a) * inner;
+        g.moveTo(x0, y0);
+        g.lineTo(x1, y1);
+        g.stroke({ width: 2.4, color: colors.cyan, alpha: 0.28 * u, cap: "round" });
+        g.moveTo(x0, y0);
+        g.lineTo(x1, y1);
+        g.stroke({ width: 1.05, color: colors.cyanHot, alpha: 0.45 + 0.5 * u, cap: "round" });
+      }
+      this.railSparks = keep;
+      return;
+    }
+
+    this.railSpin = (this.railSpin || 0) + dt * 3.4;
+    const n = 11;
+    for (let i = 0; i < n; i += 1) {
+      const a = this.railSpin + (i / n) * Math.PI * 2;
+      const rad = 19.5 + Math.sin(this.railSpin * 5.2 + i * 1.7) * 1.6;
+      const x = Math.cos(a) * rad;
+      const y = Math.sin(a) * rad;
+      const flicker = 0.4 + Math.random() * 0.6;
+      const size = 1.15 + Math.random() * 1.35;
+      g.circle(x, y, size * 2.1);
+      g.fill({ color: colors.cyan, alpha: 0.16 * flicker });
+      g.circle(x, y, size);
+      g.fill({ color: colors.cyanHot, alpha: flicker });
+    }
+  }
+
   bindTurrets() {
     const mounts = this.turretsCfg()?.mounts;
     this.turrets = mounts ? mounts.map((gun) => ({ ...gun, cool: 0 })) : [];
@@ -252,6 +342,7 @@ export class Ship {
     this.hullHp = this.hullMax;
     this.autoShield = false;
     this.bindTurrets();
+    this.clearRail();
     this.draw();
     this.drawShield();
   }
@@ -563,6 +654,7 @@ export class Ship {
     this.shieldOn = false;
     this.autoShield = false;
     this.warping = false;
+    this.clearRail();
     this.drawShield();
     for (const jet of Object.values(this.jets)) jet.stop();
     this.view.visible = false;

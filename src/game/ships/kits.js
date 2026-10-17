@@ -58,14 +58,14 @@ export const SHIP_KITS = {
     id: "ACRP33",
     entitlement: "base",
     stats: {
-      speedMul: 1,
-      turnMul: 1,
+      speedMul: 0.7,
+      turnMul: 0.28,
       hullHits: 1,
       hullIFrames: 0,
       shieldMul: 1,
     },
     weapons: {
-      noseGun: true,
+      noseGun: { charge: 0.7, hits: 4, speed: 1200, life: 2.4, coolMul: 2.2 },
       missiles: true,
     },
     specials: ["autoShield"],
