@@ -54,6 +54,22 @@ export const SHIP_KITS = {
       delayMax: 1.5,
     },
   },
+  ACRP33: {
+    id: "ACRP33",
+    entitlement: "base",
+    stats: {
+      speedMul: 1,
+      turnMul: 1,
+      hullHits: 1,
+      hullIFrames: 0,
+      shieldMul: 1,
+    },
+    weapons: {
+      noseGun: true,
+      missiles: true,
+    },
+    specials: ["autoShield"],
+  },
   SABRE: {
     id: "SABRE",
     entitlement: "base",

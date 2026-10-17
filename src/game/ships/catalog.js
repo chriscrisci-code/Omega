@@ -4,17 +4,23 @@ export const SHIP_CATALOG = [
   {
     id: "ACRP33",
     name: "ACRP33",
+    scale: 1.5,
     hulls: [
-      [0, -32, 16, -16, 10, -4, 10, 8, 6, 8, 6, 16, 8, 16, 8, 24, 6, 24, 6, 40, -6, 40, -6, 24, -8, 24, -8, 16, -6, 16, -6, 8, -10, 8, -10, -4, -16, -16],
+      [-18, -178, -7, -178, -5, -175, -5, 23, -20, 23, -20, -175],
+      [5, -178, 18, -178, 19, -175, 19, 23, 4, 23, 4, -175],
+      [-21, 23, -43, 42, -30, 59, 29, 59, 42, 42, 20, 23],
+      [-10, 61, -7, 61, -20, 99, -23, 99],
+      [6, 61, 9, 61, 21, 99, 18, 99],
+      [-25, 100, 23, 100, 23, 103, -25, 103],
+      [-60, 107, 60, 107, 60, 117, -60, 117],
+      [-20, 118, 20, 118, 20, 121, -20, 121],
+      [-27, 122, -3, 122, -3, 178, -27, 178],
+      [1, 122, 26, 122, 26, 178, 1, 178],
     ],
-    lines: [
-      [-6, -88, -6, -28],
-      [6, -88, 6, -28],
-      [-30, -6, 30, -6],
-    ],
+    lines: [],
     details: [
-      [-4, 0, 4, 0, 4, 8, -4, 8],
-      [-4, 12, 4, 12, 4, 20, -4, 20],
+      [0, 31, 15, 47, 0, 58, -15, 47],
+      [-13, 87, 12, 87, 0, 96],
     ],
   },
   {
@@ -194,7 +200,8 @@ export const WEDGE_ID = "WEDGE";
 export const DEFAULT_SHIP_ID = "DSF22";
 export const ASSAULT_ID = "ASSAULT";
 export const SABRE_ID = "SABRE";
-export const PLAYABLE_SHIP_IDS = [DEFAULT_SHIP_ID, ASSAULT_ID, SABRE_ID];
+export const ACRP33_ID = "ACRP33";
+export const PLAYABLE_SHIP_IDS = [DEFAULT_SHIP_ID, ASSAULT_ID, SABRE_ID, ACRP33_ID];
 
 export { kitFor, SHIP_KITS } from "./kits.js";
 
