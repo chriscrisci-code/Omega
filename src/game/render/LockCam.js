@@ -17,24 +17,35 @@ export class LockCam {
     this.x = 0;
     this.y = 0;
     this.hold = 0;
+    this.sight = false;
   }
 
   get active() {
-    return Boolean(this.target?.alive || this.hold > 0);
+    return this.sight || Boolean(this.target?.alive || this.hold > 0);
   }
 
   clear() {
     this.target = null;
     this.hold = 0;
+    this.sight = false;
     this.view.visible = false;
   }
 
   follow(body) {
     if (!body) return;
+    this.sight = false;
     this.target = body;
     this.x = body.x;
     this.y = body.y;
     this.hold = 0;
+  }
+
+  lookRail(x, y) {
+    this.sight = true;
+    this.target = null;
+    this.hold = 0;
+    this.x = x;
+    this.y = y;
   }
 
   noteDeath(body) {
@@ -101,6 +112,32 @@ export class LockCam {
     g.stroke({ width: 3, color: colors.cyan, alpha: 0.22, cap: "square", join: "miter" });
     corners();
     g.stroke({ width: 1.15, color: colors.cyanHot, cap: "square", join: "miter" });
+    if (this.sight) {
+      const cx = w * 0.5;
+      const cy = h * 0.5;
+      const arm = 16;
+      const gap = 7;
+      g.moveTo(cx - arm, cy);
+      g.lineTo(cx - gap, cy);
+      g.moveTo(cx + gap, cy);
+      g.lineTo(cx + arm, cy);
+      g.moveTo(cx, cy - arm);
+      g.lineTo(cx, cy - gap);
+      g.moveTo(cx, cy + gap);
+      g.lineTo(cx, cy + arm);
+      g.stroke({ width: 2.4, color: colors.cyan, alpha: 0.28, cap: "square" });
+      g.moveTo(cx - arm, cy);
+      g.lineTo(cx - gap, cy);
+      g.moveTo(cx + gap, cy);
+      g.lineTo(cx + arm, cy);
+      g.moveTo(cx, cy - arm);
+      g.lineTo(cx, cy - gap);
+      g.moveTo(cx, cy + gap);
+      g.lineTo(cx, cy + arm);
+      g.stroke({ width: 1.05, color: colors.cyanHot, cap: "square" });
+      g.circle(cx, cy, 2.1);
+      g.fill({ color: colors.cyanHot, alpha: 0.9 });
+    }
   }
 
   fitZoom(radius) {
@@ -108,7 +145,7 @@ export class LockCam {
     return Math.max(0.55, Math.min(3.4, Math.min(this.w, this.h) / span));
   }
 
-  render(renderer, world, { screen, compact, placedX, placedY, radius, hide, scales }) {
+  render(renderer, world, { screen, compact, placedX, placedY, radius, hide, scales, rotation = 0 }) {
     if (!this.active) {
       this.view.visible = false;
       return;
@@ -135,7 +172,7 @@ export class LockCam {
     world.filters = null;
     world.pivot.set(placedX, placedY);
     world.position.set(this.w * 0.5, this.h * 0.5);
-    world.rotation = 0;
+    world.rotation = this.sight ? rotation : 0;
     world.scale.set(this.fitZoom(radius));
     try {
       renderer.render({ container: world, target: this.rt, clear: true });

@@ -65,7 +65,7 @@ export const SHIP_KITS = {
       shieldMul: 1,
     },
     weapons: {
-      noseGun: { charge: 0.7, hits: 4, speed: 1200, life: 2.4, coolMul: 2.2 },
+      noseGun: { charge: 0.7, hits: 200, speed: 1200, life: 2.4, coolMul: 2.2 },
       missiles: true,
     },
     specials: ["autoShield"],
