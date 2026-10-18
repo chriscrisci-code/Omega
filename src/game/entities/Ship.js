@@ -343,8 +343,22 @@ export class Ship {
     this.autoShield = false;
     this.bindTurrets();
     this.clearRail();
+    this.placeRearJet();
     this.draw();
     this.drawShield();
+  }
+
+  placeRearJet() {
+    const dsf = -12;
+    if (!this.skin || this.skin.id === "DSF22") {
+      this.jets.rear.originX = dsf;
+      return;
+    }
+    let aft = 0;
+    for (const hull of this.skin.hulls || []) {
+      for (let i = 0; i < hull.length; i += 2) aft = Math.min(aft, hull[i]);
+    }
+    this.jets.rear.originX = (aft || dsf) - 3;
   }
 
   draw() {
