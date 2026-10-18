@@ -141,6 +141,9 @@ export class Game {
     this.railShot = null;
     this.railLock = null;
     this.railHold = 0;
+    this.railAimX = 0;
+    this.railAimY = 0;
+    this.railAimA = 0;
     this.focusFire = false;
     this.lockMark = new Graphics();
     this.lockMark.visible = false;
@@ -956,6 +959,9 @@ export class Game {
     this.railShot = null;
     this.railLock = null;
     this.railHold = 0;
+    this.railAimX = 0;
+    this.railAimY = 0;
+    this.railAimA = 0;
     this.focusFire = false;
     this.lockMark.visible = false;
     this.lockCam.clear();
@@ -1624,6 +1630,9 @@ export class Game {
     this.railShot = bullet;
     this.railLock = this.railPrey?.alive ? this.railPrey : null;
     this.railHold = 0;
+    this.railAimX = muzzle.x;
+    this.railAimY = muzzle.y;
+    this.railAimA = this.ship.rotation;
     const gun = this.gunTier();
     this.cooldown = (shipLevels.gunCool[gun - 1] ?? bullets.cooldown) * (spec.coolMul || 1);
     this.ship.clearRail();
@@ -4241,21 +4250,32 @@ export class Game {
     }
   }
 
+  lookRailAlong(ox, oy, angle, body) {
+    const space = this.space();
+    const nx = Math.cos(angle);
+    const ny = Math.sin(angle);
+    const along = body
+      ? Math.max(80, wrapDelta(body.x - ox, space.width) * nx + wrapDelta(body.y - oy, space.height) * ny)
+      : 260;
+    this.lockCam.lookRail(
+      wrapCoord(ox + nx * along, space.width),
+      wrapCoord(oy + ny * along, space.height),
+    );
+  }
+
+  railSightRot() {
+    const charging = (this.ship.railT || 0) > 0;
+    const angle = charging ? this.ship.rotation : this.railAimA;
+    return -Math.PI / 2 - (Number.isFinite(angle) ? angle : this.ship.rotation);
+  }
+
   pointRailCam() {
-    const live = this.railLock?.alive ? this.railLock : null;
-    if (live) {
-      this.lockCam.follow(live);
-      return;
-    }
-    if (this.railLock) {
-      this.lockCam.stick(this.railLock.x, this.railLock.y);
-      return;
-    }
-    if (this.railShot?.alive) {
-      this.lockCam.stick(this.railShot.x, this.railShot.y);
-      return;
-    }
-    this.lockCam.stick(this.lockCam.x, this.lockCam.y);
+    const body = this.railLock?.alive
+      ? this.railLock
+      : this.railShot?.alive
+        ? this.railShot
+        : this.railLock;
+    this.lookRailAlong(this.railAimX, this.railAimY, this.railAimA, body);
   }
 
   tickLockCam(dt) {
@@ -4269,19 +4289,10 @@ export class Game {
       return;
     }
     if (this.ship.alive && !this.ship.docked && (this.ship.railT || 0) > 0) {
-      const space = this.space();
-      const nx = Math.cos(this.ship.rotation);
-      const ny = Math.sin(this.ship.rotation);
-      const prey = this.railSightTarget(space);
+      const prey = this.railSightTarget(this.space());
       this.railPrey = prey;
       const nose = this.ship.nose?.() || this.ship;
-      const along = prey
-        ? Math.max(80, wrapDelta(prey.x - nose.x, space.width) * nx + wrapDelta(prey.y - nose.y, space.height) * ny)
-        : 260;
-      this.lockCam.lookRail(
-        wrapCoord(nose.x + nx * along, space.width),
-        wrapCoord(nose.y + ny * along, space.height),
-      );
+      this.lookRailAlong(nose.x, nose.y, this.ship.rotation, prey);
       return;
     }
     this.railPrey = null;
@@ -4315,7 +4326,7 @@ export class Game {
     const space = this.space();
     const placedX = this.camX + wrapDelta(this.lockCam.x - this.camX, space.width);
     const placedY = this.camY + wrapDelta(this.lockCam.y - this.camY, space.height);
-    const sightR = this.railPrey?.radius || 22;
+    const sightR = this.railPrey?.radius || this.railLock?.radius || 22;
     this.lockCam.render(this.app.renderer, this.world, {
       screen,
       compact: this.input.layout === "phone",
@@ -4324,7 +4335,7 @@ export class Game {
       radius: this.lockCam.sight ? Math.max(28, sightR + 10) : this.lockCam.target?.radius || this.railLock?.radius || 20,
       hide: [this.far.view, this.lockMark, this.leadMark, this.sightMark],
       scales: [this.ship, ...this.enemies].filter((item) => item?.view),
-      rotation: this.lockCam.sight ? this.headingUp() : 0,
+      rotation: this.lockCam.sight ? this.railSightRot() : 0,
     });
   }
 
