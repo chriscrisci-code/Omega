@@ -10,7 +10,17 @@ const FLICK_SLIP = 0.26;
 const TURN_EXPO = 2.4;
 const TURN_TIME = 0.58;
 const TURN_START = 0.16;
-const DIRS = ["up", "down", "left", "right"];
+const PAD_AXES = {
+  up: { up: true },
+  down: { down: true },
+  left: { left: true },
+  right: { right: true },
+  "up-left": { up: true, left: true },
+  "up-right": { up: true, right: true },
+  "down-left": { down: true, left: true },
+  "down-right": { down: true, right: true },
+};
+const DIRS = Object.keys(PAD_AXES);
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -26,8 +36,8 @@ export class TouchControls {
     this.active = false;
     this.layer = document.querySelector("#touch-layer");
     this.sight = document.querySelector("#touch-sight");
-    this.dirs = { up: false, down: false, left: false, right: false };
-    this.dirIds = { up: null, down: null, left: null, right: null };
+    this.dirs = Object.fromEntries(DIRS.map((dir) => [dir, false]));
+    this.dirIds = Object.fromEntries(DIRS.map((dir) => [dir, null]));
     this.dirBtns = {};
     this.bindPad(document.querySelector("#stick-move"));
     this.turn = this.bindStick(document.querySelector("#stick-turn"), "turn");
@@ -159,10 +169,19 @@ export class TouchControls {
     let surge = 0;
     let strafe = 0;
     let rotate = 0;
-    if (this.dirs.up) surge += 1;
-    if (this.dirs.down) surge -= 1;
-    if (this.dirs.right) strafe += 1;
-    if (this.dirs.left) strafe -= 1;
+    const axes = { up: false, down: false, left: false, right: false };
+    for (const dir of DIRS) {
+      if (!this.dirs[dir]) continue;
+      const spec = PAD_AXES[dir];
+      if (spec.up) axes.up = true;
+      if (spec.down) axes.down = true;
+      if (spec.left) axes.left = true;
+      if (spec.right) axes.right = true;
+    }
+    if (axes.up) surge += 1;
+    if (axes.down) surge -= 1;
+    if (axes.right) strafe += 1;
+    if (axes.left) strafe -= 1;
     if (turn && Math.abs(turn.x) > DEAD) rotate = this.turnForce(turn);
     this.firing = Boolean(this.input.hasGesture("stickFire") && turn && -turn.y > FIRE_FWD);
     this.input.touchStrafe = clamp(strafe, -1, 1);

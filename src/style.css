@@ -1359,11 +1359,11 @@ body.is-phone .ships-link {
 
 .touch-pad {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: 1fr 1fr 1fr;
+  grid-template-columns: 0.78fr 1.12fr 0.78fr;
+  grid-template-rows: 0.78fr 1.12fr 0.78fr;
   width: 100%;
   height: 100%;
-  gap: 6px;
+  gap: 2px;
 }
 
 .touch-dir {
@@ -1374,9 +1374,9 @@ body.is-phone .ships-link {
   min-width: 0;
   appearance: none;
   border: 1px solid rgba(102, 224, 255, 0.45);
-  border-radius: 10px;
+  border-radius: 6px;
   background: rgba(5, 8, 14, 0.42);
-  box-shadow: 0 0 12px rgba(102, 224, 255, 0.16);
+  box-shadow: 0 0 10px rgba(102, 224, 255, 0.16);
   color: #66e0ff;
   touch-action: none;
   pointer-events: auto;
@@ -1385,10 +1385,19 @@ body.is-phone .ships-link {
   -webkit-tap-highlight-color: transparent;
 }
 
-.touch-dir[data-dir="up"] { grid-column: 2; grid-row: 1; }
-.touch-dir[data-dir="left"] { grid-column: 1; grid-row: 2; }
-.touch-dir[data-dir="right"] { grid-column: 3; grid-row: 2; }
-.touch-dir[data-dir="down"] { grid-column: 2; grid-row: 3; }
+.touch-dir[data-dir="up-left"] { grid-column: 1; grid-row: 1; clip-path: polygon(6% 6%, 100% 6%, 6% 100%); }
+.touch-dir[data-dir="up"] { grid-column: 2; grid-row: 1; clip-path: polygon(12% 6%, 88% 6%, 100% 100%, 0 100%); }
+.touch-dir[data-dir="up-right"] { grid-column: 3; grid-row: 1; clip-path: polygon(0 6%, 94% 6%, 94% 100%); }
+.touch-dir[data-dir="left"] { grid-column: 1; grid-row: 2; clip-path: polygon(6% 12%, 100% 0, 100% 100%, 6% 88%); }
+.touch-dir[data-dir="right"] { grid-column: 3; grid-row: 2; clip-path: polygon(0 0, 94% 12%, 94% 88%, 0 100%); }
+.touch-dir[data-dir="down-left"] { grid-column: 1; grid-row: 3; clip-path: polygon(6% 0, 100% 94%, 6% 94%); }
+.touch-dir[data-dir="down"] { grid-column: 2; grid-row: 3; clip-path: polygon(0 0, 100% 0, 88% 94%, 12% 94%); }
+.touch-dir[data-dir="down-right"] { grid-column: 3; grid-row: 3; clip-path: polygon(0 94%, 94% 0, 94% 94%); }
+
+.touch-dir.is-diag {
+  border-radius: 2px;
+  background: rgba(5, 8, 14, 0.5);
+}
 
 .touch-dir svg {
   display: block;
