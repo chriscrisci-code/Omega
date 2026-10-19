@@ -27,13 +27,27 @@ export const SHIP_CATALOG = [
     id: "DFSB21",
     name: "DFSB21",
     hulls: [
+      [0, -72, 7, -38, 8, -10, 9, 14, 7, 36, 0, 42, -7, 36, -9, 14, -8, -10, -7, -38],
+      [-8, -8, -38, -8, -42, 5, -10, 11],
+      [8, -8, 38, -8, 42, 5, 10, 11],
+      [-8, 30, -13, 56, -5, 64, -3, 40],
+      [8, 30, 13, 56, 5, 64, 3, 40],
+    ],
+    lines: [],
+    details: [[0, -30, 7, -10, 0, 2, -7, -10]],
+  },
+  {
+    id: "GUNSHIP",
+    name: "GUNSHIP",
+    scale: 1.12,
+    hulls: [
       [
-        0, -72, 5, -36, 7, -12, 8, -2, 38, -4, 40, 6, 10, 10, 9, 28, 11, 58, 6, 62, 4, 44, 0, 40, -4, 44, -6, 62, -11, 58,
-        -9, 28, -10, 10, -40, 6, -38, -4, -8, -2, -7, -12, -5, -36,
+        -26, -72, -14, -72, -10, -16, -2, -2, 0, -12, 2, -2, 10, -16, 14, -72, 26, -72, 32, 6, 28, 52, 14, 62, 4, 28, 0, 42,
+        -4, 28, -14, 62, -28, 52, -32, 6,
       ],
     ],
     lines: [],
-    details: [],
+    details: [[0, -40, 8, -18, 0, -4, -8, -18]],
   },
   {
     id: "DSF22",
@@ -201,7 +215,8 @@ export const DEFAULT_SHIP_ID = "DSF22";
 export const ASSAULT_ID = "ASSAULT";
 export const SABRE_ID = "SABRE";
 export const ACRP33_ID = "ACRP33";
-export const PLAYABLE_SHIP_IDS = [DEFAULT_SHIP_ID, ASSAULT_ID, SABRE_ID, ACRP33_ID];
+export const GUNSHIP_ID = "GUNSHIP";
+export const PLAYABLE_SHIP_IDS = [DEFAULT_SHIP_ID, ASSAULT_ID, GUNSHIP_ID, SABRE_ID, ACRP33_ID];
 
 export { kitFor, SHIP_KITS } from "./kits.js";
 

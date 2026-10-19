@@ -1823,13 +1823,15 @@ export class Game {
     const picks = [];
     const used = new Set(skip);
     const focus = this.focusShip();
-    if (focus && !used.has(focus)) {
+    const destroyersOnly = this.ship.missileDestroyersOnly?.();
+    if (focus && !used.has(focus) && (!destroyersOnly || focus.role === "destroyer")) {
       picks.push(focus);
       used.add(focus);
     }
     const ranked = [];
     for (const enemy of [...this.enemies, ...this.stationTargets(), ...this.castleStars]) {
       if (!enemy.alive || used.has(enemy)) continue;
+      if (destroyersOnly && enemy.role !== "destroyer") continue;
       const dx = wrapDelta(enemy.x - this.ship.x, space.width);
       const dy = wrapDelta(enemy.y - this.ship.y, space.height);
       const dist = Math.hypot(dx, dy);
@@ -2486,13 +2488,35 @@ export class Game {
   tickAssaultTurrets(t, space, origin = this.ship) {
     if (!this.ship.has("aiTurrets") || !origin?.alive || !origin.turrets?.length || origin.docked) return;
     const threats = this.assaultThreats(space, origin);
-    const picks = threats.slice(0, 2);
     const canFire = origin === this.ship ? this.ship.undockLock <= 0 : origin.age > 0.28;
-    const guns = this.ship.turretsCfg() || {};
+    const guns = origin.turretsCfg?.() || this.ship.turretsCfg() || {};
+    const unique = Boolean(guns.unique);
+    const burstN = Math.max(0, guns.burst || 0);
+    const focus = this.focusShip();
+    const taken = new Set();
     origin.turrets.forEach((gun, i) => {
       gun.cool = Math.max(0, gun.cool - t);
-      const pick = picks[i] || picks[0] || null;
-      let desired = i === 0 ? -0.4 : 0.4;
+      const rest = gun.rest ?? gun.angle ?? (i === 0 ? -0.4 : 0.4);
+      let pick = null;
+      if (focus?.alive && threats.some((row) => row.body === focus)) {
+        pick = threats.find((row) => row.body === focus);
+      } else if (unique) {
+        let best = null;
+        let bestErr = Infinity;
+        for (const row of threats) {
+          if (taken.has(row.body)) continue;
+          const err = Math.abs(wrapDelta(Math.atan2(row.dy, row.dx) - origin.rotation - rest, Math.PI * 2));
+          if (err < bestErr || (err === bestErr && row.dist < (best?.dist || Infinity))) {
+            best = row;
+            bestErr = err;
+          }
+        }
+        pick = best;
+        if (pick) taken.add(pick.body);
+      } else {
+        pick = threats[i] || threats[0] || null;
+      }
+      let desired = rest;
       if (pick) {
         const vx = Number.isFinite(pick.body.vx) ? pick.body.vx : 0;
         const vy = Number.isFinite(pick.body.vy) ? pick.body.vy : 0;
@@ -2513,7 +2537,15 @@ export class Game {
       const muzzle = origin.turretWorld(gun);
       if (!Number.isFinite(muzzle.x) || !Number.isFinite(muzzle.y) || !Number.isFinite(muzzle.angle)) return;
       bullet.fire(muzzle.x, muzzle.y, muzzle.angle, { kit: "aiTurret" });
-      gun.cool = guns.cool || 0.44;
+      if (burstN) {
+        if ((gun.burstLeft || 0) <= 0) gun.burstLeft = burstN;
+        gun.burstLeft -= 1;
+        gun.cool = gun.burstLeft > 0
+          ? guns.cool || 0.105
+          : rand(guns.burstGapMin || 0.5, guns.burstGapMax || 1.4);
+      } else {
+        gun.cool = guns.cool || 0.44;
+      }
     });
   }
 
@@ -2557,7 +2589,12 @@ export class Game {
     const space = this.space();
     const focus = this.focusShip();
     const taken = focus ? [] : this.missiles.filter((item) => item.alive && item.target?.alive).map((item) => item.target);
-    const marks = focus ? [focus] : this.missileTargets(space, want, taken);
+    let marks = focus ? [focus] : this.missileTargets(space, want, taken);
+    if (this.ship.missileDestroyersOnly?.()) {
+      marks = marks.filter((item) => item?.role === "destroyer");
+      if (!marks.length) marks = this.missileTargets(space, want, taken);
+    }
+    if (this.ship.missileDestroyersOnly?.() && !marks.length) return;
     let shot = 0;
     let nose = this.ship.nose();
     let mark = null;

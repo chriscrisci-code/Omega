@@ -54,6 +54,40 @@ export const SHIP_KITS = {
       delayMax: 1.5,
     },
   },
+  GUNSHIP: {
+    id: "GUNSHIP",
+    entitlement: "base",
+    stats: {
+      speedMul: 0.5,
+      turnMul: 0.5,
+      hullHits: 3,
+      hullIFrames: 0.55,
+      shieldMul: 2,
+      empCap: 3,
+    },
+    weapons: {
+      noseGun: false,
+      missiles: { destroyers: true },
+      turrets: {
+        cool: 0.105,
+        burst: 10,
+        burstGapMin: 0.48,
+        burstGapMax: 1.45,
+        stagger: 0.32,
+        unique: true,
+        range: 780,
+        turn: 4.4,
+        aim: 0.28,
+        hits: 3,
+        mounts: [
+          { x: 9, y: -7, angle: -0.35 },
+          { x: 9, y: 7, angle: 0.35 },
+          { x: -12, y: 0, angle: Math.PI },
+        ],
+      },
+    },
+    specials: ["aiTurrets", "pulseShield", "multiHull"],
+  },
   ACRP33: {
     id: "ACRP33",
     entitlement: "base",
@@ -69,6 +103,7 @@ export const SHIP_KITS = {
       missiles: true,
     },
     specials: ["autoShield"],
+    // Later: spend LP here to buy GUNSHIP hulls as escort/protection, not Assault marines.
   },
   SABRE: {
     id: "SABRE",

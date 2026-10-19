@@ -214,6 +214,11 @@ export class Ship {
     return Math.max(1, n || 1);
   }
 
+  missileDestroyersOnly() {
+    const spec = kitWeapon(this.kitDef, "missiles");
+    return Boolean(spec && typeof spec === "object" && spec.destroyers);
+  }
+
   stat(name, fallback) {
     return kitStat(this.kitDef, name, fallback);
   }
@@ -310,8 +315,17 @@ export class Ship {
   }
 
   bindTurrets() {
-    const mounts = this.turretsCfg()?.mounts;
-    this.turrets = mounts ? mounts.map((gun) => ({ ...gun, cool: 0 })) : [];
+    const cfg = this.turretsCfg();
+    const mounts = cfg?.mounts;
+    const stagger = Math.max(0, cfg?.stagger || 0);
+    this.turrets = mounts
+      ? mounts.map((gun, i) => ({
+          ...gun,
+          rest: gun.angle,
+          burstLeft: 0,
+          cool: stagger * i + Math.random() * (stagger * 0.55 || 0.08),
+        }))
+      : [];
   }
 
   speedMul() {
