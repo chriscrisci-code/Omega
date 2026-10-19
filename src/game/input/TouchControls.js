@@ -1,5 +1,3 @@
-import { octantMove } from "../math.js";
-
 const DEAD = 0.16;
 const FIRE_FWD = 0.22;
 const REACH = 54;
@@ -12,6 +10,7 @@ const FLICK_SLIP = 0.26;
 const TURN_EXPO = 2.4;
 const TURN_TIME = 0.58;
 const TURN_START = 0.16;
+const DIRS = ["up", "down", "left", "right"];
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -27,7 +26,10 @@ export class TouchControls {
     this.active = false;
     this.layer = document.querySelector("#touch-layer");
     this.sight = document.querySelector("#touch-sight");
-    this.move = this.bindStick(document.querySelector("#stick-move"), "move");
+    this.dirs = { up: false, down: false, left: false, right: false };
+    this.dirIds = { up: null, down: null, left: null, right: null };
+    this.dirBtns = {};
+    this.bindPad(document.querySelector("#stick-move"));
     this.turn = this.bindStick(document.querySelector("#stick-turn"), "turn");
     this.stickIds = new Set();
     this.fingers = new Map();
@@ -52,6 +54,37 @@ export class TouchControls {
     this.layer?.classList.toggle("is-hidden", !this.active);
     document.body.classList.toggle("is-phone", this.active);
     if (!this.active) this.reset();
+  }
+
+  bindPad(root) {
+    if (!root) return;
+    for (const btn of root.querySelectorAll(".touch-dir")) {
+      const dir = btn.dataset.dir;
+      if (!DIRS.includes(dir)) continue;
+      this.dirBtns[dir] = btn;
+      const grab = (event) => {
+        if (!this.active || event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.stickIds.add(event.pointerId);
+        this.dirIds[dir] = event.pointerId;
+        btn.setPointerCapture?.(event.pointerId);
+        this.dirs[dir] = true;
+        btn.classList.add("is-on");
+        this.syncAxes();
+      };
+      const drop = (event) => {
+        if (this.dirIds[dir] !== event.pointerId) return;
+        this.stickIds.delete(event.pointerId);
+        this.dirIds[dir] = null;
+        this.dirs[dir] = false;
+        btn.classList.remove("is-on");
+        this.syncAxes();
+      };
+      btn.addEventListener("pointerdown", grab);
+      btn.addEventListener("pointerup", drop);
+      btn.addEventListener("pointercancel", drop);
+    }
   }
 
   bindStick(root, role) {
@@ -122,16 +155,14 @@ export class TouchControls {
   }
 
   syncAxes() {
-    const move = this.move;
     const turn = this.turn;
     let surge = 0;
     let strafe = 0;
     let rotate = 0;
-    if (move) {
-      const region = octantMove(move.x, move.y, DEAD);
-      surge = region.surge;
-      strafe = region.strafe;
-    }
+    if (this.dirs.up) surge += 1;
+    if (this.dirs.down) surge -= 1;
+    if (this.dirs.right) strafe += 1;
+    if (this.dirs.left) strafe -= 1;
     if (turn && Math.abs(turn.x) > DEAD) rotate = this.turnForce(turn);
     this.firing = Boolean(this.input.hasGesture("stickFire") && turn && -turn.y > FIRE_FWD);
     this.input.touchStrafe = clamp(strafe, -1, 1);
@@ -221,12 +252,16 @@ export class TouchControls {
     this.input.touchStrafe = 0;
     this.input.touchRotate = 0;
     this.sight?.classList.add("is-hidden");
-    for (const stick of [this.move, this.turn]) {
-      if (!stick) continue;
-      stick.id = null;
-      stick.x = 0;
-      stick.y = 0;
-      if (stick.knob) stick.knob.style.transform = "translate(-50%, -50%)";
+    for (const dir of DIRS) {
+      this.dirs[dir] = false;
+      this.dirIds[dir] = null;
+      this.dirBtns[dir]?.classList.remove("is-on");
+    }
+    if (this.turn) {
+      this.turn.id = null;
+      this.turn.x = 0;
+      this.turn.y = 0;
+      if (this.turn.knob) this.turn.knob.style.transform = "translate(-50%, -50%)";
     }
   }
 }

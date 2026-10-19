@@ -1192,7 +1192,7 @@ body.is-phone {
 
 body.is-phone .hud-bl,
 body.is-phone .hud-br {
-  bottom: 168px;
+  bottom: 198px;
 }
 
 body.is-phone .hud-center .help,
@@ -1229,7 +1229,7 @@ body.is-phone .dock-hero {
 }
 
 body.is-phone .dock-bay {
-  bottom: 158px;
+  bottom: 188px;
   width: min(920px, 94vw);
 }
 
@@ -1244,7 +1244,7 @@ body.is-phone .dock-seat {
 }
 
 body.is-phone .mode-banner {
-  bottom: 178px;
+  bottom: 208px;
 }
 
 body.is-phone .tag {
@@ -1323,6 +1323,9 @@ body.is-phone .ships-link {
 
 .stick-left {
   left: max(18px, env(safe-area-inset-left));
+  width: 168px;
+  height: 168px;
+  pointer-events: none;
 }
 
 .stick-right {
@@ -1352,6 +1355,66 @@ body.is-phone .ships-link {
   border: 1px solid #66e0ff;
   background: rgba(102, 224, 255, 0.12);
   box-shadow: 0 0 12px rgba(102, 224, 255, 0.35);
+}
+
+.touch-pad {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr 1fr;
+  width: 100%;
+  height: 100%;
+  gap: 6px;
+}
+
+.touch-dir {
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  appearance: none;
+  border: 1px solid rgba(102, 224, 255, 0.45);
+  border-radius: 10px;
+  background: rgba(5, 8, 14, 0.42);
+  box-shadow: 0 0 12px rgba(102, 224, 255, 0.16);
+  color: #66e0ff;
+  touch-action: none;
+  pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.touch-dir[data-dir="up"] { grid-column: 2; grid-row: 1; }
+.touch-dir[data-dir="left"] { grid-column: 1; grid-row: 2; }
+.touch-dir[data-dir="right"] { grid-column: 3; grid-row: 2; }
+.touch-dir[data-dir="down"] { grid-column: 2; grid-row: 3; }
+
+.touch-dir svg {
+  display: block;
+  width: 54%;
+  height: 54%;
+  margin: auto;
+}
+
+.touch-dir path {
+  fill: none;
+  stroke: #66e0ff;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.touch-dir.is-on,
+.touch-dir:active {
+  border-color: #c8f8ff;
+  background: rgba(102, 224, 255, 0.16);
+  box-shadow: 0 0 16px rgba(102, 224, 255, 0.4);
+}
+
+.touch-dir.is-on path,
+.touch-dir:active path {
+  stroke: #c8f8ff;
 }
 
 .touch-sight {

@@ -47,7 +47,7 @@ const GESTURE_NAMES = {
   flickFwd: "FLICK FWD",
   flickBack: "FLICK BACK",
   stickFire: "STICK FWD FIRE",
-  stickMove: "LEFT STICK",
+  stickMove: "DIR PAD",
   stickTurn: "RIGHT STICK",
   doubleTap: "DOUBLE TAP",
   twoFinger: "TWO FINGER",

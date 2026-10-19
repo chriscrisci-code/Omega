@@ -96,8 +96,20 @@
       </div>
       <div id="touch-layer" class="touch-layer is-hidden">
         <div class="stick stick-left" id="stick-move">
-          <div class="stick-well"></div>
-          <div class="stick-knob"></div>
+          <div class="touch-pad">
+            <button class="touch-dir" data-dir="up" type="button" aria-label="Thrust">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15 L12 8 L18 15" /></svg>
+            </button>
+            <button class="touch-dir" data-dir="left" type="button" aria-label="Strafe left">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6 L8 12 L15 18" /></svg>
+            </button>
+            <button class="touch-dir" data-dir="right" type="button" aria-label="Strafe right">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 L16 12 L9 18" /></svg>
+            </button>
+            <button class="touch-dir" data-dir="down" type="button" aria-label="Reverse">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9 L12 16 L18 9" /></svg>
+            </button>
+          </div>
         </div>
         <div class="stick stick-right" id="stick-turn">
           <div class="stick-well"></div>
