@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
-import { applyDifficulty, assault, battleship as battleshipCfg, camera as cameraConfig, castle, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, battleship as battleshipCfg, camera as cameraConfig, castle, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -1496,11 +1496,22 @@ export class Game {
   syncMissileHud() {
     if (this.attractOnDemo) return;
     const playing = this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE;
-    this.hud.setSpecial(playing ? `MSL  ${this.missileAmmo}` : "WARP EMP MSL");
+    const ammo = this.ship.can("rockets") ? "RKT" : "MSL";
+    this.hud.setSpecial(playing ? `${ammo}  ${this.missileAmmo}` : `WARP EMP ${ammo}`);
   }
 
   empCap() {
     return this.ship?.stat?.("empCap", shipLevels.emp) ?? shipLevels.emp;
+  }
+
+  gunshipCap() {
+    return this.ship.has("gunshipWing") ? shipLevels.gunship || 2 : 0;
+  }
+
+  escortWant() {
+    if (this.ship.has("wingmen")) return this.wingmen.length;
+    if (this.ship.has("gunshipWing")) return Math.max(0, Math.min(this.wingmen.length, this.levels.gunship || 0));
+    return 0;
   }
 
   empTier() {
@@ -1516,6 +1527,12 @@ export class Game {
   }
 
   upgradeCost(id) {
+    if (id === "gunship") {
+      const max = this.gunshipCap();
+      const level = this.levels.gunship || 0;
+      if (!max || level >= max) return 0;
+      return shipLevels.cost.gunship[level] || 0;
+    }
     const max = id === "emp" ? this.empCap() : shipLevels[id];
     const level = this.levels[id] || 1;
     if (!max || level >= max) return 0;
@@ -1523,24 +1540,30 @@ export class Game {
   }
 
   refreshDock() {
+    const showGunship = this.ship.has("gunshipWing");
     this.hud.bay.setUpgrades({
       points: this.points,
       levels: {
         ...this.levels,
         emp: Math.min(this.levels?.emp || 1, this.empCap()),
+        gunship: this.levels?.gunship || 0,
       },
       costs: {
         gun: this.upgradeCost("gun"),
         missile: this.upgradeCost("missile"),
         emp: this.upgradeCost("emp"),
         shield: this.upgradeCost("shield"),
+        gunship: showGunship ? this.upgradeCost("gunship") : 0,
       },
       max: {
         gun: shipLevels.gun,
         missile: shipLevels.missile,
         emp: this.empCap(),
         shield: shipLevels.shield,
+        gunship: showGunship ? this.gunshipCap() : 0,
       },
+      ammoName: this.ship.can("rockets") ? "RKT" : "MSL",
+      showGunship,
     });
   }
 
@@ -1563,25 +1586,38 @@ export class Game {
   buyUpgrade(id) {
     if (this.mode !== PLAYING || !this.ship.docked) return;
     if (id === "emp" && (this.levels.emp || 1) >= this.empCap()) return;
+    if (id === "gunship" && (!this.ship.has("gunshipWing") || (this.levels.gunship || 0) >= this.gunshipCap())) return;
     const cost = this.upgradeCost(id);
     if (!cost || this.points < cost) return;
     this.points -= cost;
-    this.levels[id] = (this.levels[id] || 1) + 1;
+    this.levels[id] = id === "gunship" ? (this.levels.gunship || 0) + 1 : (this.levels[id] || 1) + 1;
     this.addXp(xpAwards.upgrade);
     if (id === "shield") this.applyShieldLevel(true);
     if (id === "missile") this.reloadMissiles();
+    if (id === "gunship") this.syncWingmen({ revive: false });
     this.hud.setPoints(this.points);
     this.refreshDock();
     this.runDirty = true;
     this.writeCheckpoint();
     this.sfx("up");
-    this.hud.setMode(id === "missile" ? `MSL  ${this.missileAmmo}` : `${id === "shield" ? "SHD" : id.toUpperCase()}  ${this.levels[id]}`);
+    const ammoName = this.ship.can("rockets") ? "RKT" : "MSL";
+    this.hud.setMode(id === "missile" ? `${ammoName}  ${this.missileAmmo}` : `${id === "shield" ? "SHD" : id.toUpperCase()}  ${this.levels[id]}`);
   }
 
   shoot(dt = 0) {
+    if (!this.ship.alive || this.ship.docked) {
+      this.ship.clearRail?.();
+      this.fireWasOn = this.input.fireHeld;
+      return;
+    }
+    if (this.ship.can("rockets")) {
+      this.ship.clearRail?.();
+      this.tickRockets();
+      return;
+    }
     const spec = this.ship.noseGunCfg?.();
     const rail = spec && spec.charge > 0;
-    if (!this.ship.alive || this.ship.docked || !this.ship.can("noseGun")) {
+    if (!this.ship.can("noseGun")) {
       this.ship.clearRail?.();
       this.fireWasOn = this.input.fireHeld;
       return;
@@ -1649,6 +1685,67 @@ export class Game {
     if (dual) this.gun ^= 1;
     this.cooldown = shipLevels.gunCool[gun - 1] ?? bullets.cooldown;
     this.sfx("thud");
+  }
+
+  tickRockets() {
+    const held = this.attractOnDemo || this.input.fireHeld;
+    this.fireWasOn = this.input.fireHeld;
+    if (!held || this.cooldown > 0) return;
+    if (!this.attractOnDemo && this.missileAmmo <= 0) return;
+    this.fireRocket();
+  }
+
+  fireRocket() {
+    const bolt = this.missiles.find((item) => !item.alive);
+    if (!bolt) return;
+    const muzzle = this.ship.muzzle(0);
+    const spec = this.ship.rocketsCfg?.() || {};
+    bolt.fire(muzzle.x, muzzle.y, this.ship.rotation, null, {
+      rocket: true,
+      speed: spec.speed ?? rockets.speed,
+      topSpeed: spec.topSpeed ?? rockets.topSpeed,
+      ramp: spec.ramp ?? rockets.ramp,
+      turn: spec.turn ?? rockets.turn,
+      life: spec.life ?? rockets.life,
+      radius: spec.radius ?? rockets.radius,
+      drop: 0,
+      fuse: spec.fuse ?? rockets.fuse,
+      blast: spec.blast ?? rockets.blast,
+      arm: spec.arm ?? rockets.arm,
+      color: rockets.color,
+      hot: rockets.hot,
+    });
+    if (!this.attractOnDemo) {
+      this.missileAmmo = Math.max(0, this.missileAmmo - 1);
+      this.syncMissileHud();
+    }
+    const gun = this.gunTier();
+    this.cooldown = spec.cool ?? shipLevels.gunCool[gun - 1] ?? rockets.cooldown;
+    this.sfx("thud");
+  }
+
+  rocketPrey(bolt, space) {
+    const nx = Math.cos(bolt.angle);
+    const ny = Math.sin(bolt.angle);
+    let best = null;
+    let bestDist = Infinity;
+    const consider = (body) => {
+      if (!body || body.alive === false) return;
+      const dx = wrapDelta(body.x - bolt.x, space.width);
+      const dy = wrapDelta(body.y - bolt.y, space.height);
+      const along = dx * nx + dy * ny;
+      if (along < 24) return;
+      const off = Math.hypot(dx - along * nx, dy - along * ny);
+      if (off / along > (rockets.cone || 0.7)) return;
+      const dist = Math.hypot(dx, dy);
+      if (dist < bestDist) {
+        best = body;
+        bestDist = dist;
+      }
+    };
+    for (const enemy of this.enemies) consider(enemy);
+    for (const part of this.stationTargets()) consider(part);
+    return best;
   }
 
   enterHubSeat(id) {
@@ -1815,7 +1912,7 @@ export class Game {
     const focus = this.focusShip();
     if (!focus) return;
     for (const missile of this.missiles) {
-      if (missile.alive) missile.target = focus;
+      if (missile.alive && !missile.rocket) missile.target = focus;
     }
   }
 
@@ -2125,7 +2222,7 @@ export class Game {
   }
 
   freshLoadout() {
-    this.levels = { gun: 1, missile: 1, emp: 1, shield: 1 };
+    this.levels = { gun: 1, missile: 1, emp: 1, shield: 1, gunship: 0 };
     this.points = 0;
     this.loadoutBank = 0;
   }
@@ -2176,6 +2273,7 @@ export class Game {
       missile: this.levels?.missile,
       emp: this.levels?.emp,
       shield: this.levels?.shield,
+      gunship: this.levels?.gunship || 0,
       points: this.points,
       bank: this.loadoutBank,
       ammo: this.missileAmmo,
@@ -2238,6 +2336,7 @@ export class Game {
       missile: cp.loadout.missile,
       emp: cp.loadout.emp,
       shield: cp.loadout.shield,
+      gunship: cp.loadout.gunship || 0,
     };
     this.points = Math.max(0, Math.floor(Number(cp.loadout.points) || 0));
     this.loadoutBank = Math.max(0, Math.floor(Number(cp.loadout.bank) || 0));
@@ -2270,7 +2369,7 @@ export class Game {
   escortGroup() {
     const list = [];
     if (this.ship.alive && !this.ship.docked) list.push(this.ship);
-    if (this.ship.has("wingmen") && !this.ship.docked) {
+    if (this.escortWant() > 0 && !this.ship.docked) {
       for (const wing of this.wingmen) {
         if (wing.flying()) list.push(wing);
       }
@@ -2318,7 +2417,8 @@ export class Game {
 
   syncWingmen(options = {}) {
     const revive = Boolean(options.revive);
-    if (!this.ship.has("wingmen") || !this.ship.alive || this.ship.docked) {
+    const want = this.escortWant();
+    if (want <= 0 || !this.ship.alive || this.ship.docked) {
       for (const wing of this.wingmen) wing.park();
       this.leadTrail = [];
       this.leadAge = 0;
@@ -2328,10 +2428,14 @@ export class Game {
       this.leadTrail = [];
       this.leadAge = 0;
     }
-    for (const wing of this.wingmen) {
+    this.wingmen.forEach((wing, i) => {
+      if (i >= want) {
+        wing.park();
+        return;
+      }
       if (revive || !wing.alive) wing.spawn(this.ship);
       else wing.deployed = true;
-    }
+    });
   }
 
   sampleLeadTrail(dt) {
@@ -2384,23 +2488,28 @@ export class Game {
   }
 
   tickWingmen(t, space) {
-    if (!this.ship.has("wingmen") || !this.ship.alive || this.ship.docked) {
+    const want = this.escortWant();
+    if (want <= 0 || !this.ship.alive || this.ship.docked) {
       for (const wing of this.wingmen) wing.park();
       this.leadTrail = [];
       this.leadAge = 0;
       return;
     }
     this.sampleLeadTrail(t);
-    for (const wing of this.wingmen) {
-      if (!wing.alive) continue;
+    this.wingmen.forEach((wing, i) => {
+      if (i >= want) {
+        wing.park();
+        return;
+      }
+      if (!wing.alive) wing.spawn(this.ship);
       wing.deployed = true;
       if (this.ship.warping) {
         wing.snap(this.ship);
-        continue;
+        return;
       }
       wing.noticeMove(this.ship);
       wing.update(t, this.ship, this.ghostLead(wing.delay, space), space);
-    }
+    });
   }
 
   killWingman(wing) {
@@ -2466,7 +2575,7 @@ export class Game {
 
   assaultThreats(space, origin = this.ship) {
     const list = [];
-    const range = this.ship.turretsCfg()?.range || 780;
+    const range = origin.turretsCfg?.()?.range || this.ship.turretsCfg()?.range || 780;
     const consider = (body, missile = false) => {
       if (!body || body.alive === false) return;
       if (!Number.isFinite(body.x) || !Number.isFinite(body.y)) return;
@@ -2486,7 +2595,7 @@ export class Game {
   }
 
   tickAssaultTurrets(t, space, origin = this.ship) {
-    if (!this.ship.has("aiTurrets") || !origin?.alive || !origin.turrets?.length || origin.docked) return;
+    if (!origin?.alive || !origin.turrets?.length || origin.docked) return;
     const threats = this.assaultThreats(space, origin);
     const canFire = origin === this.ship ? this.ship.undockLock <= 0 : origin.age > 0.28;
     const guns = origin.turretsCfg?.() || this.ship.turretsCfg() || {};
@@ -2550,13 +2659,13 @@ export class Game {
   }
 
   tickAssaultKit(t, space) {
-    if (!this.ship.has("aiTurrets") && !this.ship.has("wingmen")) {
+    if (!this.ship.has("aiTurrets") && this.escortWant() <= 0) {
       this.ship.autoShield = this.ship.has("autoShield") ? this.ship.autoShield : false;
       for (const wing of this.wingmen) wing.park();
       return;
     }
     this.tickWingmen(t, space);
-    this.tickAssaultTurrets(t, space, this.ship);
+    if (this.ship.has("aiTurrets")) this.tickAssaultTurrets(t, space, this.ship);
     for (const wing of this.wingmen) {
       if (wing.flying()) this.tickAssaultTurrets(t, space, wing);
     }
@@ -2686,11 +2795,11 @@ export class Game {
     for (const burst of this.missileBursts) burst.kill();
   }
 
-  spawnMissileBurst(x, y, color, hot) {
+  spawnMissileBurst(x, y, color, hot, extra = {}) {
     const burst = this.missileBursts.find((item) => !item.alive) || this.missileBursts[0];
     if (!burst) return;
     if (burst.alive) burst.kill();
-    burst.fire(x, y, { color, hot });
+    burst.fire(x, y, { color, hot, ...extra });
   }
 
   clipMissileRay(ox, oy, angle, range, space) {
@@ -2757,7 +2866,15 @@ export class Game {
     const glow = missile.tint ?? colors.orange;
     const hot = missile.tintHot ?? colors.amber;
     const blast = missile.blast || 0;
-    if (blast) {
+    if (missile.rocket) {
+      this.spawnMissileBurst(missile.x, missile.y, glow, hot, {
+        count: rockets.rays,
+        range: rockets.rayRange,
+        lifeMin: rockets.rayLifeMin,
+        lifeMax: rockets.rayLifeMax,
+      });
+      this.shake = Math.max(this.shake, 6);
+    } else if (blast) {
       this.spawnMissileBurst(missile.x, missile.y, glow, hot);
       this.shake = Math.max(this.shake, 12);
     } else if (missile.star) {
@@ -3904,6 +4021,9 @@ export class Game {
     const see2 = see * see;
     for (const list of [this.missiles, this.hubMissiles, this.castleStars]) {
       for (const missile of list) {
+        if (missile.alive && missile.rocket && missile.clock >= (rockets.seekAfter || 0.14)) {
+          missile.target = this.rocketPrey(missile, space);
+        }
         const dx = wrapDelta(missile.x - this.camX, space.width);
         const dy = wrapDelta(missile.y - this.camY, space.height);
         missile.update(t, space, dx * dx + dy * dy <= see2);

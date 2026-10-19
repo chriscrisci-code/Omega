@@ -1,8 +1,8 @@
 import { Container, Graphics } from "pixi.js";
 import { colors, shield as shieldConfig, ship as shipConfig } from "../config.js";
-import { kitFor, kitStat } from "../ships/kits.js";
+import { kitFor, kitHas, kitStat, kitWeapon } from "../ships/kits.js";
 import { strokeGlow, strokeLine } from "../render/textures.js";
-import { ASSAULT_ID, SHIP_CATALOG, catalogToGameSkin } from "../ships/catalog.js";
+import { ASSAULT_ID, GUNSHIP_ID, SHIP_CATALOG, catalogToGameSkin } from "../ships/catalog.js";
 import { damp, turnToward, wrap, wrapCoord, wrapDelta } from "../math.js";
 import { paintAssaultShield } from "./Ship.js";
 
@@ -27,6 +27,7 @@ export class Wingman {
     this.rotation = 0;
     this.age = 0;
     this.kitDef = kitFor("ASSAULT");
+    this.leadKit = this.kitDef;
     this.delay = this.wing().delayMin;
     this.turrets = [
       { x: 8, y: -10, angle: -0.4, cool: 0 },
@@ -43,11 +44,19 @@ export class Wingman {
   }
 
   wing() {
-    return this.kitDef?.wing || {};
+    return this.leadKit?.wing || this.kitDef?.wing || {};
   }
 
   speedMul() {
-    return kitStat(this.kitDef, "speedMul", 0.5);
+    return this.wing().speedMul ?? kitStat(this.kitDef, "speedMul", 0.5);
+  }
+
+  turretsCfg() {
+    return kitWeapon(this.kitDef, "turrets") || null;
+  }
+
+  has(special) {
+    return kitHas(this.kitDef, special);
   }
 
   shieldRadius() {
@@ -86,9 +95,23 @@ export class Wingman {
     this.alive = true;
     this.deployed = true;
     this.age = Math.random() * 8;
-    this.kitDef = lead?.kitDef || kitFor("ASSAULT");
-    const mounts = this.kitDef?.weapons?.turrets?.mounts;
-    if (mounts) this.turrets = mounts.map((gun) => ({ ...gun, cool: 0.2 }));
+    this.leadKit = lead?.kitDef || this.leadKit;
+    const kitId = this.leadKit?.wing?.kit || this.leadKit?.id || "ASSAULT";
+    const skinId = this.leadKit?.wing?.skin || kitId;
+    this.kitDef = kitFor(kitId);
+    const fallback = kitId === GUNSHIP_ID ? GUNSHIP_ID : ASSAULT_ID;
+    this.skin = catalogToGameSkin(SHIP_CATALOG.find((item) => item.id === skinId) || SHIP_CATALOG.find((item) => item.id === fallback) || SHIP_CATALOG[0]);
+    const cfg = this.turretsCfg();
+    const mounts = cfg?.mounts;
+    const stagger = Math.max(0, cfg?.stagger || 0);
+    this.turrets = mounts
+      ? mounts.map((gun, i) => ({
+          ...gun,
+          rest: gun.angle,
+          burstLeft: 0,
+          cool: stagger * i + Math.random() * (stagger * 0.55 || 0.2),
+        }))
+      : [];
     this.hullMax = this.wing().hullHits || 2;
     this.hullHp = this.hullMax;
     this.shieldMax = shieldConfig.max;
@@ -111,8 +134,7 @@ export class Wingman {
     this.seenShield = Boolean(lead.shieldOn);
     this.rollDelay();
     for (const gun of this.turrets) {
-      gun.cool = 0.2;
-      gun.angle = gun.y < 0 ? -0.4 : 0.4;
+      gun.angle = gun.rest ?? gun.angle;
     }
     const slot = this.slotWorld(lead);
     this.x = slot.x;

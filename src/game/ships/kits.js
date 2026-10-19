@@ -67,7 +67,8 @@ export const SHIP_KITS = {
     },
     weapons: {
       noseGun: false,
-      missiles: { destroyers: true },
+      missiles: false,
+      rockets: true,
       turrets: {
         cool: 0.105,
         burst: 10,
@@ -102,8 +103,19 @@ export const SHIP_KITS = {
       noseGun: { charge: 0.7, hits: 200, speed: 1200, life: 10000 / 1200, coolMul: 2.2 },
       missiles: true,
     },
-    specials: ["autoShield"],
-    // Later: spend LP here to buy GUNSHIP hulls as escort/protection, not Assault marines.
+    specials: ["autoShield", "gunshipWing"],
+    wing: {
+      kit: "GUNSHIP",
+      skin: "GUNSHIP",
+      hullHits: 3,
+      side: 188,
+      along: 10,
+      lag: 96,
+      lead: 36,
+      delayMin: 0.25,
+      delayMax: 1.6,
+      speedMul: 0.85,
+    },
   },
   SABRE: {
     id: "SABRE",

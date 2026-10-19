@@ -17,6 +17,7 @@ export class Missile {
     this.clock = 0;
     this.points = [];
     this.star = false;
+    this.rocket = false;
     this.blind = false;
     this.dropFor = 0;
     this.fuse = 0;
@@ -82,11 +83,12 @@ export class Missile {
     }
     const glow = this.tint ?? colors.orange;
     const hot = this.tintHot ?? colors.amber;
-    this.body.poly(BODY, true);
+    const body = this.rocket ? BODY.map((n) => n * 0.7) : BODY;
+    this.body.poly(body, true);
     this.body.stroke({ width: 3.8, color: glow, alpha: 0.4, join: "round" });
-    this.body.poly(BODY, true);
-    this.body.stroke({ width: 1.55, color: hot, alpha: 1, join: "round" });
-    this.body.poly(BODY, true);
+    this.body.poly(body, true);
+    this.body.stroke({ width: this.rocket ? 1.25 : 1.55, color: hot, alpha: 1, join: "round" });
+    this.body.poly(body, true);
     this.body.stroke({ width: 0.7, color: colors.white, alpha: 0.95, join: "round" });
     if (this.clock >= this.dropFor) {
       this.body.moveTo(-3.2, 0);
@@ -98,6 +100,7 @@ export class Missile {
   fire(x, y, angle, target = null, options = {}) {
     this.alive = true;
     this.star = Boolean(options.star);
+    this.rocket = Boolean(options.rocket);
     this.tint = options.color ?? colors.orange;
     this.tintHot = options.hot ?? colors.amber;
     this.speed0 = options.speed ?? missiles.speed;
@@ -121,7 +124,7 @@ export class Missile {
     this.blast = options.blast ?? 0;
     this.armAt = options.arm ?? 0;
     this.clock = 0;
-    this.radius = this.star ? (options.radius ?? 7) : missiles.radius;
+    this.radius = this.star ? (options.radius ?? 7) : options.radius ?? missiles.radius;
     this.trailFade = missiles.trailFade;
     this.trailGap = missiles.trailGap;
     this.points = [{ x, y, t: 0 }];
@@ -222,6 +225,7 @@ export class Missile {
   kill(hard = false) {
     this.alive = false;
     this.target = null;
+    this.rocket = false;
     this.blind = false;
     this.body.visible = false;
     this.body.clear();

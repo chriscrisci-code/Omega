@@ -219,6 +219,11 @@ export class Ship {
     return Boolean(spec && typeof spec === "object" && spec.destroyers);
   }
 
+  rocketsCfg() {
+    const spec = kitWeapon(this.kitDef, "rockets");
+    return spec ? (typeof spec === "object" ? spec : {}) : null;
+  }
+
   stat(name, fallback) {
     return kitStat(this.kitDef, name, fallback);
   }

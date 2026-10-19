@@ -77,16 +77,18 @@ export class DockBay {
     const points = state.points || 0;
     const rows = [
       { id: "gun", name: "GUN" },
-      { id: "missile", name: "MSL" },
+      { id: "missile", name: state.ammoName || "MSL" },
       { id: "emp", name: "EMP" },
       { id: "shield", name: "SHD" },
     ];
-    const key = `${points}|${rows.map((row) => `${row.id}:${levels[row.id] || 1}:${costs[row.id] || 0}:${max[row.id] || 0}`).join("|")}`;
+    if (state.showGunship) rows.push({ id: "gunship", name: "GSHP" });
+    const levelOf = (id) => (id === "gunship" ? levels.gunship || 0 : levels[id] || 1);
+    const key = `${state.ammoName || "MSL"}|${state.showGunship ? 1 : 0}|${points}|${rows.map((row) => `${row.id}:${levelOf(row.id)}:${costs[row.id] || 0}:${max[row.id] || 0}`).join("|")}`;
     if (key === this.upKey && this.ups.childElementCount) return;
     this.upKey = key;
     this.ups.innerHTML = "";
     for (const row of rows) {
-      const level = levels[row.id] || 1;
+      const level = levelOf(row.id);
       const cap = max[row.id] || level;
       const cost = costs[row.id] || 0;
       const top = level >= cap;

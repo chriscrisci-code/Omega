@@ -66,12 +66,14 @@ export const shipLevels = {
   missile: 7,
   emp: 4,
   shield: 4,
+  gunship: 2,
   gunCool: [0.2, 0.14, 0.105, 0.08, 0.04],
   cost: {
     gun: [4, 6, 10, 14],
     missile: [5, 6, 8, 10, 12, 14],
     emp: [6, 10, 16],
     shield: [5, 8, 12],
+    gunship: [8, 14],
   },
 };
 
@@ -163,7 +165,7 @@ export const missiles = {
   agileSlew: 2,
   life: 30,
   cooldown: 1 / 3,
-  max: 24,
+  max: 32,
   volley: 8,
   ammoPerLevel: 6,
   radius: 5,
@@ -183,6 +185,28 @@ export const missiles = {
   raySpeed: 1150,
   rayLifeMin: 0.4,
   rayLifeMax: 2.08,
+};
+
+export const rockets = {
+  speed: 620,
+  topSpeed: 880,
+  ramp: 0.7,
+  life: 3.4,
+  cooldown: 0.16,
+  radius: 3.2,
+  turn: 5.4,
+  cone: 0.7,
+  damage: 2,
+  fuse: 16,
+  arm: 0.12,
+  seekAfter: 0.14,
+  blast: 1,
+  rays: 32,
+  rayRange: 720,
+  rayLifeMin: 0.16,
+  rayLifeMax: 0.7,
+  color: colors.amber,
+  hot: colors.white,
 };
 
 export const castle = {
