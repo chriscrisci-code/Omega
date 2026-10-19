@@ -188,11 +188,11 @@ export const missiles = {
 };
 
 export const rockets = {
-  speed: 620,
-  topSpeed: 880,
+  speed: 465,
+  topSpeed: 660,
   ramp: 0.7,
   life: 3.4,
-  cooldown: 0.16,
+  cooldown: 0.2,
   radius: 3.2,
   turn: 5.4,
   cone: 0.7,

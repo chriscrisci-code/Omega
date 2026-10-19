@@ -1719,8 +1719,7 @@ export class Game {
       this.missileAmmo = Math.max(0, this.missileAmmo - 1);
       this.syncMissileHud();
     }
-    const gun = this.gunTier();
-    this.cooldown = spec.cool ?? shipLevels.gunCool[gun - 1] ?? rockets.cooldown;
+    this.cooldown = spec.cool ?? rockets.cooldown ?? shipLevels.gunCool[0];
     this.sfx("thud");
   }
 
