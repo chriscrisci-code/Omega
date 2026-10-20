@@ -80,33 +80,49 @@ export class GameAudio {
     return node;
   }
 
-  ensureGunFlange() {
-    if (this.gunBus || !this.ctx) return;
+  makeFlange({ dry = 0.8, wet = 0.52, delay = 0.006, rate = 0.42, depth = 0.0052, feedback = 0.5 } = {}) {
     const input = this.ctx.createGain();
-    const dry = this.ctx.createGain();
-    const wet = this.ctx.createGain();
-    dry.gain.value = 0.8;
-    wet.gain.value = 0.52;
-    const delay = this.ctx.createDelay(0.05);
-    delay.delayTime.value = 0.006;
+    const dryGain = this.ctx.createGain();
+    const wetGain = this.ctx.createGain();
+    dryGain.gain.value = dry;
+    wetGain.gain.value = wet;
+    const line = this.ctx.createDelay(0.05);
+    line.delayTime.value = delay;
     const lfo = this.ctx.createOscillator();
     lfo.type = "triangle";
-    lfo.frequency.value = 0.42;
-    const depth = this.ctx.createGain();
-    depth.gain.value = 0.0052;
-    lfo.connect(depth);
-    depth.connect(delay.delayTime);
-    const feedback = this.ctx.createGain();
-    feedback.gain.value = 0.5;
-    input.connect(dry);
-    input.connect(delay);
-    delay.connect(feedback);
-    feedback.connect(delay);
-    delay.connect(wet);
-    dry.connect(this.master);
-    wet.connect(this.master);
+    lfo.frequency.value = rate;
+    const sweep = this.ctx.createGain();
+    sweep.gain.value = depth;
+    lfo.connect(sweep);
+    sweep.connect(line.delayTime);
+    const regen = this.ctx.createGain();
+    regen.gain.value = feedback;
+    input.connect(dryGain);
+    input.connect(line);
+    line.connect(regen);
+    regen.connect(line);
+    line.connect(wetGain);
+    dryGain.connect(this.master);
+    wetGain.connect(this.master);
     lfo.start();
-    this.gunBus = input;
+    return input;
+  }
+
+  ensureGunFlange() {
+    if (!this.ctx) return;
+    if (!this.gunBus) {
+      this.gunBus = this.makeFlange();
+    }
+    if (!this.gunHotBus) {
+      this.gunHotBus = this.makeFlange({
+        dry: 0.36,
+        wet: 1.05,
+        delay: 0.012,
+        rate: 0.92,
+        depth: 0.0096,
+        feedback: 0.66,
+      });
+    }
   }
 
   gun({
@@ -120,12 +136,18 @@ export class GameAudio {
     thump = 78,
     thumpPeak = 0.2,
     thumpDur = 0.09,
+    rate = 1,
     flange = false,
     at = this.now(),
   }) {
     if (flange) this.ensureGunFlange();
-    const bus = flange && this.gunBus ? this.gunBus : this.master;
+    const bus = flange === "hot" && this.gunHotBus
+      ? this.gunHotBus
+      : flange && this.gunBus
+        ? this.gunBus
+        : this.master;
     const source = this.noiseSource();
+    source.playbackRate.value = rate;
     const filter = this.ctx.createBiquadFilter();
     filter.type = type;
     filter.Q.setValueAtTime(q, at);
@@ -389,6 +411,22 @@ export const SFX = {
         thumpPeak: 0.32,
         thumpDur: 0.16,
         flange: true,
+      }),
+  },
+  turret: {
+    name: "TURRET",
+    fire: (audio) =>
+      audio.gun({
+        dur: 0.2,
+        noisePeak: 0.26,
+        cutoff: 700 * Math.SQRT2,
+        endCutoff: 140 * Math.SQRT2,
+        q: 0.7,
+        thump: 55 * Math.SQRT2,
+        thumpPeak: 0.28,
+        thumpDur: 0.16,
+        rate: Math.SQRT2,
+        flange: "hot",
       }),
   },
   enemy: {
@@ -678,7 +716,7 @@ export const SFX = {
 };
 
 export const SFX_GROUPS = [
-  { name: "GUNS", ids: ["thud", "enemy"] },
+  { name: "GUNS", ids: ["thud", "turret", "enemy"] },
   { name: "SPECIAL", ids: ["missile", "star", "warp", "emp", "laser"] },
   { name: "THRUST", ids: ["main", "side"] },
   { name: "HITS", ids: ["hit", "rock", "boom", "die", "hub"] },

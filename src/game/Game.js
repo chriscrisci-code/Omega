@@ -27,7 +27,7 @@ import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
 import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, missileAmmoCap, normalizeCheckpoint, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
-import { SHIP_CATALOG, resolveShipId } from "./ships/catalog.js";
+import { GUNSHIP_ID, SHIP_CATALOG, resolveShipId } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
 
 const TITLE = "title";
@@ -2645,6 +2645,7 @@ export class Game {
       const muzzle = origin.turretWorld(gun);
       if (!Number.isFinite(muzzle.x) || !Number.isFinite(muzzle.y) || !Number.isFinite(muzzle.angle)) return;
       bullet.fire(muzzle.x, muzzle.y, muzzle.angle, { kit: "aiTurret" });
+      if (origin.kitDef?.id === GUNSHIP_ID) this.sfx("turret");
       if (burstN) {
         if ((gun.burstLeft || 0) <= 0) gun.burstLeft = burstN;
         gun.burstLeft -= 1;
