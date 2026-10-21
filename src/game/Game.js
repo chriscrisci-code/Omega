@@ -76,6 +76,11 @@ export class Game {
       event.stopPropagation();
       this.input._controlsClick = true;
     });
+    this.hud.xpReset?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.resetXp();
+    });
 
     this.wingmen = [new Wingman(-1), new Wingman(1)];
     for (const wing of this.wingmen) this.vectors.addChild(wing.view);
@@ -1473,6 +1478,15 @@ export class Game {
     this.save.xp = this.xp;
     this.hud.setXp(this.xp);
     this.storage.save(this.save);
+  }
+
+  resetXp() {
+    this.xp = 0;
+    this.save.xp = 0;
+    this.hud.setXp(0);
+    this.storage.save(this.save);
+    this.hud.setMode("XP  0");
+    this.sfx("dump");
   }
 
   gunTier() {
