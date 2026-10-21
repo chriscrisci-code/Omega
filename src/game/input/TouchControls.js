@@ -15,10 +15,6 @@ const PAD_AXES = {
   down: { down: true },
   left: { left: true },
   right: { right: true },
-  "up-left": { up: true, left: true },
-  "up-right": { up: true, right: true },
-  "down-left": { down: true, left: true },
-  "down-right": { down: true, right: true },
 };
 const DIRS = Object.keys(PAD_AXES);
 
@@ -37,8 +33,9 @@ export class TouchControls {
     this.layer = document.querySelector("#touch-layer");
     this.sight = document.querySelector("#touch-sight");
     this.dirs = Object.fromEntries(DIRS.map((dir) => [dir, false]));
-    this.dirIds = Object.fromEntries(DIRS.map((dir) => [dir, null]));
     this.dirBtns = {};
+    this.padRoot = null;
+    this.padFingers = new Map();
     this.bindPad(document.querySelector("#stick-move"));
     this.turn = this.bindStick(document.querySelector("#stick-turn"), "turn");
     this.stickIds = new Set();
@@ -68,33 +65,65 @@ export class TouchControls {
 
   bindPad(root) {
     if (!root) return;
+    this.padRoot = root;
     for (const btn of root.querySelectorAll(".touch-dir")) {
       const dir = btn.dataset.dir;
       if (!DIRS.includes(dir)) continue;
       this.dirBtns[dir] = btn;
-      const grab = (event) => {
-        if (!this.active || event.button !== 0) return;
-        event.preventDefault();
-        event.stopPropagation();
-        this.stickIds.add(event.pointerId);
-        this.dirIds[dir] = event.pointerId;
-        btn.setPointerCapture?.(event.pointerId);
-        this.dirs[dir] = true;
-        btn.classList.add("is-on");
-        this.syncAxes();
-      };
-      const drop = (event) => {
-        if (this.dirIds[dir] !== event.pointerId) return;
-        this.stickIds.delete(event.pointerId);
-        this.dirIds[dir] = null;
-        this.dirs[dir] = false;
-        btn.classList.remove("is-on");
-        this.syncAxes();
-      };
-      btn.addEventListener("pointerdown", grab);
-      btn.addEventListener("pointerup", drop);
-      btn.addEventListener("pointercancel", drop);
     }
+    const grab = (event) => {
+      if (!this.active || event.button !== 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.stickIds.add(event.pointerId);
+      root.setPointerCapture?.(event.pointerId);
+      this.setPadFinger(event.pointerId, event.clientX, event.clientY);
+    };
+    const drag = (event) => {
+      if (!this.padFingers.has(event.pointerId)) return;
+      event.preventDefault();
+      this.setPadFinger(event.pointerId, event.clientX, event.clientY);
+    };
+    const drop = (event) => {
+      if (!this.padFingers.has(event.pointerId)) return;
+      this.stickIds.delete(event.pointerId);
+      this.padFingers.delete(event.pointerId);
+      this.applyPadDirs();
+    };
+    root.addEventListener("pointerdown", grab);
+    root.addEventListener("pointermove", drag);
+    root.addEventListener("pointerup", drop);
+    root.addEventListener("pointercancel", drop);
+  }
+
+  dirsUnder(x, y) {
+    const found = new Set();
+    const stack = document.elementsFromPoint?.(x, y) || [document.elementFromPoint(x, y)];
+    for (const node of stack) {
+      const btn = node?.closest?.(".touch-dir");
+      if (!btn || !this.padRoot?.contains(btn)) continue;
+      const dir = btn.dataset.dir;
+      if (DIRS.includes(dir)) found.add(dir);
+    }
+    return found;
+  }
+
+  setPadFinger(id, x, y) {
+    this.padFingers.set(id, this.dirsUnder(x, y));
+    this.applyPadDirs();
+  }
+
+  applyPadDirs() {
+    const on = new Set();
+    for (const dirs of this.padFingers.values()) {
+      for (const dir of dirs) on.add(dir);
+    }
+    for (const dir of DIRS) {
+      const held = on.has(dir);
+      this.dirs[dir] = held;
+      this.dirBtns[dir]?.classList.toggle("is-on", held);
+    }
+    this.syncAxes();
   }
 
   bindStick(root, role) {
@@ -271,9 +300,9 @@ export class TouchControls {
     this.input.touchStrafe = 0;
     this.input.touchRotate = 0;
     this.sight?.classList.add("is-hidden");
+    this.padFingers.clear();
     for (const dir of DIRS) {
       this.dirs[dir] = false;
-      this.dirIds[dir] = null;
       this.dirBtns[dir]?.classList.remove("is-on");
     }
     if (this.turn) {
