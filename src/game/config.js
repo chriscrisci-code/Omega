@@ -274,6 +274,21 @@ export const assault = {
   starBoost: 10,
 };
 
+/** Wave 11: fight inside a huge asteroid. Walled corridors, bounce, no wrap. */
+export const tunnel = {
+  wave: 11,
+  cols: 11,
+  rows: 11,
+  cell: 210,
+  hunters: 9,
+  coreR: 34,
+  wall: 7,
+  time: 180,
+  score: 800,
+  ox: 0.22,
+  oy: 0.78,
+};
+
 /** Unarmed yard tugs. Waves 5–6 assemble the station; wave 9 a battleship. */
 export const crane = {
   hp: 4,
