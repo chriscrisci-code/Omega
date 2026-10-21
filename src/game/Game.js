@@ -172,6 +172,7 @@ export class Game {
     this.assaultTime = assault.wave1;
     this.tunnel = null;
     this.tunnelDone = false;
+    this.holdTunnel = false;
     this.cooldown = 0;
     this.gun = 0;
     this.shipLevel = 1;
@@ -447,8 +448,9 @@ export class Game {
     if (this.assaultIndex === 9) this.yardWarn = 6.5;
     if (this.assaultIndex >= 7 && this.assaultIndex < 9) this.clearCranes();
     if (this.assaultIndex === 8) this.cullRole("hunter");
-    if (this.assaultIndex === tunnelCfg.wave) this.enterTunnel();
-    else this.leaveTunnel({ silent: true, dock: false });
+    if (this.assaultIndex === tunnelCfg.wave) {
+      if (!this.holdTunnel) this.enterTunnel();
+    } else this.leaveTunnel({ silent: true, dock: false });
   }
 
   syncStation() {
@@ -559,10 +561,31 @@ export class Game {
       this.leaveTunnel({ silent: true, dock: false });
       return;
     }
-    this.leaveTunnel({ silent: true, dock: false });
+    if (this.tunnel) {
+      this.placeInTunnel();
+      return;
+    }
     this.tunnel = new Tunnel();
     this.vectors.addChildAt(this.tunnel.view, 0);
     this.tunnelDone = false;
+    this.homeOn = false;
+    this.leaveHubSeat();
+    this.dockOpen = false;
+    this.hud.hideDock();
+    this.cullRole("hunter");
+    this.cullRole("raider");
+    this.cullRole("destroyer");
+    this.clearCranes();
+    this.hostileShots.forEach((shot) => shot.kill());
+    this.castleStars.forEach((star) => star.kill(true));
+    for (const spot of this.tunnel.hunterSpots()) this.spawnTunnelHunter(spot.x, spot.y);
+    this.syncStation();
+    this.placeInTunnel();
+    this.sfx("warn");
+  }
+
+  placeInTunnel() {
+    if (!this.tunnel) return;
     this.homeOn = false;
     this.leaveHubSeat();
     this.dockOpen = false;
@@ -574,6 +597,7 @@ export class Game {
     this.ship.vx = 0;
     this.ship.vy = 0;
     this.ship.rotation = this.tunnel.startHeading();
+    this.ship.alive = true;
     this.ship.invuln = Math.max(this.ship.invuln || 0, shipConfig.invulnTime);
     this.ship.undockLock = 0.25;
     this.ship.view.visible = true;
@@ -581,16 +605,7 @@ export class Game {
     for (const wing of this.wingmen) {
       if (wing.flying()) this.bounceTunnel(wing);
     }
-    this.cullRole("hunter");
-    this.cullRole("raider");
-    this.cullRole("destroyer");
-    this.clearCranes();
-    this.hostileShots.forEach((shot) => shot.kill());
-    this.castleStars.forEach((star) => star.kill(true));
-    for (const spot of this.tunnel.hunterSpots()) this.spawnTunnelHunter(spot.x, spot.y);
-    this.syncStation();
     this.snapCamera();
-    this.sfx("warn");
   }
 
   leaveTunnel({ silent = false, dock = true } = {}) {
@@ -1025,6 +1040,7 @@ export class Game {
     this.fireWasOn = false;
     this.timer = 0;
     this.shake = 0;
+    this.holdTunnel = true;
     this.leaveTunnel({ silent: true, dock: false });
     this.clearRocks();
     this.clearEnemies();
@@ -1096,6 +1112,7 @@ export class Game {
     if (this.ship.docked) this.hud.showDock(this.shipId);
     this.scatterField();
     this.spawnWave();
+    this.holdTunnel = false;
     if (this.assaultIndex === tunnelCfg.wave && !this.assaultRest) this.enterTunnel();
     else this.leaveTunnel({ silent: true, dock: false });
   }
@@ -3943,6 +3960,7 @@ export class Game {
         kind: "station",
         name: "CORE",
         color: colors.cyan,
+        hotColor: colors.cyanHot,
       });
     }
     this.pips.update(marks, { x: this.camX, y: this.camY }, this.camRot, screen, this.camZoom, space, this.viewRadius(), {

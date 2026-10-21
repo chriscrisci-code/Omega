@@ -1,7 +1,7 @@
-import { Container, Graphics } from "pixi.js";
+import { Container, Graphics, Rectangle } from "pixi.js";
 import { colors, tunnel as cfg, world as worldConfig } from "../config.js";
 import { pick, rand } from "../math.js";
-import { strokeGlow, strokeLine } from "../render/textures.js";
+import { strokeGlow } from "../render/textures.js";
 
 function circleHitSeg(cx, cy, r, x1, y1, x2, y2) {
   const dx = x2 - x1;
@@ -110,10 +110,13 @@ function walk(hWalls, vWalls, sx, sy) {
 export class Tunnel {
   constructor() {
     this.view = new Container();
+    this.view.eventMode = "none";
+    this.view.interactiveChildren = false;
     this.hull = new Graphics();
     this.wallsG = new Graphics();
-    this.marks = new Graphics();
-    this.view.addChild(this.hull, this.wallsG, this.marks);
+    this.gate = new Graphics();
+    this.coreRing = new Graphics();
+    this.view.addChild(this.hull, this.wallsG, this.gate, this.coreRing);
     this.walls = [];
     this.cells = [];
     this.start = { x: 0, y: 0 };
@@ -231,84 +234,60 @@ export class Tunnel {
         });
       }
     }
-    this.draw(hWalls, vWalls);
+    this.draw();
   }
 
-  draw(hWalls, vWalls) {
+  draw() {
     const cols = cfg.cols;
     const rows = cfg.rows;
     const cell = cfg.cell;
-    const ox = - (cols * cell) / 2;
-    const oy = - (rows * cell) / 2;
-    const hw = (cols * cell) / 2 + 160;
-    const hh = (rows * cell) / 2 + 160;
-    const reach = Math.hypot(hw, hh) + 40;
+    const ox = -(cols * cell) / 2;
+    const oy = -(rows * cell) / 2;
+    const reach = Math.hypot(cols * cell, rows * cell) * 0.5 + 180;
+    this.view.boundsArea = new Rectangle(-reach, -reach, reach * 2, reach * 2);
+
     const hull = [];
-    const count = 28;
+    const count = 22;
     for (let i = 0; i < count; i += 1) {
       const a = (i / count) * Math.PI * 2;
-      const u = 0.82 + ((i * 17) % 9) * 0.028 + rand(-0.04, 0.05);
+      const u = 0.86 + ((i * 17) % 7) * 0.022 + rand(-0.03, 0.04);
       hull.push(Math.cos(a) * reach * u, Math.sin(a) * reach * u);
     }
     this.hull.clear();
-    strokeGlow(this.hull, hull, colors.orange, colors.orangeHot, 2.4);
-    const inner = [];
-    for (let i = 0; i < count; i += 1) {
-      inner.push(hull[i * 2] * 0.92, hull[i * 2 + 1] * 0.92);
-    }
-    strokeGlow(this.hull, inner, colors.magenta, colors.magentaHot, 1.2);
+    strokeGlow(this.hull, hull, colors.orange, colors.orangeHot, 2.1);
 
     this.wallsG.clear();
-    const rock = (x1, y1, x2, y2) => {
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const len = Math.hypot(dx, dy) || 1;
-      const nx = -dy / len;
-      const ny = dx / len;
-      const jag = rand(-6, 6);
-      const mx = (x1 + x2) * 0.5 + nx * jag;
-      const my = (y1 + y2) * 0.5 + ny * jag;
-      strokeLine(this.wallsG, [x1, y1, mx, my, x2, y2], colors.orange, colors.orangeHot, 1.55);
+    const drawWalls = () => {
+      for (const wall of this.walls) {
+        this.wallsG.moveTo(wall.x1 - this.x, wall.y1 - this.y);
+        this.wallsG.lineTo(wall.x2 - this.x, wall.y2 - this.y);
+      }
     };
-    for (let row = 0; row <= rows; row += 1) {
-      for (let col = 0; col < cols; col += 1) {
-        if (!hWalls[row][col]) continue;
-        rock(ox + col * cell, oy + row * cell, ox + (col + 1) * cell, oy + row * cell);
-      }
-    }
-    for (let row = 0; row < rows; row += 1) {
-      for (let col = 0; col <= cols; col += 1) {
-        if (!vWalls[row][col]) continue;
-        rock(ox + col * cell, oy + row * cell, ox + col * cell, oy + (row + 1) * cell);
-      }
-    }
-    this.paintMarks();
-  }
+    drawWalls();
+    this.wallsG.stroke({ width: 4.6, color: colors.orange, alpha: 0.2, cap: "square", join: "miter" });
+    drawWalls();
+    this.wallsG.stroke({ width: 1.5, color: colors.orangeHot, alpha: 1, cap: "square", join: "miter" });
 
-  paintMarks() {
     const sx = this.start.x - this.x;
     const sy = this.start.y - this.y;
-    const cx = this.core.x - this.x;
-    const cy = this.core.y - this.y;
-    const beat = 0.82 + Math.sin(this.pulse * 3.2) * 0.18;
-    this.marks.clear();
-    strokeGlow(this.marks, [
-      sx - 22, sy - 16,
-      sx + 10, sy - 16,
-      sx + 10, sy + 16,
-      sx - 22, sy + 16,
-    ], colors.cyan, colors.cyanHot, 1.15);
-    this.marks.circle(cx, cy, cfg.coreR * beat);
-    this.marks.stroke({ width: 4.2, color: colors.cyan, alpha: 0.22 });
-    this.marks.circle(cx, cy, cfg.coreR * beat);
-    this.marks.stroke({ width: 1.6, color: colors.cyanHot, alpha: 1 });
-    this.marks.circle(cx, cy, cfg.coreR * 0.42);
-    this.marks.stroke({ width: 1.2, color: colors.white, alpha: 0.9 });
+    this.gate.clear();
+    strokeGlow(this.gate, [sx - 22, sy - 16, sx + 10, sy - 16, sx + 10, sy + 16, sx - 22, sy + 16], colors.cyan, colors.cyanHot, 1.15);
+
+    this.coreRing.clear();
+    this.coreRing.circle(0, 0, cfg.coreR);
+    this.coreRing.stroke({ width: 4.2, color: colors.cyan, alpha: 0.22 });
+    this.coreRing.circle(0, 0, cfg.coreR);
+    this.coreRing.stroke({ width: 1.6, color: colors.cyanHot, alpha: 1 });
+    this.coreRing.circle(0, 0, cfg.coreR * 0.42);
+    this.coreRing.stroke({ width: 1.2, color: colors.white, alpha: 0.9 });
+    this.coreRing.position.set(this.core.x - this.x, this.core.y - this.y);
   }
 
   update(dt) {
     this.pulse += dt;
-    this.paintMarks();
+    const beat = 0.88 + Math.sin(this.pulse * 3.2) * 0.12;
+    this.coreRing.scale.set(beat);
+    this.coreRing.alpha = 0.75 + beat * 0.25;
   }
 
   destroy() {
