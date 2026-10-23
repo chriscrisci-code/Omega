@@ -109,7 +109,9 @@ export class TouchControls {
   }
 
   setPadFinger(id, x, y) {
-    this.padFingers.set(id, this.dirsUnder(x, y));
+    const live = this.dirsUnder(x, y);
+    const prev = this.padFingers.get(id);
+    this.padFingers.set(id, live.size ? live : (prev?.size ? prev : live));
     this.applyPadDirs();
   }
 
