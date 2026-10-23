@@ -112,6 +112,7 @@ export const hudFilters = {
   destroyer: true,
   crane: true,
   station: true,
+  battleship: true,
 };
 
 /** 16000² torus. Hub at center. Cardinal castles sit 5120 out. Warp hops 2560 in 1s. */
@@ -334,14 +335,15 @@ export const station = {
   shift: [70, 95],
 };
 
-/** Wave 9 scaffold on the station. Construction only. ~8× destroyer length. */
+/** Wave 9 scaffold on the station. ~8× destroyer length. 10 ACRP rail shots to kill. */
 export const battleship = {
   fromWave: 9,
   plates: 6,
   startPlates: 2,
-  score: 0,
+  score: 1200,
   length: 1080,
   beam: 172,
+  acrpShots: 10,
 };
 
 export const ore = {

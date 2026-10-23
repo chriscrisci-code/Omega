@@ -971,13 +971,16 @@ export class Game {
   }
 
   stationTargets() {
-    return this.station?.awake ? this.station.parts() : [];
+    const parts = this.station?.awake ? [...this.station.parts()] : [];
+    if (this.station?.awake && this.battleship?.alive) parts.push(...this.battleship.hitParts());
+    return parts;
   }
 
   tickStation(t, space) {
     if (!this.station?.awake) return;
     const aim = this.nearestEscort(this.station, space) || this.ship;
     this.station.update(t, aim, space);
+    this.battleship?.sync();
     if (this.mode !== PLAYING || this.attractOnDemo || this.assaultRest) return;
     if (this.ship.docked || !this.escortGroup().length) return;
     let fired = 0;
@@ -2021,7 +2024,7 @@ export class Game {
 
   focusShip() {
     if (!this.focusFire || !this.selected?.alive) return null;
-    if (this.enemies.includes(this.selected) || this.selected.kind === "station") return this.selected;
+    if (this.enemies.includes(this.selected) || this.selected.kind === "station" || this.selected.kind === "battleship") return this.selected;
     return null;
   }
 
@@ -2145,7 +2148,7 @@ export class Game {
       }
     }
     this.selected = best;
-    this.focusFire = Boolean(best && (this.enemies.includes(best) || best.kind === "station"));
+    this.focusFire = Boolean(best && (this.enemies.includes(best) || best.kind === "station" || best.kind === "battleship"));
     this.bindMissilesToFocus();
   }
 
@@ -3202,6 +3205,10 @@ export class Game {
   }
 
   chipStationPart(part, impact, amount = 1) {
+    if (part?.kind === "battleship") {
+      this.chipBattleship(part, impact, amount);
+      return;
+    }
     if (!part?.alive) return;
     const x = impact?.x ?? part.x;
     const y = impact?.y ?? part.y;
@@ -3257,6 +3264,66 @@ export class Game {
     this.sfx("pop");
     this.noteLockDeath(part);
     if (part.joint || part.clamp) this.station.checkBreaks(this.space());
+  }
+
+  chipBattleship(part, impact, amount = 1) {
+    const ship = part?.ship || this.battleship;
+    if (!ship?.alive) return;
+    const x = impact?.x ?? part?.x ?? ship.x;
+    const y = impact?.y ?? part?.y ?? ship.y;
+    const dead = ship.wound(amount);
+    this.spawnShards(null, { x, y, vx: 0, vy: 0, rotation: ship.rotation, radius: 28 }, {
+      color: ship.color,
+      hotColor: ship.hotColor,
+      kick: debrisConfig.rockKick * 0.55,
+      life: dead ? 2.2 : 1.4,
+      wreck: dead ? 10 : 5,
+    });
+    this.fx.emit(8, {
+      x,
+      y,
+      color: ship.hotColor,
+      speed: 90,
+      speedVar: 40,
+      life: 0.2,
+      size: 5,
+    });
+    if (!dead) {
+      this.sfx("hit");
+      return;
+    }
+    this.killBattleship(ship, { x, y });
+  }
+
+  killBattleship(ship, at) {
+    if (!ship) return;
+    const x = at?.x ?? ship.x;
+    const y = at?.y ?? ship.y;
+    for (const plate of [...ship.loosePlates()]) {
+      this.battleship.dropTow(plate.towedBy);
+      plate.installed = true;
+      plate.towedBy = null;
+      plate.graphic.visible = false;
+    }
+    ship.wreck();
+    this.addScore(battleshipCfg.score || 0);
+    this.fx.burst(x, y, ship.color, 28, 240);
+    this.fx.burst(ship.x, ship.y, colors.white, 16, 180);
+    this.spawnShards(null, { x: ship.x, y: ship.y, vx: 0, vy: 0, rotation: ship.rotation, radius: 90 }, {
+      color: ship.color,
+      hotColor: colors.white,
+      kick: debrisConfig.rockKick * 0.8,
+      life: 3,
+      wreck: 18,
+    });
+    this.shake = Math.max(this.shake, 10);
+    this.sfx("pop");
+    if (this.selected?.ship === ship) this.noteLockDeath(this.selected);
+    this.noteLockDeath(ship);
+    if (this.selected?.ship === ship || this.selected === ship) {
+      this.selected = null;
+      this.focusFire = false;
+    }
   }
 
   bounceShot(shot, enemy, space) {
@@ -3952,6 +4019,7 @@ export class Game {
       ...this.enemies.filter((enemy) => enemy.alive),
     ];
     if (this.station.awake) marks.push(this.station);
+    if (this.station.awake && this.battleship?.alive) marks.push(this.battleship);
     if (this.tunnel) {
       marks.push({
         x: this.tunnel.core.x,
