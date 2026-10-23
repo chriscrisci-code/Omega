@@ -403,6 +403,7 @@ export const xp = {
   killGun: 20,
   killMissile: 12,
   killEmp: 3,
+  shipUnlock: 30000,
 };
 
 export const debris = {

@@ -1,3 +1,5 @@
+import { xp as xpCfg } from "../config.js";
+
 /** Vector hulls redrawn from Imported Artwork. Nose-up, y down. */
 
 export const SHIP_CATALOG = [
@@ -220,8 +222,30 @@ export const PLAYABLE_SHIP_IDS = [DEFAULT_SHIP_ID, ASSAULT_ID, GUNSHIP_ID, SABRE
 
 export { kitFor, SHIP_KITS } from "./kits.js";
 
-export function resolveShipId(id) {
-  return PLAYABLE_SHIP_IDS.includes(id) ? id : DEFAULT_SHIP_ID;
+export function shipUnlockStep() {
+  return Math.max(1, Math.floor(Number(xpCfg.shipUnlock) || 30000));
+}
+
+export function shipUnlockAt(id) {
+  const i = PLAYABLE_SHIP_IDS.indexOf(id);
+  if (i <= 0) return 0;
+  return i * shipUnlockStep();
+}
+
+export function unlockedShipIds(xpTotal) {
+  const step = shipUnlockStep();
+  const n = 1 + Math.floor(Math.max(0, Math.floor(Number(xpTotal) || 0)) / step);
+  return PLAYABLE_SHIP_IDS.slice(0, Math.min(PLAYABLE_SHIP_IDS.length, n));
+}
+
+export function shipUnlocked(id, xpTotal) {
+  return unlockedShipIds(xpTotal).includes(id);
+}
+
+export function resolveShipId(id, xpTotal) {
+  const want = PLAYABLE_SHIP_IDS.includes(id) ? id : DEFAULT_SHIP_ID;
+  if (xpTotal == null) return want;
+  return shipUnlocked(want, xpTotal) ? want : DEFAULT_SHIP_ID;
 }
 
 export function catalogMiniSvg(spec, size = 52, color = "#66e0ff", hot = "#c8f8ff") {

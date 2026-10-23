@@ -1177,8 +1177,17 @@ body:has(#controls-page:not(.is-hidden)) .version {
   box-shadow: 0 0 10px rgba(102, 224, 255, 0.4);
 }
 
+.dock-ship.is-lock {
+  opacity: 0.38;
+  cursor: default;
+}
+
 .dock-ship:hover {
   border-color: #c8f8ff;
+}
+
+.dock-ship.is-lock:hover {
+  border-color: rgba(102, 224, 255, 0.32);
 }
 
 #dock-hint {

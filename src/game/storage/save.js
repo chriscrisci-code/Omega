@@ -1,6 +1,6 @@
 import { missiles, shipLevels } from "../config.js";
 import { guessProfile, normalizeBinds } from "../input/bindings.js";
-import { DEFAULT_SHIP_ID, resolveShipId } from "../ships/catalog.js";
+import { DEFAULT_SHIP_ID, PLAYABLE_SHIP_IDS, resolveShipId } from "../ships/catalog.js";
 
 const KEY = "vector-game-save";
 
@@ -181,6 +181,17 @@ export function normalizeLoadout(data) {
   };
 }
 
+export function normalizeHulls(data) {
+  if (!data || typeof data !== "object") return {};
+  const out = {};
+  for (const id of PLAYABLE_SHIP_IDS) {
+    if (!data[id]) continue;
+    const row = normalizeLoadout(data[id]);
+    out[id] = { gun: row.gun, missile: row.missile, emp: row.emp, shield: row.shield, gunship: row.gunship };
+  }
+  return out;
+}
+
 const CASTLE_NAMES = new Set(["NORTH", "EAST", "SOUTH", "WEST"]);
 
 export function normalizeCheckpoint(data) {
@@ -199,6 +210,7 @@ export function normalizeCheckpoint(data) {
     cargo: Math.max(0, Math.floor(Number(data.cargo) || 0)),
     shipId: resolveShipId(data.shipId),
     loadout: normalizeLoadout(data.loadout),
+    hulls: normalizeHulls(data.hulls),
     hubOre: Math.max(0, Math.floor(Number(data.hubOre) || 0)),
     seen: seen.length ? seen : ["NORTH"],
     arriveWait: Math.max(1, Number(data.arriveWait) || 180),
@@ -255,7 +267,7 @@ function normalize(data) {
     highScore: Math.max(Number(data.highScore) || 0, highScores[0]?.score || 0),
     xp: Math.max(0, Math.floor(Number(data.xp) || 0)),
     maxWave: Math.max(1, Math.floor(Number(data.maxWave) || 1)),
-    shipId: resolveShipId(data.shipId),
+    shipId: resolveShipId(data.shipId, Math.max(0, Math.floor(Number(data.xp) || 0))),
     loadout: normalizeLoadout(data.loadout),
     checkpoint: migrateCheckpoint(data),
     macro: normalizeMacro(data.macro),

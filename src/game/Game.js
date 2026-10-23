@@ -26,9 +26,9 @@ import { LockCam } from "./render/LockCam.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, missileAmmoCap, normalizeCheckpoint, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
-import { GUNSHIP_ID, SHIP_CATALOG, resolveShipId } from "./ships/catalog.js";
+import { DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, unlockedShipIds } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
 
 const TITLE = "title";
@@ -176,6 +176,8 @@ export class Game {
     this.cooldown = 0;
     this.gun = 0;
     this.shipLevel = 1;
+    this.shipId = DEFAULT_SHIP_ID;
+    this.hullLoadouts = {};
     this.freshLoadout();
     this.runDirty = false;
     this.burstLeft = 0;
@@ -221,9 +223,10 @@ export class Game {
     this.initials = null;
     this.wavePick = null;
     this.startPick = null;
-    this.shipId = resolveShipId(this.save.shipId);
+    this.shipId = resolveShipId(this.save.shipId, this.xp);
     this.save.shipId = this.shipId;
     this.save.xp = this.xp;
+    this.hud.bay.setRoster(unlockedShipIds(this.xp), this.xp);
     this.difficulty = "easy";
     this.lifeEvery = extraLifeEvery;
     this.hud.bay.onPickShip = (id) => this.setShip(id);
@@ -1011,6 +1014,9 @@ export class Game {
   }
 
   startRun(wave = 1, resume = false) {
+    this.shipId = resolveShipId(this.shipId, this.xp);
+    this.save.shipId = this.shipId;
+    this.hud.bay.setRoster(unlockedShipIds(this.xp), this.xp);
     const tune = applyDifficulty("easy");
     this.difficulty = "easy";
     this.lifeEvery = tune.extraLifeEvery;
@@ -1612,15 +1618,30 @@ export class Game {
     if (this.attractOnDemo) return;
     const n = Math.max(0, Math.floor(Number(amount) || 0));
     if (!n) return;
+    const before = unlockedShipIds(this.xp);
     this.xp += n;
     this.save.xp = this.xp;
     this.hud.setXp(this.xp);
+    const after = unlockedShipIds(this.xp);
+    this.hud.bay.setRoster(after, this.xp);
     this.storage.save(this.save);
+    if (after.length > before.length) {
+      const id = after[after.length - 1];
+      this.hud.setMode(id);
+      this.sfx("up");
+    }
   }
 
   resetXp() {
     this.xp = 0;
     this.save.xp = 0;
+    this.shipId = DEFAULT_SHIP_ID;
+    this.save.shipId = DEFAULT_SHIP_ID;
+    this.hullLoadouts = {};
+    if (this.save.checkpoint) this.save.checkpoint.shipId = DEFAULT_SHIP_ID;
+    this.applyShipSkin();
+    this.hud.bay.setRoster(unlockedShipIds(0), 0);
+    this.hud.bay.setState(this.shipId);
     this.hud.setXp(0);
     this.storage.save(this.save);
     this.hud.setMode("XP  0");
@@ -1743,6 +1764,7 @@ export class Game {
     if (!cost || this.points < cost) return;
     this.points -= cost;
     this.levels[id] = id === "gunship" ? (this.levels.gunship || 0) + 1 : (this.levels[id] || 1) + 1;
+    this.hullLoadouts[this.shipId] = this.packLevels();
     this.addXp(xpAwards.upgrade);
     if (id === "shield") this.applyShieldLevel(true);
     if (id === "missile") this.reloadMissiles();
@@ -2372,8 +2394,40 @@ export class Game {
     this.placeView({ view: this.sightMark, x: sight.x, y: sight.y }, space.width, space.height);
   }
 
+  packLevels(src = this.levels) {
+    return {
+      gun: src?.gun || 1,
+      missile: src?.missile || 1,
+      emp: src?.emp || 1,
+      shield: src?.shield || 1,
+      gunship: src?.gunship || 0,
+    };
+  }
+
+  dropLevels(src = this.levels) {
+    const row = this.packLevels(src);
+    return {
+      gun: Math.max(1, row.gun - 1),
+      missile: Math.max(1, row.missile - 1),
+      emp: Math.max(1, row.emp - 1),
+      shield: Math.max(1, row.shield - 1),
+      gunship: Math.max(0, row.gunship - 1),
+    };
+  }
+
+  seedHullLoadout(id, from = this.levels) {
+    if (!this.hullLoadouts) this.hullLoadouts = {};
+    if (this.hullLoadouts[id]) return this.hullLoadouts[id];
+    const row = id === DEFAULT_SHIP_ID ? this.packLevels({ gun: 1, missile: 1, emp: 1, shield: 1, gunship: 0 }) : this.dropLevels(from);
+    this.hullLoadouts[id] = row;
+    return row;
+  }
+
   freshLoadout() {
-    this.levels = { gun: 1, missile: 1, emp: 1, shield: 1, gunship: 0 };
+    this.hullLoadouts = {};
+    const base = { gun: 1, missile: 1, emp: 1, shield: 1, gunship: 0 };
+    this.levels = this.shipId === DEFAULT_SHIP_ID ? { ...base } : this.dropLevels(base);
+    this.hullLoadouts[this.shipId] = this.packLevels(this.levels);
     this.points = 0;
     this.loadoutBank = 0;
   }
@@ -2429,6 +2483,7 @@ export class Game {
       bank: this.loadoutBank,
       ammo: this.missileAmmo,
     };
+    const hulls = { ...this.hullLoadouts, [this.shipId]: this.packLevels() };
     const cp = normalizeCheckpoint({
       active: true,
       wave: this.assaultIndex,
@@ -2438,6 +2493,7 @@ export class Game {
       cargo: this.cargo,
       shipId: this.shipId,
       loadout,
+      hulls,
       hubOre: this.hub?.ore,
       seen: [...(this.seenCastles || [])],
       arriveWait: this.arriveWait,
@@ -2481,7 +2537,7 @@ export class Game {
   applyCheckpoint() {
     const cp = normalizeCheckpoint(this.save.checkpoint);
     if (!cp) return false;
-    this.shipId = resolveShipId(cp.shipId);
+    this.shipId = resolveShipId(cp.shipId, this.xp);
     this.levels = {
       gun: cp.loadout.gun,
       missile: cp.loadout.missile,
@@ -2489,6 +2545,8 @@ export class Game {
       shield: cp.loadout.shield,
       gunship: cp.loadout.gunship || 0,
     };
+    this.hullLoadouts = normalizeHulls(cp.hulls || cp.loadout?.hulls);
+    this.hullLoadouts[this.shipId] = this.packLevels(this.levels);
     this.points = Math.max(0, Math.floor(Number(cp.loadout.points) || 0));
     this.loadoutBank = Math.max(0, Math.floor(Number(cp.loadout.bank) || 0));
     this.missileAmmo = Math.max(0, Math.floor(Number(cp.loadout.ammo) || 0));
@@ -2716,12 +2774,26 @@ export class Game {
   }
 
   setShip(id) {
-    this.shipId = resolveShipId(id);
+    const next = resolveShipId(id, this.xp);
+    if (id && id !== next) {
+      const need = shipUnlockAt(id);
+      this.hud.setMode(need > 0 ? `${Math.round(need / 1000)}K XP` : "LOCK");
+      return;
+    }
+    if (next === this.shipId) {
+      this.hud.bay.setState(this.shipId);
+      return;
+    }
+    this.hullLoadouts[this.shipId] = this.packLevels();
+    this.levels = { ...this.seedHullLoadout(next, this.levels) };
+    this.shipId = next;
     this.applyShipSkin();
     this.applyShieldLevel(true);
+    this.clampMissileAmmo();
     this.persistLoadout();
     this.refreshDock();
     this.hud.bay.setState(this.shipId);
+    this.writeCheckpoint();
   }
 
   assaultThreats(space, origin = this.ship) {

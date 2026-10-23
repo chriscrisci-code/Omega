@@ -1,4 +1,4 @@
-import { catalogMiniSvg, DEFAULT_SHIP_ID, PLAYABLE_SHIP_IDS, SHIP_CATALOG } from "../ships/catalog.js";
+import { catalogMiniSvg, DEFAULT_SHIP_ID, PLAYABLE_SHIP_IDS, SHIP_CATALOG, shipUnlockAt, unlockedShipIds } from "../ships/catalog.js";
 import { vectorTextSvg } from "./vectorText.js";
 
 const CYAN = "#66e0ff";
@@ -22,6 +22,8 @@ export class DockBay {
     this.onBay = null;
     this.shipId = DEFAULT_SHIP_ID;
     this.upKey = "";
+    this.rosterKey = "";
+    this.unlocked = new Set(unlockedShipIds(0));
     this.seat = null;
     this.seats = document.querySelector("#dock-seats");
     this.bayBack = document.querySelector("#dock-bay-back");
@@ -52,19 +54,38 @@ export class DockBay {
     });
   }
 
-  buildShips() {
+  setRoster(unlocked, xp = 0) {
+    const ids = Array.isArray(unlocked) && unlocked.length ? unlocked : unlockedShipIds(0);
+    const key = `${ids.join(",")}|${Math.max(0, Math.floor(Number(xp) || 0))}`;
+    if (key === this.rosterKey && this.ships?.childElementCount) {
+      this.setState(this.shipId);
+      return;
+    }
+    this.rosterKey = key;
+    this.unlocked = new Set(ids);
+    this.buildShips(ids, xp);
+    this.setState(this.shipId);
+  }
+
+  buildShips(unlocked = unlockedShipIds(0), xp = 0) {
     if (!this.ships) return;
     this.ships.innerHTML = "";
+    const open = new Set(unlocked);
     const list = PLAYABLE_SHIP_IDS.map((id) => {
       const spec = SHIP_CATALOG.find((item) => item.id === id) || null;
-      return { id, name: spec?.name || id, spec };
+      const need = shipUnlockAt(id);
+      const free = open.has(id);
+      return { id, name: spec?.name || id, spec, free, need };
     });
     for (const item of list) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "dock-ship";
+      button.className = `dock-ship${item.free ? "" : " is-lock"}`;
       button.dataset.id = item.id;
-      button.innerHTML = `${catalogMiniSvg(item.spec, 28)}${vectorTextSvg(item.name, 5, DIM, CYAN, "center")}`;
+      const label = item.free ? item.name : `${Math.round(item.need / 1000)}K`;
+      const color = item.free ? DIM : "#4a5d68";
+      const hot = item.free ? CYAN : DIM;
+      button.innerHTML = `${catalogMiniSvg(item.spec, 28, color, hot)}${vectorTextSvg(label, 5, color, hot, "center")}`;
       this.ships.appendChild(button);
     }
   }
