@@ -334,12 +334,14 @@ export const station = {
   shift: [70, 95],
 };
 
-/** Wave 9 scaffold on the station. Construction only. */
+/** Wave 9 scaffold on the station. Construction only. ~8× destroyer length. */
 export const battleship = {
   fromWave: 9,
   plates: 6,
   startPlates: 2,
   score: 0,
+  length: 1080,
+  beam: 172,
 };
 
 export const ore = {

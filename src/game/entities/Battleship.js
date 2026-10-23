@@ -3,19 +3,173 @@ import { battleship as cfg, colors, station as stationCfg } from "../config.js";
 import { wrap } from "../math.js";
 import { strokeGlow, strokeLine } from "../render/textures.js";
 
-function boxPts(w, h) {
-  const x = w * 0.5;
-  const y = h * 0.5;
-  return [-x, -y, x, -y, x, y, -x, y];
+const CY = -(stationCfg.hub + 128);
+
+function boxPts(x, y, w, h) {
+  const hw = w * 0.5;
+  const hh = h * 0.5;
+  return [x - hw, y - hh, x + hw, y - hh, x + hw, y + hh, x - hw, y + hh];
+}
+
+function shift(pts, ox, oy) {
+  const out = [];
+  for (let i = 0; i < pts.length; i += 2) out.push(pts[i] + ox, pts[i + 1] + oy);
+  return out;
 }
 
 function paintPlate(g, color, hot, w, h) {
   g.clear();
-  strokeGlow(g, boxPts(w, h), color, hot, 1.15);
-  strokeLine(g, [-w * 0.32, -h * 0.22, w * 0.32, -h * 0.22, w * 0.32, h * 0.22, -w * 0.32, h * 0.22], color, colors.white, 0.8);
-  g.moveTo(-w * 0.4, 0);
-  g.lineTo(w * 0.4, 0);
-  g.stroke({ width: 0.9, color: hot, alpha: 0.7 });
+  const hw = w * 0.5;
+  const hh = h * 0.5;
+  const cut = Math.min(12, hw * 0.22);
+  strokeGlow(g, [-hw + cut, -hh, hw - cut, -hh, hw, -hh + cut, hw, hh - cut, hw - cut, hh, -hw + cut, hh, -hw, hh - cut, -hw, -hh + cut], color, hot, 1.2);
+  strokeGlow(g, boxPts(0, 0, w * 0.62, h * 0.42), color, colors.white, 0.8);
+  strokeLine(g, [-hw * 0.7, 0, hw * 0.7, 0], color, hot, 0.85);
+}
+
+function hullOutline() {
+  return [
+    540, 0,
+    508, 10,
+    460, 20,
+    400, 30,
+    320, 38,
+    240, 42,
+    160, 46,
+    80, 48,
+    10, 52,
+    -70, 58,
+    -150, 66,
+    -230, 78,
+    -310, 84,
+    -390, 80,
+    -450, 68,
+    -450, -68,
+    -390, -80,
+    -310, -84,
+    -230, -78,
+    -150, -66,
+    -70, -58,
+    10, -52,
+    80, -48,
+    160, -46,
+    240, -42,
+    320, -38,
+    400, -30,
+    460, -20,
+    508, -10,
+  ];
+}
+
+function wing(side) {
+  const s = side < 0 ? -1 : 1;
+  return [
+    -40, 50 * s,
+    70, 50 * s,
+    78, 62 * s,
+    70, 86 * s,
+    20, 88 * s,
+    -90, 86 * s,
+    -118, 72 * s,
+    -110, 54 * s,
+    -70, 50 * s,
+  ];
+}
+
+function engine(side) {
+  const s = side < 0 ? -1 : 1;
+  return [
+    -448, 18 * s,
+    -448, 58 * s,
+    -470, 66 * s,
+    -540, 58 * s,
+    -540, 22 * s,
+    -500, 16 * s,
+  ];
+}
+
+function paintHull(g, color, hot, ox, oy) {
+  g.clear();
+  const put = (pts) => shift(pts, ox, oy);
+  strokeGlow(g, put(hullOutline()), color, hot, 1.55);
+  strokeGlow(g, put(wing(-1)), color, hot, 1.35);
+  strokeGlow(g, put(wing(1)), color, hot, 1.35);
+  strokeGlow(g, put(engine(-1)), color, hot, 1.35);
+  strokeGlow(g, put(engine(1)), color, hot, 1.35);
+
+  const inner = [
+    420, 16,
+    240, 26,
+    40, 30,
+    -160, 38,
+    -320, 48,
+    -320, -48,
+    -160, -38,
+    40, -30,
+    240, -26,
+    420, -16,
+  ];
+  strokeGlow(g, put(inner), color, hot, 1.05);
+
+  const decks = [
+    [360, 0, 88, 22],
+    [268, 0, 72, 26],
+    [184, 0, 70, 28],
+    [100, 0, 68, 30],
+    [20, 0, 72, 32],
+    [-60, 0, 70, 34],
+    [-140, 0, 74, 36],
+    [-230, 0, 86, 40],
+    [-320, 0, 78, 36],
+  ];
+  for (const [x, y, w, h] of decks) strokeGlow(g, put(boxPts(x, y, w, h)), color, hot, 0.95);
+
+  const bays = [
+    [-10, -72, 56, 22],
+    [-10, 72, 56, 22],
+    [-70, -70, 48, 20],
+    [-70, 70, 48, 20],
+    [-490, -40, 42, 18],
+    [-490, 40, 42, 18],
+    [-512, -40, 28, 14],
+    [-512, 40, 28, 14],
+  ];
+  for (const [x, y, w, h] of bays) strokeGlow(g, put(boxPts(x, y, w, h)), color, hot, 0.9);
+
+  strokeGlow(g, put(boxPts(200, 0, 36, 16)), colors.white, colors.white, 0.85);
+  strokeGlow(g, put(boxPts(-200, 0, 40, 16)), color, colors.white, 0.85);
+
+  const guns = [
+    [150, -54, 150, -72, 188, -72, 188, -64, 150, -64],
+    [150, 54, 150, 72, 188, 72, 188, 64, 150, 64],
+  ];
+  for (const gun of guns) strokeGlow(g, put(gun), color, hot, 1.05);
+
+  const ribs = [
+    [400, -28, 400, 28],
+    [240, -40, 240, 40],
+    [80, -46, 80, 46],
+    [-80, -58, -80, 58],
+    [-240, -78, -240, 78],
+    [-400, -78, -400, 78],
+    [320, -20, 80, -28],
+    [320, 20, 80, 28],
+    [-40, -34, -280, -46],
+    [-40, 34, -280, 46],
+    [-450, -18, -450, 18],
+  ];
+  for (const line of ribs) strokeLine(g, put(line), color, hot, 0.85);
+}
+
+function plateSlots() {
+  return [
+    { lx: 360, ly: CY, w: 132, h: 48 },
+    { lx: 180, ly: CY, w: 118, h: 46 },
+    { lx: -20, ly: CY - 74, w: 108, h: 42 },
+    { lx: -20, ly: CY + 74, w: 108, h: 42 },
+    { lx: -230, ly: CY, w: 128, h: 52 },
+    { lx: -430, ly: CY, w: 136, h: 56 },
+  ];
 }
 
 export class Battleship {
@@ -42,24 +196,20 @@ export class Battleship {
   }
 
   buildPlates() {
-    const count = cfg.plates;
-    const span = 520;
+    const slots = plateSlots();
+    const count = Math.min(cfg.plates, slots.length);
     for (let i = 0; i < count; i += 1) {
-      const t = count === 1 ? 0.5 : i / (count - 1);
-      const lx = -span * 0.5 + span * t;
-      const ly = -(stationCfg.hub + 70);
-      const w = i === 0 || i === count - 1 ? 108 : 88;
-      const h = i === 0 || i === count - 1 ? 52 : 44;
+      const slot = slots[i];
       const g = new Graphics();
-      paintPlate(g, this.color, this.hotColor, w, h);
-      g.position.set(lx, ly);
+      paintPlate(g, this.color, this.hotColor, slot.w, slot.h);
+      g.position.set(slot.lx, slot.ly);
       this.view.addChild(g);
       this.plates.push({
         slot: i,
-        lx,
-        ly,
-        w,
-        h,
+        lx: slot.lx,
+        ly: slot.ly,
+        w: slot.w,
+        h: slot.h,
         graphic: g,
         installed: true,
         towedBy: null,
@@ -74,15 +224,11 @@ export class Battleship {
   }
 
   paintKeel(on) {
-    this.keel.clear();
-    if (!on) return;
-    const y = -(stationCfg.hub + 70);
-    this.keel.moveTo(-280, y);
-    this.keel.lineTo(280, y);
-    this.keel.stroke({ width: 1.1, color: this.hotColor, alpha: 0.35 });
-    this.keel.moveTo(-260, y - 18);
-    this.keel.lineTo(220, y - 18);
-    this.keel.stroke({ width: 0.8, color: this.color, alpha: 0.25 });
+    if (!on) {
+      this.keel.clear();
+      return;
+    }
+    paintHull(this.keel, this.color, this.hotColor, 0, CY);
   }
 
   localToWorld(lx, ly) {
