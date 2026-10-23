@@ -401,8 +401,9 @@ export const xp = {
   oreDump: 25,
   upgrade: 40,
   killGun: 20,
-  killMissile: 12,
-  killEmp: 3,
+  killShare: 3,
+  killHome: 5,
+  killPoint: 1,
   shipUnlock: 30000,
 };
 

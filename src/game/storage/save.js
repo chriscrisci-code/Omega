@@ -217,6 +217,7 @@ export function normalizeCheckpoint(data) {
     baseUnlockIn: Math.max(0, Number(data.baseUnlockIn) || 0),
     nextLifeAt: Math.max(0, Math.floor(Number(data.nextLifeAt) || 0)),
     castlesArmed: Boolean(data.castlesArmed),
+    bountyUnits: Math.max(0, Math.floor(Number(data.bountyUnits) || 0)),
   };
 }
 

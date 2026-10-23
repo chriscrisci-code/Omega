@@ -1756,6 +1756,41 @@ export class Game {
     this.writeCheckpoint();
   }
 
+  killUnits(via) {
+    const share = xpAwards.killShare || 3;
+    return via === "emp" || via === "missile" ? 1 : share;
+  }
+
+  payKillUnits(units) {
+    const n = Math.max(0, Number(units) || 0);
+    if (!n) return;
+    const share = xpAwards.killShare || 3;
+    const gun = xpAwards.killGun || 20;
+    const point = xpAwards.killPoint || 1;
+    this.addXp(n * gun / share);
+    this.addPoints(n * point / share);
+  }
+
+  noteKillBounty(via) {
+    if (this.attractOnDemo) return;
+    const units = this.killUnits(via);
+    const home = xpAwards.killHome || 5;
+    if (this.ship?.docked) {
+      this.payKillUnits(units * home);
+      return;
+    }
+    this.bountyUnits = (this.bountyUnits || 0) + units;
+    this.stampCheckpoint();
+  }
+
+  cashKillBounty() {
+    const units = this.bountyUnits || 0;
+    if (!units) return;
+    this.bountyUnits = 0;
+    const home = xpAwards.killHome || 5;
+    this.payKillUnits(units * home);
+  }
+
   buyUpgrade(id) {
     if (this.mode !== PLAYING || !this.ship.docked) return;
     if (id === "emp" && (this.levels.emp || 1) >= this.empCap()) return;
@@ -2430,6 +2465,7 @@ export class Game {
     this.hullLoadouts[this.shipId] = this.packLevels(this.levels);
     this.points = 0;
     this.loadoutBank = 0;
+    this.bountyUnits = 0;
   }
 
   hasCheckpoint() {
@@ -2448,6 +2484,7 @@ export class Game {
     this.save.checkpoint.lives = Math.max(1, Math.floor(Number(this.lives) || 0) || shipConfig.lives);
     this.save.checkpoint.cargo = Math.max(0, Math.floor(Number(this.cargo) || 0));
     this.save.checkpoint.nextLifeAt = Math.max(0, Math.floor(Number(this.nextLifeAt) || 0));
+    this.save.checkpoint.bountyUnits = Math.max(0, Math.floor(Number(this.bountyUnits) || 0));
     if (this.save.checkpoint.loadout) {
       this.save.checkpoint.loadout.points = Math.max(0, Math.floor(Number(this.points) || 0));
       this.save.checkpoint.loadout.bank = Math.max(0, Math.floor(Number(this.loadoutBank) || 0) % 3);
@@ -2500,6 +2537,7 @@ export class Game {
       baseUnlockIn: this.baseUnlockIn,
       nextLifeAt: this.nextLifeAt,
       castlesArmed: this.castlesArmed,
+      bountyUnits: this.bountyUnits,
     });
     if (!cp) return;
     this.save.checkpoint = cp;
@@ -2554,6 +2592,7 @@ export class Game {
     this.score = 0;
     this.lives = Math.max(1, Math.floor(Number(cp.lives) || 0) || shipConfig.lives);
     this.cargo = Math.max(0, Math.floor(Number(cp.cargo) || 0));
+    this.bountyUnits = Math.max(0, Math.floor(Number(cp.bountyUnits) || 0));
     this.nextLifeAt = this.lifeEvery;
     this.save.loadout = normalizeLoadout(cp.loadout);
     this.beginAssault(cp.wave, true);
@@ -2737,9 +2776,19 @@ export class Game {
     wing.kill();
   }
 
+  overHub(body = this.ship) {
+    if (!this.hub?.alive || !body || this.inTunnel()) return false;
+    const space = this.space();
+    const dx = wrapDelta(body.x - this.hub.x, space.width);
+    const dy = wrapDelta(body.y - this.hub.y, space.height);
+    const reach = (this.hub.radius || 150) + (body.radius || 0);
+    return dx * dx + dy * dy <= reach * reach;
+  }
+
   hurtFriendly(body) {
     if (this.attractOnDemo || !body?.alive) return;
     if ((body.invuln || 0) > 0) return;
+    if (body === this.ship && (this.ship.docked || this.overHub(body))) return;
     if (body !== this.ship) {
       body.hullHp = (body.hullHp ?? 1) - 1;
       body.invuln = this.ship.stat("hullIFrames", 0.55);
@@ -3483,7 +3532,7 @@ export class Game {
     }
     this.addScore(enemy.role === "raider" ? 150 : enemy.role === "destroyer" ? 250 : enemy.role === "crane" ? craneCfg.score : 75);
     this.noteKill();
-    this.addXp(via === "emp" ? xpAwards.killEmp : via === "missile" ? xpAwards.killMissile : xpAwards.killGun);
+    this.noteKillBounty(via);
     this.shake = Math.max(this.shake, 4);
     this.sfx("boom");
     this.noteLockDeath(enemy);
@@ -3924,7 +3973,7 @@ export class Game {
   }
 
   killShip() {
-    if (this.attractOnDemo || !this.ship.alive || this.ship.docked) return;
+    if (this.attractOnDemo || !this.ship.alive || this.ship.docked || this.overHub()) return;
     for (const wing of this.wingmen) wing.park();
     this.ship.kill();
     this.spawnShards(HULL, this.ship, {
@@ -4250,6 +4299,7 @@ export class Game {
         if (!this.dockOpen) {
           this.dockOpen = true;
           this.depositOre();
+          this.cashKillBounty();
           this.reloadMissiles();
           this.refreshDock();
           this.hud.showDock(this.shipId);
@@ -4629,6 +4679,7 @@ export class Game {
 
       for (const flyer of this.escortGroup()) {
         if (!flyer.alive || (flyer.invuln || 0) > 0) continue;
+        if (flyer === this.ship && this.overHub(flyer)) continue;
         const body = flyer.hitBody();
         let struck = false;
         if (!this.tunnel) {
