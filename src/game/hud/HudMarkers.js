@@ -204,6 +204,11 @@ export class HudMarkers {
     this.lock.addChild(this.lockMark);
     this.lock.visible = false;
     this.view.addChild(this.lock);
+    this.corvetteRunway = new Container();
+    this.corvetteMark = new Graphics();
+    this.corvetteRunway.addChild(this.corvetteMark);
+    this.corvetteRunway.visible = false;
+    this.view.addChild(this.corvetteRunway);
   }
 
   setFilter(kind, on) {
@@ -269,9 +274,10 @@ export class HudMarkers {
       pip.node.position.set(screen.width * 0.5 + pinned.x, screen.height * 0.5 + pinned.y);
       pip.node.rotation = Math.atan2(sy, sx);
       const alert = target.kind === "hub" && extras.hubAlert;
+      const hunt = target.kind === "corvette";
       const pipScale = extras.compact ? 0.55 : 1;
-      pip.node.scale.set((alert ? 1.08 : 1 - fade * 0.3) * pipScale);
-      pip.node.alpha = alert ? 1 : rangeAlpha(target.kind, fade);
+      pip.node.scale.set((alert || hunt ? 1.08 : 1 - fade * 0.3) * pipScale);
+      pip.node.alpha = alert || hunt ? 1 : rangeAlpha(target.kind, fade);
       drawGlyph(pip.mark, target.kind, target.color, target.hotColor, {
         alert,
         close: extras.hubClose,
@@ -286,12 +292,18 @@ export class HudMarkers {
       drawVectorText(pip.label, target.name ? `${target.name}  ${range}` : range, 0, 14, 9, glow, tint, "center");
     });
 
-    this.updateLock(extras.lock, origin, camRot, screen, zoom, world, extras);
+    const corvette = visible.find((target) => target.kind === "corvette");
+    this.aimRunway(this.corvetteRunway, this.corvetteMark, corvette, origin, camRot, screen, zoom, world, extras);
+    const lock = extras.lock?.kind === "corvette" ? null : extras.lock;
+    this.aimRunway(this.lock, this.lockMark, lock, origin, camRot, screen, zoom, world, {
+      ...extras,
+      close: extras.lockClose,
+    });
   }
 
-  updateLock(target, origin, camRot, screen, zoom, world, extras = {}) {
+  aimRunway(node, mark, target, origin, camRot, screen, zoom, world, extras = {}) {
     if (!target?.alive || extras.mapping) {
-      this.lock.visible = false;
+      node.visible = false;
       return;
     }
     const dx = wrapDelta(target.x - origin.x, world.width);
@@ -301,21 +313,22 @@ export class HudMarkers {
     const sx = (dx * cos - dy * sin) * zoom;
     const sy = (dx * sin + dy * cos) * zoom;
     if (sx * sx + sy * sy < 16) {
-      this.lock.visible = false;
+      node.visible = false;
       return;
     }
-    const halfW = screen.width * 0.5 - 34;
-    const halfH = screen.height * 0.5 - 34;
+    const pad = extras.compact ? 22 : 34;
+    const halfW = screen.width * 0.5 - pad;
+    const halfH = screen.height * 0.5 - pad;
     const edge = pinToEdge(sx, sy, halfW, halfH);
-    this.lock.visible = true;
-    this.lock.position.set(screen.width * 0.5 + edge.x * 0.5, screen.height * 0.5 + edge.y * 0.5);
-    this.lock.rotation = Math.atan2(sy, sx);
-    this.lock.alpha = 1;
-    this.lock.scale.set(1);
-    drawRunway(this.lockMark, target.color, target.hotColor, {
+    node.visible = true;
+    node.position.set(screen.width * 0.5 + edge.x * 0.5, screen.height * 0.5 + edge.y * 0.5);
+    node.rotation = Math.atan2(sy, sx);
+    node.alpha = 1;
+    node.scale.set(extras.compact ? 0.7 : 1);
+    drawRunway(mark, target.color, target.hotColor, {
       time: extras.time,
-      close: extras.lockClose,
+      close: extras.close ?? Math.hypot(sx, sy) < screen.height * 0.28,
     });
-    this.view.addChild(this.lock);
+    this.view.addChild(node);
   }
 }
