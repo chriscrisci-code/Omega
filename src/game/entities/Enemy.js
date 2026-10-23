@@ -1,10 +1,28 @@
 import { Container, Graphics } from "pixi.js";
-import { castle, colors, crane as craneCfg, destroyer as destroyerConfig, raid } from "../config.js";
+import { castle, colors, corvette as corvetteCfg, crane as craneCfg, destroyer as destroyerConfig, raid } from "../config.js";
 import { turnToward, wrap, wrapDelta } from "../math.js";
 import { strokeGlow, strokeLine } from "../render/textures.js";
 
 export const HUNTER = [12, 0, -8, 6, -4, 0, -8, -6];
 export const RAIDER = [15, 0, -5, 8, -11, 0, -5, -8];
+export const CORVETTE = [
+  30, 0,
+  22, 7,
+  8, 11,
+  -10, 12,
+  -22, 9,
+  -28, 4,
+  -28, -4,
+  -22, -9,
+  -10, -12,
+  8, -11,
+  22, -7,
+];
+const CORVETTE_INNER = [16, 4, -12, 5, -12, -5, 16, -4];
+const CORVETTE_ENGINES = [
+  [-28, 7, -36, 6, -36, 2, -28, 2],
+  [-28, -7, -36, -6, -36, -2, -28, -2],
+];
 const CRANE_BARGE = [18, 7, -16, 9, -22, 0, -16, -9, 18, -7];
 export const CRANE = [78, 58, -54, 52, -64, 0, -54, -52, 58, -38];
 
@@ -41,6 +59,7 @@ const DESTROYER_LINES = [
 function roleOf(options) {
   if (options.role === "raider") return "raider";
   if (options.role === "destroyer") return "destroyer";
+  if (options.role === "corvette") return "corvette";
   if (options.role === "crane") return "crane";
   return "hunter";
 }
@@ -51,28 +70,31 @@ export class Enemy {
     this.color = color;
     this.hotColor = home.hotColor;
     this.role = roleOf(options);
-    this.kind = this.role === "raider" ? "raider" : this.role === "destroyer" ? "destroyer" : this.role === "crane" ? "crane" : "enemy";
-    this.name = this.role === "raider" ? "RAIDER" : this.role === "destroyer" ? "DESTROYER" : this.role === "crane" ? "CRANE" : "HUNTER";
-    this.hull = this.role === "raider" ? RAIDER : this.role === "destroyer" ? DESTROYER : this.role === "crane" ? CRANE : HUNTER;
+    this.kind = this.role === "raider" ? "raider" : this.role === "destroyer" ? "destroyer" : this.role === "corvette" ? "corvette" : this.role === "crane" ? "crane" : "enemy";
+    this.name = this.role === "raider" ? "RAIDER" : this.role === "destroyer" ? "DESTROYER" : this.role === "corvette" ? "CORVETTE" : this.role === "crane" ? "CRANE" : "HUNTER";
+    this.hull = this.role === "raider" ? RAIDER : this.role === "destroyer" ? DESTROYER : this.role === "corvette" ? CORVETTE : this.role === "crane" ? CRANE : HUNTER;
     this.x = x;
     this.y = y;
     this.vx = 0;
     this.vy = 0;
     this.rotation = 0;
-    this.radius = this.role === "raider" ? 13 : this.role === "destroyer" ? 56 : this.role === "crane" ? 52 : 11;
-    this.hp = this.role === "raider" ? raid.hits : this.role === "destroyer" ? destroyerConfig.hits : this.role === "crane" ? craneCfg.hp : castle.hunterHits;
+    this.radius = this.role === "raider" ? 13 : this.role === "destroyer" ? 56 : this.role === "corvette" ? corvetteCfg.radius : this.role === "crane" ? 52 : 11;
+    this.hp = this.role === "raider" ? raid.hits : this.role === "destroyer" ? destroyerConfig.hits : this.role === "corvette" ? corvetteCfg.hits : this.role === "crane" ? craneCfg.hp : castle.hunterHits;
     this.job = null;
     this.maxHp = this.hp;
-    this.cooldown = this.role === "raider" ? 0.9 : this.role === "destroyer" ? 1.25 : 0.6;
+    this.cooldown = this.role === "raider" ? 0.9 : this.role === "destroyer" ? 1.25 : this.role === "corvette" ? 0.7 : 0.6;
     this.ramCool = 0;
     this.dodgeUntil = 0;
     this.dodgeSign = 1;
+    this.veer = 0;
     this.stunned = 0;
     this.laserCharge = 0;
     this.laserOn = false;
     this.laserCool = 0;
-    this.shieldMax = this.role === "destroyer" ? destroyerConfig.shieldHits : 0;
+    this.shieldMax = this.role === "destroyer" ? destroyerConfig.shieldHits : this.role === "corvette" ? corvetteCfg.shieldHits : 0;
     this.shieldHp = this.shieldMax;
+    this.shieldHurt = 0;
+    this.shieldRegen = 0;
     this.gunSign = 1;
     this.flashes = [];
     this.alive = true;
@@ -81,8 +103,10 @@ export class Enemy {
     this.g = new Graphics();
     this.flashG = new Graphics();
     this.laserG = new Graphics();
-    this.view.addChild(this.laserG, this.g, this.flashG);
+    this.shieldG = new Graphics();
+    this.view.addChild(this.laserG, this.shieldG, this.g, this.flashG);
     this.paintHull();
+    this.paintShield();
   }
 
   turretLocal(side = 1) {
@@ -177,6 +201,14 @@ export class Enemy {
       g.stroke({ width: 1.2, color: colors.white, alpha: 0.9 });
       return;
     }
+    if (this.role === "corvette") {
+      strokeGlow(this.g, CORVETTE, this.color, this.hotColor, 1.5);
+      strokeGlow(this.g, CORVETTE_INNER, this.color, this.hotColor, 1.15);
+      for (const engine of CORVETTE_ENGINES) strokeGlow(this.g, engine, this.color, this.hotColor, 1.2);
+      strokeLine(this.g, [8, 11, 8, -11], this.color, this.hotColor, 0.95);
+      strokeLine(this.g, [-10, 12, -10, -12], this.color, this.hotColor, 0.9);
+      return;
+    }
     if (this.role !== "destroyer") {
       strokeGlow(this.g, this.hull, this.color, this.hotColor, this.role === "raider" ? 1.55 : 1.4);
       return;
@@ -222,8 +254,38 @@ export class Enemy {
     }
   }
 
+  paintShield() {
+    this.shieldG.clear();
+    if (this.role !== "corvette" || this.shieldHp <= 0) return;
+    const t = this.shieldHp / Math.max(1, this.shieldMax);
+    this.shieldG.ellipse(0, 0, 34, 16);
+    this.shieldG.stroke({ width: 2.4, color: this.color, alpha: 0.1 + t * 0.16 });
+    this.shieldG.ellipse(0, 0, 34, 16);
+    this.shieldG.stroke({ width: 1.05, color: this.hotColor, alpha: 0.28 + t * 0.4 });
+  }
+
+  noteShieldHit() {
+    this.shieldHurt = corvetteCfg.regenDelay;
+    this.shieldRegen = corvetteCfg.regenEvery;
+    this.paintShield();
+  }
+
+  tickShield(dt) {
+    if (this.role !== "corvette" || this.shieldMax <= 0) return;
+    if (this.shieldHurt > 0) {
+      this.shieldHurt = Math.max(0, this.shieldHurt - dt);
+      return;
+    }
+    if (this.shieldHp >= this.shieldMax) return;
+    this.shieldRegen -= dt;
+    if (this.shieldRegen > 0) return;
+    this.shieldHp += 1;
+    this.shieldRegen = corvetteCfg.regenEvery;
+    this.paintShield();
+  }
+
   nose() {
-    const tip = this.role === "raider" ? 15 : this.role === "destroyer" ? 52 : 12;
+    const tip = this.role === "raider" ? 15 : this.role === "destroyer" ? 52 : this.role === "corvette" ? 30 : 12;
     return {
       x: this.x + Math.cos(this.rotation) * tip,
       y: this.y + Math.sin(this.rotation) * tip,
@@ -240,7 +302,7 @@ export class Enemy {
     this.laserG.clear();
   }
 
-  update(dt, target, space, aimedAt) {
+  update(dt, target, space, aimedAt, extras = {}) {
     if (this.stunned > 0) {
       this.stunned = Math.max(0, this.stunned - dt);
       this.vx *= 0.88;
@@ -252,6 +314,7 @@ export class Enemy {
       this.view.rotation = this.rotation;
       this.view.alpha = this.stunned > 0 ? 0.28 + 0.22 * (0.5 + 0.5 * Math.sin(this.stunned * 18)) : 1;
       this.tickFlashes(dt);
+      this.tickShield(dt);
       return;
     }
     this.view.alpha = 1;
@@ -259,15 +322,30 @@ export class Enemy {
     const dy = wrapDelta(target.y - this.y, space.height);
     const dist = Math.hypot(dx, dy) || 1;
     const toTarget = Math.atan2(dy, dx);
-    const turn = this.role === "raider" ? 2.2 : this.role === "destroyer" ? destroyerConfig.turn : this.role === "crane" ? craneCfg.turn : 2.8;
+    const turn = this.role === "raider" ? 2.2 : this.role === "destroyer" ? destroyerConfig.turn : this.role === "corvette" ? corvetteCfg.turn : this.role === "crane" ? craneCfg.turn : 2.8;
     const craneHold = this.job?.kind === "weld" || this.job?.phase === "haul" || this.job?.phase === "dock" ? 22 : craneCfg.hold;
     const hold = this.role === "raider" ? 210 : this.role === "destroyer" ? 420 : this.role === "crane" ? craneHold : 220;
-    const chase = this.role === "raider" ? 400 : this.role === "destroyer" ? 170 : this.role === "crane" ? craneCfg.speed : 320;
+    const chase = this.role === "raider" ? 400 : this.role === "destroyer" ? 170 : this.role === "corvette" ? corvetteCfg.chase : this.role === "crane" ? craneCfg.speed : 320;
     const back = this.role === "raider" ? 220 : this.role === "destroyer" ? 90 : this.role === "crane" ? 40 : 260;
-    const cap = this.role === "raider" ? 400 : this.role === "destroyer" ? 110 : this.role === "crane" ? craneCfg.speed : 340;
+    const cap = this.role === "raider" ? 400 : this.role === "destroyer" ? 110 : this.role === "corvette" ? corvetteCfg.speed : this.role === "crane" ? craneCfg.speed : 340;
     let ax = 0;
     let ay = 0;
-    if (this.role === "destroyer") {
+    if (this.role === "corvette") {
+      const seen = Boolean(extras.seen);
+      if (this.dodgeUntil <= 0) {
+        this.dodgeSign *= -1;
+        this.dodgeUntil = seen ? 0.2 + Math.random() * 0.28 : 0.55;
+        this.veer = (0.4 + Math.random() * 0.7) * this.dodgeSign;
+      }
+      const course = seen ? toTarget + this.veer : toTarget;
+      this.rotation = turnToward(this.rotation, course, turn * dt);
+      ax += Math.cos(this.rotation) * chase;
+      ay += Math.sin(this.rotation) * chase;
+      if (seen) {
+        ax += (-dy / dist) * 420 * this.dodgeSign;
+        ay += (dx / dist) * 420 * this.dodgeSign;
+      }
+    } else if (this.role === "destroyer") {
       let course = toTarget;
       if (dist < hold - 60) course = toTarget + Math.PI;
       else if (dist < hold + 80) course = toTarget + Math.PI * 0.5;
@@ -317,6 +395,7 @@ export class Enemy {
     this.ramCool = Math.max(0, this.ramCool - dt);
     this.view.rotation = this.rotation;
     this.tickFlashes(dt);
+    this.tickShield(dt);
     this.paintCable(target, space);
   }
 
@@ -341,12 +420,12 @@ export class Enemy {
     const dx = wrapDelta(target.x - this.x, space.width);
     const dy = wrapDelta(target.y - this.y, space.height);
     const dist = Math.hypot(dx, dy);
-    const max = this.role === "raider" ? 460 : this.role === "destroyer" ? 640 : 520;
-    const min = this.role === "raider" ? 90 : 70;
+    const max = this.role === "raider" ? 460 : this.role === "destroyer" ? 640 : this.role === "corvette" ? 540 : 520;
+    const min = this.role === "raider" ? 90 : this.role === "corvette" ? 80 : 70;
     if (dist > max || dist < min) return false;
     if (this.role === "destroyer") return true;
     const err = Math.abs(wrapDelta(this.rotation - Math.atan2(dy, dx), Math.PI * 2));
-    return err < 0.18;
+    return err < (this.role === "corvette" ? 0.4 : 0.18);
   }
 
   destroy() {

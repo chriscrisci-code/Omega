@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
-import { applyDifficulty, assault, battleship as battleshipCfg, camera as cameraConfig, castle, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, battleship as battleshipCfg, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -167,6 +167,7 @@ export class Game {
     this.wave = 1;
     this.waveCooldown = 0;
     this.raiderTimer = raid.first;
+    this.corvetteTimer = corvetteCfg.first;
     this.assaultIndex = 1;
     this.assaultRest = false;
     this.assaultTime = assault.wave1;
@@ -316,6 +317,21 @@ export class Game {
     return Math.hypot(this.app.screen.width, this.app.screen.height) * 0.5 / this.playZoom();
   }
 
+  onScreen(body) {
+    if (!body) return false;
+    const space = this.space();
+    const screen = this.app.screen;
+    const zoom = this.camZoom || this.playZoom();
+    const dx = wrapDelta(body.x - this.camX, space.width);
+    const dy = wrapDelta(body.y - this.camY, space.height);
+    const c = Math.cos(this.camRot);
+    const s = Math.sin(this.camRot);
+    const sx = (dx * c - dy * s) * zoom;
+    const sy = (dx * s + dy * c) * zoom;
+    const pad = (body.radius || 0) * zoom;
+    return Math.abs(sx) < screen.width * 0.5 + pad && Math.abs(sy) < screen.height * 0.5 + pad;
+  }
+
   viewEdgeAlong(ox, oy, angle) {
     const screen = this.app.screen;
     const zoom = this.camZoom || cameraConfig.zoom;
@@ -425,6 +441,10 @@ export class Game {
     return this.enemies.filter((enemy) => enemy.alive && enemy.role === "hunter").length;
   }
 
+  corvetteCount() {
+    return this.enemies.filter((enemy) => enemy.alive && enemy.role === "corvette").length;
+  }
+
   assaultDuration(n) {
     if (n <= 1) return assault.wave1;
     if (n === 2) return assault.wave2;
@@ -437,6 +457,7 @@ export class Game {
     this.assaultRest = false;
     this.assaultTime = this.assaultDuration(this.assaultIndex);
     this.raiderTimer = this.assaultIndex === 1 ? raid.first : 1.1;
+    this.corvetteTimer = this.assaultIndex < corvetteCfg.fromWave ? corvetteCfg.first : 2.4;
     this.markWaveReached(this.assaultIndex);
     const destroyers = this.destroyerCap();
     for (const base of this.bases) {
@@ -578,6 +599,7 @@ export class Game {
     this.cullRole("hunter");
     this.cullRole("raider");
     this.cullRole("destroyer");
+    this.cullRole("corvette");
     this.clearCranes();
     this.hostileShots.forEach((shot) => shot.kill());
     this.castleStars.forEach((star) => star.kill(true));
@@ -911,6 +933,26 @@ export class Game {
     );
     enemy.vx = Math.cos(angle) * 180;
     enemy.vy = Math.sin(angle) * 180;
+    this.enemies.push(enemy);
+    this.vectors.addChild(enemy.view);
+    return enemy;
+  }
+
+  spawnCorvette(base) {
+    const angle = Math.atan2(
+      wrapDelta(this.hub.y - base.y, worldConfig.height),
+      wrapDelta(this.hub.x - base.x, worldConfig.width),
+    ) + rand(-0.35, 0.35);
+    const reach = 130;
+    const enemy = new Enemy(
+      wrapCoord(base.x + Math.cos(angle) * reach, worldConfig.width),
+      wrapCoord(base.y + Math.sin(angle) * reach, worldConfig.height),
+      base,
+      base.color,
+      { role: "corvette" },
+    );
+    enemy.vx = Math.cos(angle) * 240;
+    enemy.vy = Math.sin(angle) * 240;
     this.enemies.push(enemy);
     this.vectors.addChild(enemy.view);
     return enemy;
@@ -2643,7 +2685,7 @@ export class Game {
   }
 
   pickHunt(enemy, space) {
-    if (enemy.role === "raider" && this.hub.alive) return this.hub;
+    if ((enemy.role === "raider" || enemy.role === "corvette") && this.hub.alive) return this.hub;
     const group = this.escortGroup();
     if (!group.length) return this.ship.alive ? this.ship : null;
     if (enemy.hunt && group.includes(enemy.hunt)) {
@@ -3292,6 +3334,16 @@ export class Game {
       else this.sfx("hit");
       return;
     }
+    if (enemy.role === "corvette" && enemy.shieldHp > 0) {
+      enemy.addHitFlash(atX, atY, worldConfig.width, worldConfig.height, 0.06);
+      this.shieldHitFlash(atX, atY, enemy.hotColor);
+      const leftover = Math.max(0, amount - enemy.shieldHp);
+      enemy.shieldHp = Math.max(0, enemy.shieldHp - amount);
+      enemy.noteShieldHit();
+      this.sfx(enemy.shieldHp > 0 ? "block" : "pop");
+      if (leftover <= 0) return;
+      amount = leftover;
+    }
     const hits = this.ship.turretsCfg()?.hits || 3;
     const fromTurret = impact?.kit === "aiTurret" && (enemy.role === "hunter" || enemy.role === "raider");
     if (fromTurret) {
@@ -3530,7 +3582,7 @@ export class Game {
       this.station.dropTow(enemy);
       this.battleship.dropTow(enemy);
     }
-    this.addScore(enemy.role === "raider" ? 150 : enemy.role === "destroyer" ? 250 : enemy.role === "crane" ? craneCfg.score : 75);
+    this.addScore(enemy.role === "raider" ? 150 : enemy.role === "destroyer" ? 250 : enemy.role === "corvette" ? corvetteCfg.score : enemy.role === "crane" ? craneCfg.score : 75);
     this.noteKill();
     this.noteKillBounty(via);
     this.shake = Math.max(this.shake, 4);
@@ -3688,7 +3740,7 @@ export class Game {
         wrapDelta(enemy.y - this.hub.y, space.height),
       );
       if (dist > raid.warn) continue;
-      const score = enemy.role === "raider" ? dist : dist + 400;
+      const score = enemy.role === "raider" || enemy.role === "corvette" ? dist : dist + 400;
       if (score < bestDist) {
         best = enemy;
         bestDist = score;
@@ -4124,7 +4176,7 @@ export class Game {
     this.drawLock();
     this.drawLead(mapping);
     if (this.lockMark.visible) {
-      const shipLike = this.selected?.kind === "enemy" || this.selected?.kind === "raider" || this.selected?.kind === "destroyer" || this.selected?.kind === "crane";
+      const shipLike = this.selected?.kind === "enemy" || this.selected?.kind === "raider" || this.selected?.kind === "destroyer" || this.selected?.kind === "corvette" || this.selected?.kind === "crane";
       this.lockMark.scale.set(mapping && shipLike ? 14 : 1);
     }
 
@@ -4492,6 +4544,19 @@ export class Game {
             if (launchers.length) this.spawnRaider(pick(launchers));
             this.raiderTimer = plan.raidEvery + rand(-1.6, 1.8);
           }
+          this.corvetteTimer -= t;
+          if (
+            this.corvetteTimer <= 0 &&
+            this.hub.alive &&
+            !this.inTunnel() &&
+            this.assaultIndex >= corvetteCfg.fromWave &&
+            this.assaultIndex !== tunnelCfg.wave &&
+            this.corvetteCount() < 1
+          ) {
+            const launchers = this.bases.filter((base) => !base.hub && base.alive);
+            if (launchers.length) this.spawnCorvette(pick(launchers));
+            this.corvetteTimer = corvetteCfg.every + rand(-2.5, 3);
+          }
         }
         this.tickCastleWatch(t, space);
       }
@@ -4504,7 +4569,7 @@ export class Game {
         }
         const prey = this.pickHunt(enemy, space) || this.ship;
         enemy.hunt = prey;
-        enemy.update(t, prey, space, this.aimedAt(enemy, space));
+        enemy.update(t, prey, space, this.aimedAt(enemy, space), { seen: this.onScreen(enemy) });
         if (this.tunnel) this.bounceTunnel(enemy);
         if (enemy.wantsShot(prey, space)) this.fireHostile(enemy);
       }
@@ -4663,7 +4728,7 @@ export class Game {
           }
         }
         for (const enemy of this.enemies) {
-          if (!enemy.alive || enemy.role !== "raider" || enemy.ramCool > 0 || enemy.stunned > 0) continue;
+          if (!enemy.alive || (enemy.role !== "raider" && enemy.role !== "corvette") || enemy.ramCool > 0 || enemy.stunned > 0) continue;
           if (hits(enemy, { x: this.hub.x, y: this.hub.y, radius: this.hub.hitRadius }, space.width, space.height)) {
             const dx = wrapDelta(enemy.x - this.hub.x, space.width);
             const dy = wrapDelta(enemy.y - this.hub.y, space.height);

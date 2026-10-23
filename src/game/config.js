@@ -110,6 +110,7 @@ export const hudFilters = {
   enemy: true,
   raider: true,
   destroyer: true,
+  corvette: true,
   crane: true,
   station: true,
   battleship: true,
@@ -245,6 +246,22 @@ export const destroyer = {
   turn: 0.2,
   fromWave: 4,
   playtest: false,
+};
+
+/** One at a time. Fast hub runner: weave on-screen, bee-line off-screen. */
+export const corvette = {
+  fromWave: 3,
+  hits: 10,
+  shieldHits: 5,
+  regenDelay: 0.45,
+  regenEvery: 0.2,
+  turn: 3.2,
+  speed: 430,
+  chase: 520,
+  every: 18,
+  first: 9,
+  score: 180,
+  radius: 24,
 };
 
 export const raid = {
