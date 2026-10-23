@@ -87,6 +87,10 @@ export class Enemy {
     this.dodgeUntil = 0;
     this.dodgeSign = 1;
     this.veer = 0;
+    this.jinkHold = 0;
+    this.jinkAge = 0;
+    this.jinkHeading = 0;
+    this.lastPlayerRot = 0;
     this.stunned = 0;
     this.laserCharge = 0;
     this.laserOn = false;
@@ -302,6 +306,45 @@ export class Enemy {
     this.laserG.clear();
   }
 
+  beginJink(toHub, extras, space) {
+    this.dodgeSign *= -1;
+    let base = Number.isFinite(extras.playerRot) ? extras.playerRot : toHub;
+    if (!Number.isFinite(extras.playerRot) && Number.isFinite(extras.playerX) && space) {
+      const bx = wrapDelta(this.x - extras.playerX, space.width);
+      const by = wrapDelta(this.y - extras.playerY, space.height);
+      base = Math.atan2(by, bx);
+    }
+    const cut = this.dodgeSign * ((corvetteCfg.jink || 1.15) + Math.random() * 0.2);
+    const across = base + cut;
+    const lean = wrapDelta(toHub - across, Math.PI * 2) * 0.16;
+    this.jinkHeading = across + lean;
+    this.jinkHold = (corvetteCfg.jinkHold || 0.92) * (0.86 + Math.random() * 0.28);
+    this.jinkAge = 0;
+  }
+
+  steerCorvette(dt, toHub, extras, aimedAt, space) {
+    const seen = Boolean(extras.seen);
+    const playerRot = extras.playerRot ?? this.lastPlayerRot;
+    const dPlayer = wrapDelta(playerRot - this.lastPlayerRot, Math.PI * 2);
+    const steered = Math.abs(extras.playerSteer || 0) > 0.26 || Math.abs(dPlayer) > 0.018;
+    this.lastPlayerRot = playerRot;
+    if (!seen) {
+      this.jinkHold = 0;
+      this.rotation = turnToward(this.rotation, toHub, corvetteCfg.turn * dt);
+      return corvetteCfg.chase;
+    }
+    const min = corvetteCfg.jinkMin || 0.32;
+    this.jinkHold = Math.max(0, (this.jinkHold || 0) - dt);
+    if (this.jinkHold > 0) this.jinkAge += dt;
+    else this.jinkAge = 0;
+    const committed = this.jinkHold > 0;
+    const canRecut = committed && this.jinkAge >= min;
+    if ((!committed && aimedAt) || (canRecut && steered)) this.beginJink(toHub, extras, space);
+    const course = this.jinkHold > 0 ? this.jinkHeading : toHub;
+    this.rotation = turnToward(this.rotation, course, corvetteCfg.turn * dt);
+    return this.jinkHold > 0 ? corvetteCfg.chase * 1.12 : corvetteCfg.chase;
+  }
+
   update(dt, target, space, aimedAt, extras = {}) {
     if (this.stunned > 0) {
       this.stunned = Math.max(0, this.stunned - dt);
@@ -331,20 +374,9 @@ export class Enemy {
     let ax = 0;
     let ay = 0;
     if (this.role === "corvette") {
-      const seen = Boolean(extras.seen);
-      if (this.dodgeUntil <= 0) {
-        this.dodgeSign *= -1;
-        this.dodgeUntil = seen ? 0.2 + Math.random() * 0.28 : 0.55;
-        this.veer = (0.4 + Math.random() * 0.7) * this.dodgeSign;
-      }
-      const course = seen ? toTarget + this.veer : toTarget;
-      this.rotation = turnToward(this.rotation, course, turn * dt);
-      ax += Math.cos(this.rotation) * chase;
-      ay += Math.sin(this.rotation) * chase;
-      if (seen) {
-        ax += (-dy / dist) * 420 * this.dodgeSign;
-        ay += (dx / dist) * 420 * this.dodgeSign;
-      }
+      const cut = this.steerCorvette(dt, toTarget, extras, aimedAt, space);
+      ax += Math.cos(this.rotation) * cut;
+      ay += Math.sin(this.rotation) * cut;
     } else if (this.role === "destroyer") {
       let course = toTarget;
       if (dist < hold - 60) course = toTarget + Math.PI;
@@ -367,7 +399,7 @@ export class Enemy {
       }
     }
 
-    if (aimedAt && this.role !== "destroyer" && this.role !== "crane") {
+    if (aimedAt && this.role !== "destroyer" && this.role !== "crane" && this.role !== "corvette") {
       if (this.dodgeUntil <= 0) {
         this.dodgeSign *= -1;
         this.dodgeUntil = 0.28 + Math.random() * 0.2;

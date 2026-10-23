@@ -4569,7 +4569,13 @@ export class Game {
         }
         const prey = this.pickHunt(enemy, space) || this.ship;
         enemy.hunt = prey;
-        enemy.update(t, prey, space, this.aimedAt(enemy, space), { seen: this.onScreen(enemy) });
+        enemy.update(t, prey, space, this.aimedAt(enemy, space), {
+          seen: this.onScreen(enemy),
+          playerX: this.ship.x,
+          playerY: this.ship.y,
+          playerRot: this.ship.rotation,
+          playerSteer: this.input.rotate,
+        });
         if (this.tunnel) this.bounceTunnel(enemy);
         if (enemy.wantsShot(prey, space)) this.fireHostile(enemy);
       }

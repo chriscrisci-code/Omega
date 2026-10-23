@@ -248,16 +248,19 @@ export const destroyer = {
   playtest: false,
 };
 
-/** One at a time. Fast hub runner: weave on-screen, bee-line off-screen. */
+/** One at a time. Near-DSF speed. Jink when the player centers or follows. */
 export const corvette = {
   fromWave: 3,
   hits: 10,
   shieldHits: 5,
   regenDelay: 0.45,
   regenEvery: 0.2,
-  turn: 3.2,
-  speed: 430,
-  chase: 520,
+  turn: 6.2,
+  speed: 508,
+  chase: 760,
+  jink: 1.15,
+  jinkHold: 0.92,
+  jinkMin: 0.32,
   every: 18,
   first: 9,
   score: 180,
