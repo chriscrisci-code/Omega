@@ -375,7 +375,7 @@ export class Enemy {
     this.rotation = this.evadeHeading;
     const range = (corvetteCfg.warpRange || 440) * (0.88 + Math.random() * 0.22);
     this.beginWarp(Math.cos(this.evadeHeading) * range, Math.sin(this.evadeHeading) * range, corvetteCfg.warpDur || 0.2);
-    this.warpCool = corvetteCfg.warpCool || 1.25;
+    this.warpCool = corvetteCfg.warpCool || 3.75;
   }
 
   steerCorvette(dt, toHub, extras, aimedAt, space) {

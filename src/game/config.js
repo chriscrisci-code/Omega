@@ -264,7 +264,7 @@ export const corvette = {
   aimCone: 0.22,
   warpRange: 440,
   warpDur: 0.2,
-  warpCool: 1.25,
+  warpCool: 3.75,
   every: 18,
   first: 9,
   score: 180,
