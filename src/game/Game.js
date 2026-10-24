@@ -1923,7 +1923,8 @@ export class Game {
     const gun = this.gunTier();
     this.cooldown = (shipLevels.gunCool[gun - 1] ?? bullets.cooldown) * (spec.coolMul || 1);
     this.ship.clearRail();
-    this.sfx("thud");
+    this.audio.tickRail(0, false);
+    this.sfx("rail");
   }
 
   fireGunShot() {
@@ -4022,6 +4023,7 @@ export class Game {
       enemy.paintLaser(null);
     }
     this.audio.tickLaser(false);
+    this.audio.tickRail(0, false);
   }
 
   killShip() {
@@ -4287,6 +4289,7 @@ export class Game {
       this.tickLockCam(0);
       this.audio.tickEngine(0, 0, 0, 0);
       this.audio.tickLaser(false);
+      this.audio.tickRail(0, false);
       this.tickMusicInput();
       this.audio.tickMusic(this.musicOutLevel());
       this.renderLockCam(screen);
@@ -4854,6 +4857,15 @@ export class Game {
       this.ship.alive &&
       (Boolean(this.hubLaserOn) || this.enemies.some((enemy) => enemy.alive && enemy.role === "destroyer" && enemy.laserOn));
     this.audio.tickLaser(laserOn);
+    const railNeed = this.ship.noseGunCfg?.()?.charge || 0;
+    const railT = this.ship.railT || 0;
+    const railOn =
+      (this.mode === PLAYING || this.attractOnDemo) &&
+      this.ship.alive &&
+      !this.ship.docked &&
+      railNeed > 0 &&
+      railT > 0;
+    this.audio.tickRail(railOn ? Math.min(1, railT / railNeed) : 0, railOn && this.ship.railReady);
     this.tickMusicInput();
     this.audio.tickMusic(this.musicOutLevel());
 

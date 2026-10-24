@@ -93,6 +93,7 @@ export class Enemy {
     this.warpT = 0;
     this.warpDur = 1;
     this.warpCool = 0;
+    this.warpArmed = false;
     this.didWarp = false;
     this.stunned = 0;
     this.laserCharge = 0;
@@ -301,6 +302,7 @@ export class Enemy {
 
   stun(seconds) {
     this.warping = false;
+    this.warpArmed = false;
     this.view.alpha = 1;
     this.stunned = Math.max(this.stunned, seconds);
     this.vx *= 0.15;
@@ -369,13 +371,17 @@ export class Enemy {
       this.evadeHeading = this.pickEvadeHeading(toHub, extras, space);
       this.evadeHold = (corvetteCfg.evade || 1.45) * (0.92 + Math.random() * 0.2);
     }
-    if (!hop || this.warpCool > 0 || this.warping) return;
-    this.evadeHeading = this.pickEvadeHeading(toHub, extras, space);
-    this.evadeHold = (corvetteCfg.evade || 1.45) * (0.92 + Math.random() * 0.2);
-    this.rotation = this.evadeHeading;
+    if (hop && this.warpCool <= 0 && !this.warping) this.warpArmed = true;
+  }
+
+  tryWarp() {
+    if (!this.warpArmed || this.warpCool > 0 || this.warping) return;
+    const err = Math.abs(wrapDelta(this.rotation - this.evadeHeading, Math.PI * 2));
+    if (err > 0.28) return;
     const range = (corvetteCfg.warpRange || 440) * (0.88 + Math.random() * 0.22);
     this.beginWarp(Math.cos(this.evadeHeading) * range, Math.sin(this.evadeHeading) * range, corvetteCfg.warpDur || 0.2);
-    this.warpCool = corvetteCfg.warpCool || 3.75;
+    this.warpCool = corvetteCfg.warpCool || 7.5;
+    this.warpArmed = false;
   }
 
   steerCorvette(dt, toHub, extras, aimedAt, space) {
@@ -388,13 +394,15 @@ export class Enemy {
     const lined = Boolean(aimedAt) || this.playerLined(extras, space);
     if (lined) this.startEvade(toHub, extras, space, true);
     else if (close) this.startEvade(toHub, extras, space, false);
-    const evading = this.evadeHold > 0;
+    const evading = this.evadeHold > 0 || this.warpArmed;
     if (!lined && !close && !evading) {
+      this.warpArmed = false;
       this.rotation = turnToward(this.rotation, toHub, corvetteCfg.turn * dt);
       return corvetteCfg.chase;
     }
     const course = evading ? this.evadeHeading : this.pickEvadeHeading(toHub, extras, space);
     this.rotation = turnToward(this.rotation, course, corvetteCfg.turn * dt);
+    this.tryWarp();
     return evading ? corvetteCfg.chase * 1.2 : corvetteCfg.chase;
   }
 

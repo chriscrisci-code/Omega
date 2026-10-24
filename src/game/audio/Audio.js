@@ -10,6 +10,8 @@ export class GameAudio {
     this.engines = null;
     this.laserBed = null;
     this._laserOn = 0;
+    this.railBed = null;
+    this._railPhase = "off";
     this.musicVol = 0.2;
     this._musicStarting = false;
     this._musicLevel = 0;
@@ -302,6 +304,70 @@ export class GameAudio {
     this.laserBed.buzzGain.gain.setTargetAtTime(amt * 0.07, t, 0.04);
   }
 
+  ensureRail() {
+    if (this.railBed || !this.ctx) return;
+    const hissSrc = this.noiseSource();
+    const hissFilter = this.ctx.createBiquadFilter();
+    hissFilter.type = "bandpass";
+    hissFilter.frequency.value = 1600;
+    hissFilter.Q.value = 1.7;
+    const hiss = this.ctx.createGain();
+    hiss.gain.value = 0;
+    hissSrc.connect(hissFilter);
+    hissFilter.connect(hiss);
+    hiss.connect(this.master);
+    hissSrc.start();
+    const coil = this.ctx.createOscillator();
+    coil.type = "sawtooth";
+    coil.frequency.value = 200;
+    const coilFilter = this.ctx.createBiquadFilter();
+    coilFilter.type = "lowpass";
+    coilFilter.frequency.value = 1200;
+    const coilGain = this.ctx.createGain();
+    coilGain.gain.value = 0;
+    coil.connect(coilFilter);
+    coilFilter.connect(coilGain);
+    coilGain.connect(this.master);
+    coil.start();
+    const hold = this.ctx.createOscillator();
+    hold.type = "triangle";
+    hold.frequency.value = 1080;
+    const holdGain = this.ctx.createGain();
+    holdGain.gain.value = 0;
+    hold.connect(holdGain);
+    holdGain.connect(this.master);
+    hold.start();
+    this.railBed = { hiss, hissFilter, coil, coilFilter, coilGain, hold, holdGain };
+  }
+
+  tickRail(u = 0, ready = false) {
+    if (!this.ctx || this.ctx.state !== "running") return;
+    const charge = Math.min(1, Math.max(0, Number(u) || 0));
+    const on = ready || charge > 0.01;
+    if (!on && !this.railBed) {
+      this._railPhase = "off";
+      return;
+    }
+    this.ensureRail();
+    const t = this.now();
+    const bed = this.railBed;
+    bed.hiss.gain.setTargetAtTime(on ? (ready ? 0.075 : 0.03 + charge * 0.08) : 0, t, on ? 0.06 : 0.035);
+    bed.hissFilter.frequency.setTargetAtTime(ready ? 3400 : 820 + charge * 2300, t, 0.08);
+    bed.coilGain.gain.setTargetAtTime(ready ? 0.016 : charge * 0.058, t, 0.055);
+    bed.coil.frequency.setTargetAtTime(ready ? 760 : 170 + charge * 780, t, 0.075);
+    bed.holdGain.gain.setTargetAtTime(ready ? 0.075 : 0, t, ready ? 0.045 : 0.07);
+    const phase = !on ? "off" : ready ? "hold" : "charge";
+    if (phase === "charge" && this._railPhase === "off") {
+      this.whoosh({ from: 240, to: 780, dur: 0.16, peak: 0.1, q: 0.7 });
+      this.tone({ type: "sine", freq: 140, glide: 300, dur: 0.14, peak: 0.055, attack: 0.02 });
+    }
+    if (phase === "hold" && this._railPhase !== "hold") {
+      this.chime({ freq: 980, dur: 0.12, peak: 0.09 });
+      this.tone({ type: "sine", freq: 1960, dur: 0.07, peak: 0.045, attack: 0.002 });
+    }
+    this._railPhase = phase;
+  }
+
   tickFly(amount = 0, recede = 1) {
     if (!this.ctx || this.ctx.state !== "running") return;
     this.ensureEngine();
@@ -398,6 +464,24 @@ export class GameAudio {
 }
 
 export const SFX = {
+  rail: {
+    name: "RAIL",
+    fire: (audio) => {
+      audio.whoosh({ from: 2600, to: 160, dur: 0.4, peak: 0.3, q: 0.4 });
+      audio.gun({
+        dur: 0.24,
+        attack: 0.001,
+        noisePeak: 0.38,
+        cutoff: 2400,
+        endCutoff: 110,
+        q: 0.52,
+        thump: 40,
+        thumpPeak: 0.36,
+        thumpDur: 0.2,
+      });
+      audio.tone({ type: "sine", freq: 240, glide: 52, dur: 0.3, peak: 0.14, attack: 0.002 });
+    },
+  },
   thud: {
     name: "THUD",
     fire: (audio) =>
@@ -716,7 +800,7 @@ export const SFX = {
 };
 
 export const SFX_GROUPS = [
-  { name: "GUNS", ids: ["thud", "turret", "enemy"] },
+  { name: "GUNS", ids: ["thud", "rail", "turret", "enemy"] },
   { name: "SPECIAL", ids: ["missile", "star", "warp", "emp", "laser"] },
   { name: "THRUST", ids: ["main", "side"] },
   { name: "HITS", ids: ["hit", "rock", "boom", "die", "hub"] },
