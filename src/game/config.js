@@ -248,13 +248,14 @@ export const destroyer = {
   playtest: false,
 };
 
-/** One at a time. Evade first: cut away from the Hub, short warp when lined up. */
+/** One at a time from wave 9. Evade first: cut away from the Hub, short warp when lined up. */
 export const corvette = {
-  fromWave: 3,
+  fromWave: 9,
   hits: 10,
   shieldHits: 5,
   regenDelay: 0.45,
   regenEvery: 0.2,
+  shieldRadius: 56,
   turn: 4.8,
   speed: 590,
   chase: 920,
@@ -265,8 +266,8 @@ export const corvette = {
   warpRange: 440,
   warpDur: 0.2,
   warpCool: 7.5,
-  every: 18,
-  first: 9,
+  every: 150,
+  first: 150,
   score: 180,
   radius: 24,
 };

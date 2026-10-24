@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OMEGA — Codex</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #05060a;
+        --cyan: #66e0ff;
+        --hot: #c8f8ff;
+        --dim: #6d8a99;
+        --line: #1a2a33;
+        --card: #0a0e14;
+        --magenta: #ff4d9a;
+        --orange: #ff9a3c;
+        --amber: #ffc266;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--hot);
+        font-family: "Share Tech Mono", "Cascadia Mono", ui-monospace, monospace;
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      body {
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        min-height: 100vh;
+      }
+      nav {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        overflow: auto;
+        padding: 28px 20px;
+        border-right: 1px solid var(--line);
+        background: #07090e;
+      }
+      nav a {
+        display: block;
+        color: var(--dim);
+        text-decoration: none;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        padding: 5px 0;
+      }
+      nav a:hover, nav a:focus { color: var(--cyan); }
+      nav .brand {
+        color: var(--cyan);
+        font-size: 18px;
+        letter-spacing: 0.22em;
+        margin: 0 0 6px;
+      }
+      nav .sub { color: var(--dim); font-size: 11px; margin: 0 0 22px; letter-spacing: 0.12em; }
+      main { padding: 40px 56px 80px; max-width: 920px; }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 34px;
+        letter-spacing: 0.28em;
+        color: var(--cyan);
+        font-weight: 400;
+      }
+      .tag { color: var(--dim); letter-spacing: 0.16em; margin: 0 0 32px; }
+      h2 {
+        margin: 48px 0 14px;
+        padding-top: 16px;
+        border-top: 1px solid var(--line);
+        font-size: 16px;
+        letter-spacing: 0.2em;
+        color: var(--cyan);
+        font-weight: 400;
+      }
+      h3 {
+        margin: 28px 0 10px;
+        font-size: 13px;
+        letter-spacing: 0.16em;
+        color: var(--amber);
+        font-weight: 400;
+      }
+      p, li { color: var(--hot); }
+      ul { padding-left: 1.2em; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0 20px;
+        font-size: 12.5px;
+      }
+      th, td {
+        text-align: left;
+        padding: 7px 10px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th { color: var(--dim); letter-spacing: 0.1em; font-weight: 400; }
+      .note {
+        color: var(--dim);
+        font-size: 12px;
+        border-left: 2px solid var(--cyan);
+        padding: 8px 12px;
+        margin: 16px 0;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        padding: 12px 14px;
+      }
+      .card strong { color: var(--cyan); letter-spacing: 0.08em; }
+      .print {
+        position: fixed;
+        right: 24px;
+        bottom: 24px;
+        background: #0a1218;
+        color: var(--cyan);
+        border: 1px solid var(--cyan);
+        padding: 8px 14px;
+        font: inherit;
+        letter-spacing: 0.14em;
+        cursor: pointer;
+      }
+      .print:hover { background: #122028; }
+      @media (max-width: 820px) {
+        body { grid-template-columns: 1fr; }
+        nav { position: relative; height: auto; }
+        main { padding: 28px 20px 72px; }
+        .grid { grid-template-columns: 1fr; }
+      }
+      @media print {
+        nav, .print { display: none; }
+        body { display: block; background: #fff; color: #111; }
+        h1, h2, .brand { color: #111; }
+        main { max-width: none; padding: 0; }
+        th, td, p, li { color: #111; }
+        .card { border-color: #ccc; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <p class="brand">OMEGA</p>
+      <p class="sub">CODEX  0.1.0</p>
+      <a href="#loop">LOOP</a>
+      <a href="#money">CURRENCIES</a>
+      <a href="#ships">SHIPS</a>
+      <a href="#dock">DOCK LOADOUT</a>
+      <a href="#waves">ASSAULT WAVES</a>
+      <a href="#enemies">ENEMIES</a>
+      <a href="#hub">HUB</a>
+      <a href="#rocks">ROCKS &amp; ORE</a>
+      <a href="#score">SCORE TABLE</a>
+      <a href="#rules">COMBAT RULES</a>
+      <a href="#controls">CONTROLS</a>
+    </nav>
+    <main>
+      <h1>OMEGA</h1>
+      <p class="tag">FLOWSTATE SPACE COMBAT &nbsp;·&nbsp; LOCAL REFERENCE</p>
+      <p>
+        Neon vector arena on a <strong>16000 × 16000</strong> torus. Hub at center. Cardinal castles sit 5120 out.
+        Camera zoom 0.56. Steam / desktop is the goal; phone is optional. Career XP is local for now; Steam Cloud is planned later.
+      </p>
+      <p class="note">Numbers below are Easy unless noted. Medium / Hard raise HP, spawn rates, and pressure. Extra life stays every 10,000 score.</p>
+
+      <h2 id="loop">THE LOOP</h2>
+      <ol>
+        <li>Title → difficulty (EASY / MEDIUM / HARD) → start any unlocked assault wave.</li>
+        <li>Fly, mine, fight. Dock at the Hub to upgrade and cash kill bounties.</li>
+        <li>Assault waves are <strong>timed combat</strong>. Between them is a <strong>rest</strong>.</li>
+        <li>Die with lives left → respawn invulnerable (2.1s). Lives hit 0 → Continue.</li>
+        <li><strong>Score</strong> is this run. <strong>XP</strong> is career and survives Continue and new runs. No XP leaderboard.</li>
+      </ol>
+      <p><strong>Continue</strong> resets Score to 0 and the extra-life threshold. Ship, loadout, Points, bounty, and assault wave stay. <strong>RESET XP</strong> also resets ship locks and the current hull to DSF 22.</p>
+      <p>You are <strong>safe overlapping the Hub</strong> even if you are not docked. HOME warps you home (2560 in 1s, 2.4s cool, stops 160 short).</p>
+
+      <h2 id="money">THREE CURRENCIES</h2>
+      <table>
+        <thead><tr><th>Name</th><th>What it is</th><th>Spent on</th></tr></thead>
+        <tbody>
+          <tr><td>SCORE</td><td>This run. Extra life every 10,000. High score saved.</td><td>Nothing. Pride and lives.</td></tr>
+          <tr><td>POINTS</td><td>Dock currency from kill bounties.</td><td>Gun / missile / EMP / shield / gunship wing.</td></tr>
+          <tr><td>XP</td><td>Career. Unlocks hulls. Persists.</td><td>Ships, 30,000 XP each after DSF 22.</td></tr>
+        </tbody>
+      </table>
+      <h3>KILL BOUNTY</h3>
+      <p>Kills bank <strong>units</strong>. Cash <strong>×5</strong> when you dock. Kill while already docked pays immediately.</p>
+      <table>
+        <thead><tr><th>How you killed it</th><th>Units</th></tr></thead>
+        <tbody>
+          <tr><td>Gun, rail, ram, most other</td><td>3</td></tr>
+          <tr><td>EMP or missile / rocket</td><td>1</td></tr>
+        </tbody>
+      </table>
+      <p>Paid as XP = units × 20 / 3 and Points = units × 1 / 3, then ×5 at the Hub.</p>
+      <p>Also XP: ore pickup <strong>5</strong>, ore dump <strong>25</strong> each, dock upgrade <strong>40</strong>.</p>
+
+      <h2 id="ships">SHIPS</h2>
+      <p>Unlock ladder. New hulls start <strong>one level down</strong> on every dock stat. DSF 22 starts 1 / 1 / 1 / 1.</p>
+      <p>Stock flight: max speed <strong>520</strong> × hull speedMul, thrust 460, turn 2.15, 3 lives.</p>
+      <table>
+        <thead>
+          <tr><th>XP</th><th>Hull</th><th>Speed</th><th>Turn</th><th>Hull</th><th>Shield</th><th>Nose</th><th>Specials</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>0</td><td>DSF 22</td><td>1.00</td><td>1.00</td><td>1</td><td>×1 auto</td><td>stream</td><td>Auto-shield vs shots, not missiles.</td></tr>
+          <tr><td>30k</td><td>ASSAULT</td><td>0.50</td><td>0.50</td><td>3</td><td>×2 pulse</td><td>none</td><td>AI turrets, 2 decoy wingmen, pulse shield while ON.</td></tr>
+          <tr><td>60k</td><td>GUNSHIP</td><td>0.50</td><td>0.50</td><td>3</td><td>×2 pulse</td><td>rockets</td><td>3 AI burst turrets, pulse shield.</td></tr>
+          <tr><td>90k</td><td>SABRE</td><td>1.28</td><td>0.84</td><td>2</td><td>×1 auto</td><td>stream</td><td>2-volley missiles, multi-hull.</td></tr>
+          <tr><td>120k</td><td>ACRP 33</td><td>0.70</td><td>0.28</td><td>1</td><td>×10 auto</td><td>rail</td><td>1.5s charge, 200 hits. Optional Gunship wing.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">ACRP rail: 10 shots destroy the Battleship. Charge-hold-fire has its own audio bed.</p>
+
+      <h2 id="dock">DOCK LOADOUT</h2>
+      <p>Buy with Points while docked. Missiles / rockets reload only at the Hub.</p>
+      <table>
+        <thead><tr><th>Stat</th><th>Levels</th><th>What it does</th><th>Costs</th></tr></thead>
+        <tbody>
+          <tr><td>GUN</td><td>1–5</td><td>Hold-fire: slow → 2 → 3 → original stream → twin. Cool 0.2 / 0.14 / 0.105 / 0.08 / 0.04.</td><td>4 / 6 / 10 / 14</td></tr>
+          <tr><td>MSL / RKT</td><td>1–7</td><td>Ammo = 6 per level.</td><td>5 / 6 / 8 / 10 / 12 / 14</td></tr>
+          <tr><td>EMP</td><td>1–4</td><td>1 off / 2 stun 15s / 3 long stun / 4 kill. Assault &amp; Gunship cap at 3. Cool 8s.</td><td>6 / 10 / 16</td></tr>
+          <tr><td>SHD</td><td>1–4</td><td>Pool 2 → 4. Level 4 is 2× time. Hull shieldMul on top. Drain 0.42/s, recharge 0.08/s.</td><td>5 / 8 / 12</td></tr>
+          <tr><td>GUNSHIP</td><td>0–2</td><td>ACRP only: spawn Gunship wingmen.</td><td>8 / 14</td></tr>
+        </tbody>
+      </table>
+      <p>Player shield: hold to raise. Shot hit 0.12, body 0.22. Assault / Gunship is a <strong>pulse while ON</strong>, not DSF auto-block. Auto-shield does not eat missiles.</p>
+
+      <h2 id="waves">ASSAULT WAVES</h2>
+      <p>Timed fight, then rest <strong>72s</strong> (Easy), then the next wave. The wave picker uses the highest assault wave you have reached.</p>
+      <p class="note">A second counter only respawns the asteroid field when the area is clear. That is not the assault clock.</p>
+      <table>
+        <thead><tr><th>Wave</th><th>Time</th><th>What happens</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>210s</td><td>Soft open. 2 hunters global, every 14s. Raiders up to 12, every 5.2s.</td></tr>
+          <tr><td>2</td><td>85s</td><td>2 hunters per castle. Castle stars on. Raiders scale with live castles.</td></tr>
+          <tr><td>3+</td><td>95s + 28s/wave</td><td>Full castle spawn (max 3 hunters/castle, every 5.5s). Raiders max 4, every 11s. Stars on.</td></tr>
+          <tr><td>4+</td><td>—</td><td>Destroyers start. Cap = wave − 3 (wave 4 → 1, wave 5 → 2, …).</td></tr>
+          <tr><td>5</td><td>—</td><td>Enemy station appears. 2 cranes assemble it.</td></tr>
+          <tr><td>6</td><td>—</td><td>3 cranes, faster yard.</td></tr>
+          <tr><td>7</td><td>—</td><td>Hunter flood (10× spawn). No stars. Leftover cranes cleared.</td></tr>
+          <tr><td>8</td><td>—</td><td>No hunters. Star storm (10× rate).</td></tr>
+          <tr><td>9</td><td>—</td><td>Battleship scaffold on the station. 3 cranes. Yard warning. <strong>Corvettes start.</strong></td></tr>
+          <tr><td>10</td><td>formula</td><td>Open space again.</td></tr>
+          <tr><td>11</td><td>180s</td><td>Tunnel: fight inside a huge asteroid. Walled corridors, bounce, no wrap. 9 hunters + core. Clear core for 800. Corvettes / destroyers / raiders / cranes culled.</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="enemies">ENEMIES</h2>
+
+      <h3>HUNTER</h3>
+      <p>Dart. 2 HP (Easy). Score 75. Castles spawn them. Wave 11 tunnel includes 9.</p>
+
+      <h3>RAIDER</h3>
+      <p>Attacks the Hub. 3 HP. Score 150. Count and rate come from the assault plan. Can ram the Hub.</p>
+
+      <h3>DESTROYER — from wave 4</h3>
+      <p>48 hull. 100-hit shield (missiles do 10 shield each; guns often ricochet 42% / pierce 22%). Twin hold-lasers: 3s charge, 5s recharge, range 780. Slow (cap 110, turn 0.2). Score 250.</p>
+
+      <h3>CORVETTE — from wave 9, one at a time</h3>
+      <p>Mini-battleship hull. Attacks the Hub. Evade is first: if the player is close (860) or lined up, it banks <strong>away from the Hub</strong> and runs. Lined up → short warp (~440 over 0.2s) after it faces the cut, then 7.5s cool. Mid-warp: no shots, missiles, or ram.</p>
+      <table>
+        <thead><tr><th></th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>First wave</td><td>9</td></tr>
+          <tr><td>Interval</td><td>~2.5 minutes (±15–20s). Timer does not reset every new wave.</td></tr>
+          <tr><td>Hull / shield</td><td>10 / 5, regen after 0.45s, +1 every 0.2s</td></tr>
+          <tr><td>Shield look</td><td>Large circle, radius 56. Visual only. Easy to remove later.</td></tr>
+          <tr><td>Speed / evade</td><td>590 / 640 — faster than a stock DSF 22 (520)</td></tr>
+          <tr><td>Hitbox</td><td>24</td></tr>
+          <tr><td>Score</td><td>180</td></tr>
+          <tr><td>HUD</td><td>Dedicated runway + mini-battleship pip</td></tr>
+        </tbody>
+      </table>
+
+      <h3>CRANE</h3>
+      <p>Unarmed yard tugs. 4 HP, slow. Waves 5–6 build the station; wave 9 the battleship. Score 100.</p>
+
+      <h3>CASTLE STARS</h3>
+      <p>Homing bolts from live castles. More on wave 2, storm on wave 8.</p>
+
+      <h3>STATION — wave 5+</h3>
+      <p>Ring 980, hub 220, 8 spokes. Guns 4 HP, modules 30, joints / clamps 80. Blow both edge joints and the spoke clamp to drop a section. Half the ring starts loose.</p>
+
+      <h3>BATTLESHIP — wave 9+</h3>
+      <p>~8× destroyer length. 6 plates, 2 start on. <strong>10 ACRP rail shots</strong> to kill. Score 1200.</p>
+
+      <h2 id="hub">HUB</h2>
+      <p>Center dock. Upgrade, reload missiles, cash bounties, swap unlocked ships. Safe while overlapping it.</p>
+      <p>Dump ore to unlock Hub tiers:</p>
+      <table>
+        <thead><tr><th>Ore</th><th>Tier</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>8</td><td>RING</td><td>+2 outer shield</td></tr>
+          <tr><td>16</td><td>PORTS</td><td>Faster shield regen</td></tr>
+          <tr><td>28</td><td>TURRETS</td><td>Two stock guns + hold-beam laser seats</td></tr>
+          <tr><td>44</td><td>ARMOR</td><td>+8 core HP</td></tr>
+          <tr><td>64</td><td>SCAFFOLD</td><td>Faster missiles, extra skin shield</td></tr>
+        </tbody>
+      </table>
+      <p>Raiders and Corvettes ram the Hub. Layered shields then core take those hits. Hub seats: two stock guns (cool 0.2) plus a hold-beam laser (range 920).</p>
+
+      <h2 id="rocks">ROCKS &amp; ORE</h2>
+      <table>
+        <thead><tr><th>Size</th><th>Hits</th><th>Score</th><th>Ore</th></tr></thead>
+        <tbody>
+          <tr><td>3 large</td><td>4</td><td>20</td><td>3</td></tr>
+          <tr><td>2 mid</td><td>3</td><td>50</td><td>2</td></tr>
+          <tr><td>1 small</td><td>2</td><td>100</td><td>1</td></tr>
+        </tbody>
+      </table>
+      <p>Start field 4 large (Easy), up to 36 in the field, max 8 large at once. Pickup XP 5, dump XP 25 each.</p>
+
+      <h2 id="score">RUN SCORE</h2>
+      <table>
+        <thead><tr><th>Thing</th><th>Score</th></tr></thead>
+        <tbody>
+          <tr><td>Hunter</td><td>75</td></tr>
+          <tr><td>Crane</td><td>100</td></tr>
+          <tr><td>Raider</td><td>150</td></tr>
+          <tr><td>Corvette</td><td>180</td></tr>
+          <tr><td>Destroyer</td><td>250</td></tr>
+          <tr><td>Rock 3 / 2 / 1</td><td>20 / 50 / 100</td></tr>
+          <tr><td>Station gun / module / joint</td><td>80 / 55 / 80</td></tr>
+          <tr><td>Battleship</td><td>1200</td></tr>
+          <tr><td>Tunnel core</td><td>800</td></tr>
+          <tr><td>Castle damaged / destroyed</td><td>25 / 500</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="rules">COMBAT RULES</h2>
+      <div class="grid">
+        <div class="card"><strong>LOCK / RUNWAY</strong><br />Lock cam on a target. Corvettes always get their own runway strip.</div>
+        <div class="card"><strong>AI TURRETS</strong><br />Assault / Gunship / wingmen. Invisible fire. 3-hit packs vs hunters and raiders.</div>
+        <div class="card"><strong>MISSILES</strong><br />Drop, then ramp 520 → 1040. Fuse / blast. Ammo only.</div>
+        <div class="card"><strong>ROCKETS</strong><br />Gunship only. Shorter, amber, 2 damage.</div>
+        <div class="card"><strong>EMP</strong><br />Grow 0.72s, fade 0.28s, cool 8s. Tier 4 kills. Blinds missiles.</div>
+        <div class="card"><strong>MAP</strong><br />Hold to zoom out. Pause / save / end run are bound actions.</div>
+      </div>
+
+      <h2 id="controls">CONTROLS</h2>
+      <p>Rebindable. Profiles: MOUSE / PAD / LAPTOP / PHONE.</p>
+      <p>Thrust, Reverse, Strafe L/R, Turn L/R, Aim, Fire, Shield, Warp, EMP, Missile, Map, Lock, Home, Pause, Save, Fullscreen, End Run.</p>
+      <p>Phone has a d-pad + stick. Last direction latches if a finger slides off.</p>
+      <p class="note">Open this file anytime at <strong>/codex.html</strong> while the game is running, or print it from the button. Print-to-PDF works from the browser.</p>
+    </main>
+    <button class="print" type="button" onclick="window.print()">PRINT / PDF</button>
+  </body>
+</html>

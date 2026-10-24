@@ -457,7 +457,8 @@ export class Game {
     this.assaultRest = false;
     this.assaultTime = this.assaultDuration(this.assaultIndex);
     this.raiderTimer = this.assaultIndex === 1 ? raid.first : 1.1;
-    this.corvetteTimer = this.assaultIndex < corvetteCfg.fromWave ? corvetteCfg.first : 2.4;
+    if (this.assaultIndex < corvetteCfg.fromWave) this.corvetteTimer = corvetteCfg.first;
+    else if (!Number.isFinite(this.corvetteTimer) || this.corvetteTimer <= 0) this.corvetteTimer = corvetteCfg.first;
     this.markWaveReached(this.assaultIndex);
     const destroyers = this.destroyerCap();
     for (const base of this.bases) {
@@ -4562,7 +4563,7 @@ export class Game {
           ) {
             const launchers = this.bases.filter((base) => !base.hub && base.alive);
             if (launchers.length) this.spawnCorvette(pick(launchers));
-            this.corvetteTimer = corvetteCfg.every + rand(-2.5, 3);
+            this.corvetteTimer = corvetteCfg.every + rand(-15, 20);
           }
         }
         this.tickCastleWatch(t, space);

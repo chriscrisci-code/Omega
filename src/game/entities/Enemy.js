@@ -345,9 +345,10 @@ export class Enemy {
     this.shieldG.clear();
     if (this.role !== "corvette" || this.shieldHp <= 0) return;
     const t = this.shieldHp / Math.max(1, this.shieldMax);
-    this.shieldG.ellipse(-2, 0, 42, 18);
+    const r = corvetteCfg.shieldRadius || 56;
+    this.shieldG.circle(0, 0, r);
     this.shieldG.stroke({ width: 2.4, color: this.color, alpha: 0.1 + t * 0.16 });
-    this.shieldG.ellipse(-2, 0, 42, 18);
+    this.shieldG.circle(0, 0, r);
     this.shieldG.stroke({ width: 1.05, color: this.hotColor, alpha: 0.28 + t * 0.4 });
   }
 
