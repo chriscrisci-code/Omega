@@ -288,7 +288,7 @@ export class Hud {
     this.center.classList.remove("is-hidden");
     this.title.innerHTML = vectorTitleSvg("2DSG", 44, CYAN, HOT, { motion: true, block: true });
     this.applyTrailState();
-    this.paint(this.tag, "THE VOID IS LISTENING", 12, MAGENTA, PINK, "center");
+    this.paint(this.tag, "FLOWSTATE SPACE COMBAT", 12, MAGENTA, PINK, "center");
     this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP TO START" : "PRESS FIRE", 20, CYAN, HOT);
     this.paint(this.credit, "C 1984  2DSG", 9, DIM, CYAN, "center");
     this.paintHelp();
