@@ -4112,10 +4112,14 @@ export class Game {
     this.world.pivot.set(this.camX, this.camY);
     this.world.position.set(screen.width / 2 + shakeX, screen.height / 2 + shakeY);
     this.world.rotation = this.camRot;
-    this.worldFilterArea.x = 0;
-    this.worldFilterArea.y = 0;
-    this.worldFilterArea.width = screen.width;
-    this.worldFilterArea.height = screen.height;
+    const zoom = Math.max(0.04, this.camZoom || this.playZoom());
+    const pad = 1.5;
+    const viewW = (screen.width * pad) / zoom;
+    const viewH = (screen.height * pad) / zoom;
+    this.worldFilterArea.x = this.camX - viewW * 0.5;
+    this.worldFilterArea.y = this.camY - viewH * 0.5;
+    this.worldFilterArea.width = Math.max(1, viewW);
+    this.worldFilterArea.height = Math.max(1, viewH);
     this.world.filterArea = this.worldFilterArea;
     this.far.sync(this.camX, this.camY, !mapping && this.mode !== SHIPS);
 

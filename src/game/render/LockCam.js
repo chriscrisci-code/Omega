@@ -169,15 +169,15 @@ export class LockCam {
       sy: world.scale.y,
       px: world.pivot.x,
       py: world.pivot.y,
-      filters: world.filters,
     };
+    const blooms = (world.filters || []).map((filter) => ({ filter, on: filter.enabled }));
     const hidden = (hide || []).map((node) => ({ node, vis: node.visible }));
     const scaled = (scales || []).map((item) => ({ view: item.view, x: item.view.scale.x, y: item.view.scale.y }));
 
     for (const row of hidden) row.node.visible = false;
     for (const row of scaled) row.view.scale.set(1);
+    for (const row of blooms) row.filter.enabled = false;
 
-    world.filters = null;
     world.pivot.set(placedX, placedY);
     world.position.set(this.w * 0.5, this.h * 0.5);
     world.rotation = this.sight ? rotation : 0;
@@ -185,11 +185,11 @@ export class LockCam {
     try {
       renderer.render({ container: world, target: this.rt, clear: true });
     } finally {
-      world.filters = saved.filters;
       world.pivot.set(saved.px, saved.py);
       world.position.set(saved.x, saved.y);
       world.rotation = saved.rot;
       world.scale.set(saved.sx, saved.sy);
+      for (const row of blooms) row.filter.enabled = row.on;
       for (const row of hidden) row.node.visible = row.vis;
       for (const row of scaled) row.view.scale.set(row.x, row.y);
     }
