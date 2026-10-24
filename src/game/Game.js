@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
-import { applyDifficulty, assault, battleship as battleshipCfg, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, battleship as battleshipCfg, bloom as bloomConfig, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -4116,14 +4116,17 @@ export class Game {
     this.world.position.set(screen.width / 2 + shakeX, screen.height / 2 + shakeY);
     this.world.rotation = this.camRot;
     const zoom = Math.max(0.04, this.camZoom || this.playZoom());
-    const pad = 1.5;
-    const filterW = (screen.width * pad) / zoom;
-    const filterH = (screen.height * pad) / zoom;
+    const pad = bloomConfig.pad || 1.08;
+    const snap = bloomConfig.snap || 64;
+    const filterW = Math.max(snap, Math.ceil((screen.width * pad) / zoom / snap) * snap);
+    const filterH = Math.max(snap, Math.ceil((screen.height * pad) / zoom / snap) * snap);
     this.worldFilterArea.x = this.camX - filterW * 0.5;
     this.worldFilterArea.y = this.camY - filterH * 0.5;
-    this.worldFilterArea.width = Math.max(1, filterW);
-    this.worldFilterArea.height = Math.max(1, filterH);
-    this.world.filterArea = this.worldFilterArea;
+    if (this.worldFilterArea.width !== filterW || this.worldFilterArea.height !== filterH) {
+      this.worldFilterArea.width = filterW;
+      this.worldFilterArea.height = filterH;
+      this.world.filterArea = this.worldFilterArea;
+    }
     this.far.sync(this.camX, this.camY, !mapping && this.mode !== SHIPS);
 
     const shipBoost = mapping ? 22 : this.attractOnDemo ? 1.45 : 1;

@@ -411,9 +411,11 @@ export const bloom = {
   threshold: 0.28,
   bloomScale: 1.45,
   brightness: 1.08,
-  blur: 6,
-  quality: 4,
+  blur: 5,
+  quality: 3,
   resolution: 1,
+  pad: 1.08,
+  snap: 64,
 };
 
 export const extraLifeEvery = 10000;

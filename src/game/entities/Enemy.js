@@ -17,6 +17,15 @@ function boxPts(x, y, w, h) {
   return [x - hw, y - hh, x + hw, y - hh, x + hw, y + hh, x - hw, y + hh];
 }
 
+function ringPts(sides, radius, turn = 0) {
+  const points = [];
+  for (let i = 0; i < sides; i += 1) {
+    const a = turn + (i / sides) * Math.PI * 2;
+    points.push(Math.cos(a) * radius, Math.sin(a) * radius);
+  }
+  return points;
+}
+
 /** Battleship silhouette at corvette scale. */
 const CV_SX = 0.072;
 const CV_SY = 0.16;
@@ -346,10 +355,8 @@ export class Enemy {
     if (this.role !== "corvette" || this.shieldHp <= 0) return;
     const t = this.shieldHp / Math.max(1, this.shieldMax);
     const r = corvetteCfg.shieldRadius || 56;
-    this.shieldG.circle(0, 0, r);
-    this.shieldG.stroke({ width: 2.4, color: this.color, alpha: 0.1 + t * 0.16 });
-    this.shieldG.circle(0, 0, r);
-    this.shieldG.stroke({ width: 1.05, color: this.hotColor, alpha: 0.28 + t * 0.4 });
+    strokeGlow(this.shieldG, ringPts(16, r), this.color, this.hotColor, 1.25 + t * 0.3);
+    strokeGlow(this.shieldG, ringPts(8, r * 0.72), this.color, this.hotColor, 1.05 + t * 0.2);
   }
 
   noteShieldHit() {
