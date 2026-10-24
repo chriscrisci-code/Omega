@@ -6,22 +6,41 @@ import { strokeGlow, strokeLine } from "../render/textures.js";
 export const HUNTER = [12, 0, -8, 6, -4, 0, -8, -6];
 export const RAIDER = [15, 0, -5, 8, -11, 0, -5, -8];
 export const CORVETTE = [
-  30, 0,
-  22, 7,
-  8, 11,
-  -10, 12,
-  -22, 9,
-  -28, 4,
-  -28, -4,
-  -22, -9,
-  -10, -12,
-  8, -11,
-  22, -7,
+  32, 0,
+  16, 4,
+  2, 5,
+  -4, 15,
+  -18, 17,
+  -14, 6,
+  -22, 5,
+  -28, 11,
+  -38, 9,
+  -38, 3,
+  -26, 2,
+  -26, -2,
+  -38, -3,
+  -38, -9,
+  -28, -11,
+  -22, -5,
+  -14, -6,
+  -18, -17,
+  -4, -15,
+  2, -5,
+  16, -4,
 ];
-const CORVETTE_INNER = [16, 4, -12, 5, -12, -5, 16, -4];
+const CORVETTE_SPINE = [22, 2.4, -20, 3, -20, -3, 22, -2.4];
+const CORVETTE_COCKPIT = [10, 2, 2, 3.2, -4, 2, -4, -2, 2, -3.2, 10, -2];
 const CORVETTE_ENGINES = [
-  [-28, 7, -36, 6, -36, 2, -28, 2],
-  [-28, -7, -36, -6, -36, -2, -28, -2],
+  [-28, 11, -38, 9, -38, 3, -26, 2, -22, 5],
+  [-28, -11, -38, -9, -38, -3, -26, -2, -22, -5],
+];
+const CORVETTE_LINES = [
+  [16, 4, -4, 15],
+  [16, -4, -4, -15],
+  [2, 5, -14, 6],
+  [2, -5, -14, -6],
+  [-4, 15, -18, 17],
+  [-4, -15, -18, -17],
 ];
 const CRANE_BARGE = [18, 7, -16, 9, -22, 0, -16, -9, 18, -7];
 export const CRANE = [78, 58, -54, 52, -64, 0, -54, -52, 58, -38];
@@ -210,11 +229,11 @@ export class Enemy {
       return;
     }
     if (this.role === "corvette") {
-      strokeGlow(this.g, CORVETTE, this.color, this.hotColor, 1.5);
-      strokeGlow(this.g, CORVETTE_INNER, this.color, this.hotColor, 1.15);
-      for (const engine of CORVETTE_ENGINES) strokeGlow(this.g, engine, this.color, this.hotColor, 1.2);
-      strokeLine(this.g, [8, 11, 8, -11], this.color, this.hotColor, 0.95);
-      strokeLine(this.g, [-10, 12, -10, -12], this.color, this.hotColor, 0.9);
+      strokeGlow(this.g, CORVETTE, this.color, this.hotColor, 1.45);
+      strokeGlow(this.g, CORVETTE_SPINE, this.color, this.hotColor, 1.1);
+      strokeGlow(this.g, CORVETTE_COCKPIT, this.color, this.hotColor, 1);
+      for (const engine of CORVETTE_ENGINES) strokeGlow(this.g, engine, this.color, this.hotColor, 1.15);
+      for (const line of CORVETTE_LINES) strokeLine(this.g, line, this.color, this.hotColor, 0.9);
       return;
     }
     if (this.role !== "destroyer") {
@@ -266,9 +285,9 @@ export class Enemy {
     this.shieldG.clear();
     if (this.role !== "corvette" || this.shieldHp <= 0) return;
     const t = this.shieldHp / Math.max(1, this.shieldMax);
-    this.shieldG.ellipse(0, 0, 34, 16);
+    this.shieldG.ellipse(-2, 0, 38, 20);
     this.shieldG.stroke({ width: 2.4, color: this.color, alpha: 0.1 + t * 0.16 });
-    this.shieldG.ellipse(0, 0, 34, 16);
+    this.shieldG.ellipse(-2, 0, 38, 20);
     this.shieldG.stroke({ width: 1.05, color: this.hotColor, alpha: 0.28 + t * 0.4 });
   }
 
@@ -293,7 +312,7 @@ export class Enemy {
   }
 
   nose() {
-    const tip = this.role === "raider" ? 15 : this.role === "destroyer" ? 52 : this.role === "corvette" ? 30 : 12;
+    const tip = this.role === "raider" ? 15 : this.role === "destroyer" ? 52 : this.role === "corvette" ? 32 : 12;
     return {
       x: this.x + Math.cos(this.rotation) * tip,
       y: this.y + Math.sin(this.rotation) * tip,

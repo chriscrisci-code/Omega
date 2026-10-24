@@ -83,17 +83,21 @@ function drawGlyph(g, kind, color, hot, extras = {}) {
   }
 
   if (kind === "corvette") {
-    g.moveTo(12, 0);
-    g.lineTo(6, 4.5);
-    g.lineTo(-8, 5);
-    g.lineTo(-12, 2.4);
-    g.lineTo(-12, -2.4);
-    g.lineTo(-8, -5);
-    g.lineTo(6, -4.5);
+    g.moveTo(13, 0);
+    g.lineTo(4, 3);
+    g.lineTo(-2, 8);
+    g.lineTo(-8, 8);
+    g.lineTo(-5, 2.4);
+    g.lineTo(-12, 3.4);
+    g.lineTo(-12, -3.4);
+    g.lineTo(-5, -2.4);
+    g.lineTo(-8, -8);
+    g.lineTo(-2, -8);
+    g.lineTo(4, -3);
     g.closePath();
     g.stroke({ width: 1.2, color: hot, join: "round" });
-    g.rect(-6, -2, 8, 4);
-    g.stroke({ width: 0.9, color });
+    g.rect(-4, -1.6, 7, 3.2);
+    g.stroke({ width: 0.85, color });
     return;
   }
 
