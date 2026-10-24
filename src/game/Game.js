@@ -4114,12 +4114,12 @@ export class Game {
     this.world.rotation = this.camRot;
     const zoom = Math.max(0.04, this.camZoom || this.playZoom());
     const pad = 1.5;
-    const viewW = (screen.width * pad) / zoom;
-    const viewH = (screen.height * pad) / zoom;
-    this.worldFilterArea.x = this.camX - viewW * 0.5;
-    this.worldFilterArea.y = this.camY - viewH * 0.5;
-    this.worldFilterArea.width = Math.max(1, viewW);
-    this.worldFilterArea.height = Math.max(1, viewH);
+    const filterW = (screen.width * pad) / zoom;
+    const filterH = (screen.height * pad) / zoom;
+    this.worldFilterArea.x = this.camX - filterW * 0.5;
+    this.worldFilterArea.y = this.camY - filterH * 0.5;
+    this.worldFilterArea.width = Math.max(1, filterW);
+    this.worldFilterArea.height = Math.max(1, filterH);
     this.world.filterArea = this.worldFilterArea;
     this.far.sync(this.camX, this.camY, !mapping && this.mode !== SHIPS);
 
