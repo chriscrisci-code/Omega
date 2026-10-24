@@ -248,19 +248,23 @@ export const destroyer = {
   playtest: false,
 };
 
-/** One at a time. Near-DSF speed. Jink when the player centers or follows. */
+/** One at a time. Evade first: cut away from the Hub, short warp when lined up. */
 export const corvette = {
   fromWave: 3,
   hits: 10,
   shieldHits: 5,
   regenDelay: 0.45,
   regenEvery: 0.2,
-  turn: 6.2,
+  turn: 5.4,
   speed: 508,
-  chase: 760,
-  jink: 1.15,
-  jinkHold: 0.92,
-  jinkMin: 0.32,
+  chase: 780,
+  evadeSpeed: 518,
+  evade: 1.45,
+  warn: 860,
+  aimCone: 0.22,
+  warpRange: 440,
+  warpDur: 0.2,
+  warpCool: 1.25,
   every: 18,
   first: 9,
   score: 180,

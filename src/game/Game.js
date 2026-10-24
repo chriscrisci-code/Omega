@@ -3098,7 +3098,7 @@ export class Game {
     const pad = this.missileFusePad(missile);
     const touch = (body) => body && body.alive !== false && hits(missile, body, space.width, space.height, pad);
     for (const enemy of this.enemies) {
-      if (enemy.alive && touch(enemy)) return enemy;
+      if (enemy.alive && !enemy.warping && touch(enemy)) return enemy;
     }
     for (const star of this.castleStars) {
       if (touch(star)) return star;
@@ -4576,8 +4576,14 @@ export class Game {
           playerRot: this.ship.rotation,
           playerSteer: this.input.rotate,
         });
+        if (enemy.didWarp) {
+          enemy.didWarp = false;
+          this.fx.burst(enemy.x, enemy.y, enemy.hotColor || colors.magentaHot, 12, 200);
+          this.fx.burst(enemy.x, enemy.y, colors.white, 6, 120);
+          this.sfx("warp");
+        }
         if (this.tunnel) this.bounceTunnel(enemy);
-        if (enemy.wantsShot(prey, space)) this.fireHostile(enemy);
+        if (!enemy.warping && enemy.wantsShot(prey, space)) this.fireHostile(enemy);
       }
       this.tickStation(t, space);
       this.battleship.tickLoose(t, space);
@@ -4641,6 +4647,7 @@ export class Game {
       }
 
       for (const enemy of [...this.enemies]) {
+        if (enemy.warping) continue;
         for (const shot of this.shots) {
           if (!shot.alive || shot.ignore === enemy) continue;
           if (!hitsBeam(shot, enemy, shot.streak || bullets.streak, space.width, space.height)) continue;
@@ -4734,7 +4741,7 @@ export class Game {
           }
         }
         for (const enemy of this.enemies) {
-          if (!enemy.alive || (enemy.role !== "raider" && enemy.role !== "corvette") || enemy.ramCool > 0 || enemy.stunned > 0) continue;
+          if (!enemy.alive || (enemy.role !== "raider" && enemy.role !== "corvette") || enemy.ramCool > 0 || enemy.stunned > 0 || enemy.warping) continue;
           if (hits(enemy, { x: this.hub.x, y: this.hub.y, radius: this.hub.hitRadius }, space.width, space.height)) {
             const dx = wrapDelta(enemy.x - this.hub.x, space.width);
             const dy = wrapDelta(enemy.y - this.hub.y, space.height);
@@ -4765,7 +4772,7 @@ export class Game {
         }
         if (!flyer.alive || struck) continue;
         for (const enemy of this.enemies) {
-          if (!enemy.alive || !hits(body, enemy, space.width, space.height)) continue;
+          if (!enemy.alive || enemy.warping || !hits(body, enemy, space.width, space.height)) continue;
           if (flyer.shieldOn) this.deflect(enemy, shieldConfig.hitBody, space, flyer);
           else this.hurtFriendly(flyer);
           struck = true;

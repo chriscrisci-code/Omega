@@ -1,6 +1,6 @@
 import { Container, Graphics } from "pixi.js";
 import { castle, colors, corvette as corvetteCfg, crane as craneCfg, destroyer as destroyerConfig, raid } from "../config.js";
-import { turnToward, wrap, wrapDelta } from "../math.js";
+import { turnToward, wrap, wrapCoord, wrapDelta } from "../math.js";
 import { strokeGlow, strokeLine } from "../render/textures.js";
 
 export const HUNTER = [12, 0, -8, 6, -4, 0, -8, -6];
@@ -87,10 +87,13 @@ export class Enemy {
     this.dodgeUntil = 0;
     this.dodgeSign = 1;
     this.veer = 0;
-    this.jinkHold = 0;
-    this.jinkAge = 0;
-    this.jinkHeading = 0;
-    this.lastPlayerRot = 0;
+    this.evadeHold = 0;
+    this.evadeHeading = 0;
+    this.warping = false;
+    this.warpT = 0;
+    this.warpDur = 1;
+    this.warpCool = 0;
+    this.didWarp = false;
     this.stunned = 0;
     this.laserCharge = 0;
     this.laserOn = false;
@@ -297,6 +300,8 @@ export class Enemy {
   }
 
   stun(seconds) {
+    this.warping = false;
+    this.view.alpha = 1;
     this.stunned = Math.max(this.stunned, seconds);
     this.vx *= 0.15;
     this.vy *= 0.15;
@@ -306,47 +311,97 @@ export class Enemy {
     this.laserG.clear();
   }
 
-  beginJink(toHub, extras, space) {
-    this.dodgeSign *= -1;
-    let base = Number.isFinite(extras.playerRot) ? extras.playerRot : toHub;
-    if (!Number.isFinite(extras.playerRot) && Number.isFinite(extras.playerX) && space) {
-      const bx = wrapDelta(this.x - extras.playerX, space.width);
-      const by = wrapDelta(this.y - extras.playerY, space.height);
-      base = Math.atan2(by, bx);
+  playerLined(extras, space) {
+    if (!Number.isFinite(extras.playerX) || !Number.isFinite(extras.playerRot) || !space) return false;
+    const dx = wrapDelta(this.x - extras.playerX, space.width);
+    const dy = wrapDelta(this.y - extras.playerY, space.height);
+    if (Math.hypot(dx, dy) < 48) return true;
+    const bearing = Math.atan2(dy, dx);
+    return Math.abs(wrapDelta(extras.playerRot - bearing, Math.PI * 2)) < (corvetteCfg.aimCone || 0.22);
+  }
+
+  pickEvadeHeading(toHub, extras, space) {
+    const awayHub = toHub + Math.PI;
+    if (!Number.isFinite(extras.playerX) || !space) return awayHub;
+    const dx = wrapDelta(this.x - extras.playerX, space.width);
+    const dy = wrapDelta(this.y - extras.playerY, space.height);
+    const fromPlayer = Math.atan2(dy, dx);
+    const cut = 1.2;
+    const left = fromPlayer + cut;
+    const right = fromPlayer - cut;
+    const leftOff = Math.abs(wrapDelta(left - awayHub, Math.PI * 2));
+    const rightOff = Math.abs(wrapDelta(right - awayHub, Math.PI * 2));
+    return leftOff <= rightOff ? left : right;
+  }
+
+  beginWarp(dx, dy, duration) {
+    this.warping = true;
+    this.warpT = 0;
+    this.warpDur = Math.max(0.08, duration || 0.2);
+    this.warpFromX = this.x;
+    this.warpFromY = this.y;
+    this.warpDx = dx;
+    this.warpDy = dy;
+    this.vx = 0;
+    this.vy = 0;
+    this.didWarp = true;
+  }
+
+  tickWarp(dt, space) {
+    this.warpT += dt;
+    const u = Math.min(1, this.warpT / this.warpDur);
+    const e = u * u * (3 - 2 * u);
+    this.x = wrapCoord(this.warpFromX + this.warpDx * e, space.width);
+    this.y = wrapCoord(this.warpFromY + this.warpDy * e, space.height);
+    this.vx = 0;
+    this.vy = 0;
+    this.view.alpha = 0.28 + Math.abs(u - 0.5) * 1.44;
+    if (u < 1) return;
+    this.warping = false;
+    this.view.alpha = 1;
+    const burst = corvetteCfg.evadeSpeed || corvetteCfg.speed;
+    this.vx = Math.cos(this.rotation) * burst;
+    this.vy = Math.sin(this.rotation) * burst;
+  }
+
+  startEvade(toHub, extras, space, hop) {
+    if (this.evadeHold <= 0) {
+      this.evadeHeading = this.pickEvadeHeading(toHub, extras, space);
+      this.evadeHold = (corvetteCfg.evade || 1.45) * (0.92 + Math.random() * 0.2);
     }
-    const cut = this.dodgeSign * ((corvetteCfg.jink || 1.15) + Math.random() * 0.2);
-    const across = base + cut;
-    const lean = wrapDelta(toHub - across, Math.PI * 2) * 0.16;
-    this.jinkHeading = across + lean;
-    this.jinkHold = (corvetteCfg.jinkHold || 0.92) * (0.86 + Math.random() * 0.28);
-    this.jinkAge = 0;
+    if (!hop || this.warpCool > 0 || this.warping) return;
+    this.evadeHeading = this.pickEvadeHeading(toHub, extras, space);
+    this.evadeHold = (corvetteCfg.evade || 1.45) * (0.92 + Math.random() * 0.2);
+    this.rotation = this.evadeHeading;
+    const range = (corvetteCfg.warpRange || 440) * (0.88 + Math.random() * 0.22);
+    this.beginWarp(Math.cos(this.evadeHeading) * range, Math.sin(this.evadeHeading) * range, corvetteCfg.warpDur || 0.2);
+    this.warpCool = corvetteCfg.warpCool || 1.25;
   }
 
   steerCorvette(dt, toHub, extras, aimedAt, space) {
-    const seen = Boolean(extras.seen);
-    const playerRot = extras.playerRot ?? this.lastPlayerRot;
-    const dPlayer = wrapDelta(playerRot - this.lastPlayerRot, Math.PI * 2);
-    const steered = Math.abs(extras.playerSteer || 0) > 0.26 || Math.abs(dPlayer) > 0.018;
-    this.lastPlayerRot = playerRot;
-    if (!seen) {
-      this.jinkHold = 0;
+    this.warpCool = Math.max(0, (this.warpCool || 0) - dt);
+    this.evadeHold = Math.max(0, (this.evadeHold || 0) - dt);
+    const px = Number.isFinite(extras.playerX) ? wrapDelta(extras.playerX - this.x, space.width) : 0;
+    const py = Number.isFinite(extras.playerY) ? wrapDelta(extras.playerY - this.y, space.height) : 0;
+    const pDist = Math.hypot(px, py);
+    const close = pDist > 1 && pDist < (corvetteCfg.warn || 860);
+    const lined = Boolean(aimedAt) || this.playerLined(extras, space);
+    if (lined) this.startEvade(toHub, extras, space, true);
+    else if (close) this.startEvade(toHub, extras, space, false);
+    const evading = this.evadeHold > 0;
+    if (!lined && !close && !evading) {
       this.rotation = turnToward(this.rotation, toHub, corvetteCfg.turn * dt);
       return corvetteCfg.chase;
     }
-    const min = corvetteCfg.jinkMin || 0.32;
-    this.jinkHold = Math.max(0, (this.jinkHold || 0) - dt);
-    if (this.jinkHold > 0) this.jinkAge += dt;
-    else this.jinkAge = 0;
-    const committed = this.jinkHold > 0;
-    const canRecut = committed && this.jinkAge >= min;
-    if ((!committed && aimedAt) || (canRecut && steered)) this.beginJink(toHub, extras, space);
-    const course = this.jinkHold > 0 ? this.jinkHeading : toHub;
+    const course = evading ? this.evadeHeading : this.pickEvadeHeading(toHub, extras, space);
     this.rotation = turnToward(this.rotation, course, corvetteCfg.turn * dt);
-    return this.jinkHold > 0 ? corvetteCfg.chase * 1.12 : corvetteCfg.chase;
+    return evading ? corvetteCfg.chase * 1.2 : corvetteCfg.chase;
   }
 
   update(dt, target, space, aimedAt, extras = {}) {
     if (this.stunned > 0) {
+      this.warping = false;
+      this.view.alpha = 1;
       this.stunned = Math.max(0, this.stunned - dt);
       this.vx *= 0.88;
       this.vy *= 0.88;
@@ -356,6 +411,16 @@ export class Enemy {
       this.cooldown = Math.max(this.cooldown, this.stunned);
       this.view.rotation = this.rotation;
       this.view.alpha = this.stunned > 0 ? 0.28 + 0.22 * (0.5 + 0.5 * Math.sin(this.stunned * 18)) : 1;
+      this.tickFlashes(dt);
+      this.tickShield(dt);
+      return;
+    }
+    if (this.role === "corvette" && this.warping) {
+      this.tickWarp(dt, space);
+      this.cooldown = Math.max(0, this.cooldown - dt);
+      this.ramCool = Math.max(0, this.ramCool - dt);
+      this.warpCool = Math.max(0, this.warpCool - dt);
+      this.view.rotation = this.rotation;
       this.tickFlashes(dt);
       this.tickShield(dt);
       return;
@@ -370,11 +435,20 @@ export class Enemy {
     const hold = this.role === "raider" ? 210 : this.role === "destroyer" ? 420 : this.role === "crane" ? craneHold : 220;
     const chase = this.role === "raider" ? 400 : this.role === "destroyer" ? 170 : this.role === "corvette" ? corvetteCfg.chase : this.role === "crane" ? craneCfg.speed : 320;
     const back = this.role === "raider" ? 220 : this.role === "destroyer" ? 90 : this.role === "crane" ? 40 : 260;
-    const cap = this.role === "raider" ? 400 : this.role === "destroyer" ? 110 : this.role === "corvette" ? corvetteCfg.speed : this.role === "crane" ? craneCfg.speed : 340;
+    const cap = this.role === "raider" ? 400 : this.role === "destroyer" ? 110 : this.role === "corvette" ? (this.evadeHold > 0 ? corvetteCfg.evadeSpeed || corvetteCfg.speed : corvetteCfg.speed) : this.role === "crane" ? craneCfg.speed : 340;
     let ax = 0;
     let ay = 0;
     if (this.role === "corvette") {
       const cut = this.steerCorvette(dt, toTarget, extras, aimedAt, space);
+      if (this.warping) {
+        this.tickWarp(dt, space);
+        this.cooldown = Math.max(0, this.cooldown - dt);
+        this.ramCool = Math.max(0, this.ramCool - dt);
+        this.view.rotation = this.rotation;
+        this.tickFlashes(dt);
+        this.tickShield(dt);
+        return;
+      }
       ax += Math.cos(this.rotation) * cut;
       ay += Math.sin(this.rotation) * cut;
     } else if (this.role === "destroyer") {
