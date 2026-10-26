@@ -233,10 +233,8 @@
         </tbody>
       </table>
       <p>Player shield: hold to raise. Shot hit 0.12, body 0.22. Assault / Gunship is a <strong>pulse while ON</strong>, not DSF auto-block. Auto-shield does not eat missiles.</p>
-      <h3>BLACK HOLE BOMB — B</h3>
-      <p>Available now (gate later). Jets forward for <strong>2s</strong>, then opens a magenta well the same size as an EMP. For ~2.8s it pulls ships, missiles, asteroids, and ore. Things that reach the core are crushed.</p>
-      <p>Does <strong>not</strong> move or damage castles, the Hub, the Station, or the Battleship.</p>
-      <p>You are pulled only if your nose still points at the well. <strong>Turn away</strong> to stay out. Cool 8s.</p>
+      <h3>BLACK HOLE BOMB — GATED</h3>
+      <p>Built, then turned off. Set <code>blackHole.enabled</code> to bring it back. B. Jets 2s, EMP-sized pull. Turn away or you go in. Castles / Hub / Station / Battleship immune.</p>
 
       <h2 id="waves">ASSAULT WAVES</h2>
       <p>Timed fight, then rest <strong>72s</strong> (Easy), then the next wave. The wave picker uses the highest assault wave you have reached.</p>
@@ -345,7 +343,7 @@
         <div class="card"><strong>MISSILES</strong><br />Drop, then ramp 520 → 1040. Fuse / blast. Ammo only.</div>
         <div class="card"><strong>ROCKETS</strong><br />Gunship only. Shorter, amber, 2 damage.</div>
         <div class="card"><strong>EMP</strong><br />Grow 0.72s, fade 0.28s, cool 8s. Tier 4 kills. Blinds missiles.</div>
-        <div class="card"><strong>HOLE</strong><br />B. Jet 2s, then EMP-sized pull. Turn away or you go in. Castles / Hub / Station / Battleship immune.</div>
+        <div class="card"><strong>HOLE</strong><br />Gated off. Flip blackHole.enabled to restore. B. Jet 2s, EMP-sized pull.</div>
         <div class="card"><strong>MAP</strong><br />Hold to zoom out. Pause / save / end run are bound actions.</div>
       </div>
 

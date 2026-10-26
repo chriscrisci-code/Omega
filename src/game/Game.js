@@ -3090,6 +3090,7 @@ export class Game {
   }
 
   fireHole() {
+    if (!holeCfg.enabled) return;
     if (this.holeCool > 0 || this.hole.alive || !this.ship.alive || this.ship.docked || this.attractOnDemo) return;
     const nose = this.ship.nose();
     this.hole.fire(nose.x, nose.y, this.ship.rotation, this.empReach());

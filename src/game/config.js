@@ -48,8 +48,9 @@ export const emp = {
   cooldown: 8,
 };
 
-/** B. Jets 2s, then pulls ships / missiles / rocks / ore. Same reach as EMP. Turn away to stay out. */
+/** B. Gated off for now. Flip enabled to bring it back. */
 export const blackHole = {
+  enabled: false,
   jetTime: 2,
   jetSpeed: 420,
   pullTime: 2.8,
@@ -356,7 +357,7 @@ export const station = {
   jointHits: 80,
   clampHits: 80,
   breakNeed: 2,
-  gunCool: 1.45,
+  gunCool: 0.48,
   gunRange: 1180,
   gunSpeed: 680,
   gunLife: 1.45,
