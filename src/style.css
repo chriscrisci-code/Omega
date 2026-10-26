@@ -241,6 +241,14 @@ body.is-attract .hud-center.is-demo .score-board {
   display: none;
 }
 
+.hud-center.is-hub-over .tag {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
 .score-board {
   position: relative;
   margin: 8px auto 0;

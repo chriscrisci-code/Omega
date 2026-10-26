@@ -303,7 +303,7 @@ export class Hud {
   showWavePick(maxWave, selected) {
     this.attract(true);
     this.setAttractDemo(false);
-    this.center.classList.remove("is-hidden", "is-scores", "is-initials");
+    this.center.classList.remove("is-hidden", "is-scores", "is-initials", "is-hub-over");
     this.center.classList.add("is-wave");
     this.title.innerHTML = "";
     this.paint(this.tag, "WAVE", 18, MAGENTA, PINK, "center");
@@ -345,7 +345,7 @@ export class Hud {
   showStartPick(label, selected) {
     this.attract(true);
     this.setAttractDemo(false);
-    this.center.classList.remove("is-hidden", "is-scores", "is-initials");
+    this.center.classList.remove("is-hidden", "is-scores", "is-initials", "is-hub-over");
     this.center.classList.add("is-wave");
     this.title.innerHTML = "";
     this.paint(this.tag, label || "SAVE", 18, MAGENTA, PINK, "center");
@@ -386,7 +386,7 @@ export class Hud {
   showScores(rows, heading = "ALL TIME") {
     this.attract(true);
     this.setAttractDemo(false);
-    this.center.classList.remove("is-hidden", "is-initials");
+    this.center.classList.remove("is-hidden", "is-initials", "is-hub-over");
     this.center.classList.add("is-scores");
     document.body.classList.add("is-scoreboard");
     this.paintScoreBoard(rows, heading);
@@ -399,15 +399,21 @@ export class Hud {
     this.setMode("");
   }
 
-  showInitials(score, entry, label = "SCORE") {
+  showInitials(score, entry, label = "SCORE", reason = "final") {
     this.attract(true);
     this.setAttractDemo(false);
     this.center.classList.remove("is-hidden", "is-scores");
     this.center.classList.add("is-initials");
+    this.center.classList.toggle("is-hub-over", reason === "hub");
     this.hideWavePick();
     document.body.classList.add("is-scoreboard");
-    this.title.innerHTML = "";
-    this.paint(this.tag, `${label}  ${score}`, 14, MAGENTA, PINK, "center");
+    if (reason === "hub") {
+      this.title.innerHTML = vectorTitleSvg("GAME OVER", 28, CYAN, HOT);
+      this.tag.innerHTML = `${vectorTextSvg("THE HUB HAS FALLEN", 14, MAGENTA, PINK, "center")}${vectorTextSvg(`${label}  ${score}`, 10, DIM, CYAN, "center")}`;
+    } else {
+      this.title.innerHTML = "";
+      this.paint(this.tag, `${label}  ${score}`, 14, MAGENTA, PINK, "center");
+    }
     this.paintInitials(entry);
     this.paint(this.credit, "WHEEL OR ARROWS   CLICK NEXT", 8, DIM, CYAN, "center");
     this.cta.innerHTML = "";
@@ -448,7 +454,7 @@ export class Hud {
   }
 
   hideScores() {
-    this.center?.classList.remove("is-scores", "is-initials");
+    this.center?.classList.remove("is-scores", "is-initials", "is-hub-over");
     this.scoreBoard?.classList.add("is-hidden");
     document.body.classList.remove("is-scoreboard");
   }

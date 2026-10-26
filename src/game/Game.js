@@ -4154,21 +4154,21 @@ export class Game {
     this.leaveHubSeat();
     this.hud.hideDock();
     const rank = this.rankEntry();
-    if (reason === "final" || rank.all || rank.daily || rank.ace || rank.aceDaily) {
-      this.beginInitials();
+    if (reason === "final" || reason === "hub" || rank.all || rank.daily || rank.ace || rank.aceDaily) {
+      this.beginInitials(reason);
       return;
     }
     this.goTitle();
   }
 
-  beginInitials() {
+  beginInitials(reason = "final") {
     this.mode = INITIALS;
     this.silenceLasers();
     this.initials = { letters: ["A", "A", "A"], i: 0 };
     const rank = this.rankEntry();
     const shown = rank.all || rank.daily ? this.score : rank.ace || rank.aceDaily ? this.bestAce : this.score;
     const label = (rank.ace || rank.aceDaily) && !rank.all && !rank.daily ? "ACE" : "SCORE";
-    this.hud.showInitials(shown, this.initials, label);
+    this.hud.showInitials(shown, this.initials, label, reason);
   }
 
   nudgeInitial(dir) {
