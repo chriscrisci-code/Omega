@@ -549,6 +549,16 @@ export class Ship {
     this.invuln = Math.max(this.invuln, duration);
   }
 
+  endWarp() {
+    if (!this.warping) return;
+    this.warping = false;
+    this.vx = 0;
+    this.vy = 0;
+    this.surge = 0;
+    this.strafe = 0;
+    this.invuln = Math.min(this.invuln, 0.12);
+  }
+
   tickWarp(dt, bounds) {
     if (!this.warping) return;
     this.warpT += dt;

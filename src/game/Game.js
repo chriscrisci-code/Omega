@@ -4603,6 +4603,7 @@ export class Game {
 
       if (this.ship.warping) {
         this.input.aim = null;
+        if (!this.attractOnDemo && this.input.surge < -0.2) this.ship.endWarp();
         this.ship.tickWarp(t, space);
         this.fx.emit(5, {
           x: this.ship.x,
