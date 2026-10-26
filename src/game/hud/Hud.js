@@ -171,7 +171,7 @@ export class Hud {
       return;
     }
     this.mode.hidden = false;
-    this.paint(this.mode, label, 11, CYAN, HOT, "center");
+    this.paint(this.mode, label, label.length > 16 ? 7 : 11, CYAN, HOT, "center");
   }
 
   setLives(count) {
@@ -506,7 +506,8 @@ export class Hud {
     const range = info.range >= 1000 ? `${(info.range / 1000).toFixed(1)}K` : `${Math.round(info.range)}`;
     const color = info.close ? AMBER : MAGENTA;
     const hot = info.close ? "#ffe0b0" : PINK;
-    this.paint(this.alertTitle, "HUB UNDER ATTACK", 8, color, hot, "center");
+    const title = info.title || "HUB UNDER ATTACK";
+    this.paint(this.alertTitle, title, title.length > 18 ? 6 : 8, color, hot, "center");
     this.paint(this.alertSub, `${info.count} INBOUND  ${range}  SHIELD ${info.shield ?? 0}  HULL ${info.hull}`, 7, color, hot, "center");
   }
 

@@ -317,6 +317,17 @@ export const raid = {
   ramEvery: 0.85,
 };
 
+/** Wave 4+: one castle dumps a tight pack at the Hub every ~5 minutes. */
+export const strike = {
+  fromWave: 4,
+  first: 48,
+  every: 300,
+  jitter: 45,
+  raiders: 20,
+  hunters: 10,
+  destroyers: 1,
+};
+
 export const assault = {
   rest: 72,
   wave1: 210,

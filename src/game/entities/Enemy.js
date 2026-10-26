@@ -189,6 +189,7 @@ export class Enemy {
     this.shieldRegen = 0;
     this.gunSign = 1;
     this.flashes = [];
+    this.pack = null;
     this.alive = true;
 
     this.view = new Container();
@@ -493,6 +494,40 @@ export class Enemy {
     return evading ? corvetteCfg.chase * 1.2 : corvetteCfg.chase;
   }
 
+  steerPack(dt, extras, space) {
+    const lead = extras.packLead;
+    const heading = extras.packHeading;
+    const turn = this.role === "destroyer" ? 0.9 : this.role === "raider" ? 2.4 : 3.1;
+    const toHub = Math.atan2(
+      wrapDelta((extras.hubY ?? 0) - this.y, space.height),
+      wrapDelta((extras.hubX ?? 0) - this.x, space.width),
+    );
+    if (!lead || !Number.isFinite(heading)) {
+      this.rotation = turnToward(this.rotation, toHub, turn * dt);
+      return 240;
+    }
+    const isLead = lead === this;
+    let wantX = extras.hubX ?? this.x;
+    let wantY = extras.hubY ?? this.y;
+    if (!isLead) {
+      const c = Math.cos(heading);
+      const s = Math.sin(heading);
+      const fx = this.pack?.fx || 0;
+      const fy = this.pack?.fy || 0;
+      wantX = wrapCoord(lead.x + c * fx - s * fy, space.width);
+      wantY = wrapCoord(lead.y + s * fx + c * fy, space.height);
+    }
+    const dx = wrapDelta(wantX - this.x, space.width);
+    const dy = wrapDelta(wantY - this.y, space.height);
+    const dist = Math.hypot(dx, dy) || 1;
+    const face = isLead || dist < 36 ? heading : Math.atan2(dy, dx);
+    this.rotation = turnToward(this.rotation, face, turn * dt);
+    if (dist > 180) return 420;
+    if (dist > 70) return 280;
+    if (isLead) return 190;
+    return 80;
+  }
+
   update(dt, target, space, aimedAt, extras = {}) {
     if (this.stunned > 0) {
       this.warping = false;
@@ -536,10 +571,24 @@ export class Enemy {
     const hold = this.role === "raider" ? 210 : this.role === "destroyer" ? 420 : this.role === "crane" ? craneHold : 220;
     const chase = this.role === "raider" ? 400 : this.role === "destroyer" ? 170 : this.role === "corvette" ? corvetteCfg.chase : this.role === "crane" ? craneCfg.speed : hunterCfg.chase * pace;
     const back = this.role === "raider" ? 220 : this.role === "destroyer" ? 90 : this.role === "crane" ? 40 : 260 * pace;
-    const cap = this.role === "raider" ? 400 : this.role === "destroyer" ? 110 : this.role === "corvette" ? (this.evadeHold > 0 ? corvetteCfg.evadeSpeed || corvetteCfg.speed : corvetteCfg.speed) : this.role === "crane" ? craneCfg.speed : hunterCfg.cap * pace;
+    const cap = this.pack
+      ? (extras.packCap || 200)
+      : this.role === "raider"
+        ? 400
+        : this.role === "destroyer"
+          ? 110
+          : this.role === "corvette"
+            ? (this.evadeHold > 0 ? corvetteCfg.evadeSpeed || corvetteCfg.speed : corvetteCfg.speed)
+            : this.role === "crane"
+              ? craneCfg.speed
+              : hunterCfg.cap * pace;
     let ax = 0;
     let ay = 0;
-    if (this.role === "corvette") {
+    if (this.pack) {
+      const cut = this.steerPack(dt, extras, space);
+      ax += Math.cos(this.rotation) * cut;
+      ay += Math.sin(this.rotation) * cut;
+    } else if (this.role === "corvette") {
       const cut = this.steerCorvette(dt, toTarget, extras, aimedAt, space);
       if (this.warping) {
         this.tickWarp(dt, space);
@@ -574,7 +623,7 @@ export class Enemy {
       }
     }
 
-    if (aimedAt && this.role !== "destroyer" && this.role !== "crane" && this.role !== "corvette") {
+    if (aimedAt && !this.pack && this.role !== "destroyer" && this.role !== "crane" && this.role !== "corvette") {
       if (this.dodgeUntil <= 0) {
         this.dodgeSign *= -1;
         this.dodgeUntil = 0.28 + Math.random() * 0.2;
@@ -631,6 +680,7 @@ export class Enemy {
     const min = this.role === "raider" ? 90 : this.role === "corvette" ? 80 : 70;
     if (dist > max || dist < min) return false;
     if (this.role === "destroyer") return true;
+    if (this.pack && this.role === "hunter") return dist < 420;
     const err = Math.abs(wrapDelta(this.rotation - Math.atan2(dy, dx), Math.PI * 2));
     return err < (this.role === "corvette" ? 0.4 : 0.18);
   }

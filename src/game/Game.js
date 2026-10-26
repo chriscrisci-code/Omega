@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
-import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, bloom as bloomConfig, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, hunter as hunterCfg, hunterScale, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, bloom as bloomConfig, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, hunter as hunterCfg, hunterScale, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, strike as strikeCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -42,6 +42,31 @@ const INITIALS = "initials";
 const WAVEPICK = "wavepick";
 const STARTPICK = "startpick";
 const GAMEOVER = "gameover";
+
+function strikeSlots(withDestroyer) {
+  const slots = [];
+  const rows = [148, 88, 28, -32];
+  const cols = [-86, -43, 0, 43, 86];
+  let raiders = 0;
+  for (const fx of rows) {
+    for (const fy of cols) {
+      if (raiders >= strikeCfg.raiders) break;
+      slots.push({ role: "raider", fx, fy });
+      raiders += 1;
+    }
+  }
+  const hunts = [
+    [78, -136], [18, -146], [-42, -126],
+    [78, 136], [18, 146], [-42, 126],
+    [168, -68], [168, 68],
+    [-98, -88], [-98, 88],
+  ];
+  for (let i = 0; i < strikeCfg.hunters && i < hunts.length; i += 1) {
+    slots.push({ role: "hunter", fx: hunts[i][0], fy: hunts[i][1] });
+  }
+  if (withDestroyer) slots.push({ role: "destroyer", fx: -118, fy: 0 });
+  return slots;
+}
 
 export class Game {
   constructor(app, { storage }) {
@@ -171,6 +196,10 @@ export class Game {
     this.wave = 1;
     this.waveCooldown = 0;
     this.raiderTimer = raid.first;
+    this.strikeTimer = strikeCfg.first;
+    this.strikeWarn = 0;
+    this.packs = [];
+    this.packSeq = 0;
     this.corvetteTimer = corvetteCfg.first;
     this.assaultIndex = 1;
     this.assaultRest = false;
@@ -431,19 +460,20 @@ export class Game {
   clearEnemies() {
     for (const enemy of this.enemies) enemy.destroy();
     this.enemies.length = 0;
+    this.packs = [];
     this.hostileShots.forEach((shot) => shot.kill());
   }
 
   enemiesFrom(base, role = "hunter") {
-    return this.enemies.filter((enemy) => enemy.home === base && enemy.alive && enemy.role === role).length;
+    return this.enemies.filter((enemy) => enemy.home === base && enemy.alive && enemy.role === role && !enemy.pack).length;
   }
 
   raiderCount() {
-    return this.enemies.filter((enemy) => enemy.alive && enemy.role === "raider").length;
+    return this.enemies.filter((enemy) => enemy.alive && enemy.role === "raider" && !enemy.pack).length;
   }
 
   hunterCount() {
-    return this.enemies.filter((enemy) => enemy.alive && enemy.role === "hunter").length;
+    return this.enemies.filter((enemy) => enemy.alive && enemy.role === "hunter" && !enemy.pack).length;
   }
 
   corvetteCount() {
@@ -931,6 +961,85 @@ export class Game {
     return enemy;
   }
 
+  launchStrike() {
+    if (this.attractOnDemo || this.inTunnel() || !this.hub.alive) return false;
+    if (this.packs.some((pack) => pack.members.some((enemy) => enemy.alive))) return false;
+    const launchers = this.bases.filter((base) => !base.hub && base.alive);
+    if (!launchers.length) return false;
+    const base = pick(launchers);
+    const heading = Math.atan2(
+      wrapDelta(this.hub.y - base.y, worldConfig.height),
+      wrapDelta(this.hub.x - base.x, worldConfig.width),
+    );
+    const withDestroyer = this.destroyerCap() > 0 && strikeCfg.destroyers > 0;
+    const pack = {
+      id: (this.packSeq += 1),
+      members: [],
+      heading,
+      lead: null,
+      cap: withDestroyer ? 118 : 280,
+    };
+    const c = Math.cos(heading);
+    const s = Math.sin(heading);
+    const ox = wrapCoord(base.x + c * 160, worldConfig.width);
+    const oy = wrapCoord(base.y + s * 160, worldConfig.height);
+    for (const slot of strikeSlots(withDestroyer)) {
+      const enemy = new Enemy(
+        wrapCoord(ox + c * slot.fx - s * slot.fy, worldConfig.width),
+        wrapCoord(oy + s * slot.fx + c * slot.fy, worldConfig.height),
+        base,
+        base.color,
+        { role: slot.role },
+      );
+      enemy.pack = { id: pack.id, fx: slot.fx, fy: slot.fy };
+      enemy.rotation = heading;
+      enemy.vx = c * 90;
+      enemy.vy = s * 90;
+      pack.members.push(enemy);
+      this.enemies.push(enemy);
+      this.vectors.addChild(enemy.view);
+    }
+    this.packs.push(pack);
+    this.strikeWarn = 3.8;
+    this.hubAlertOn = true;
+    this.hubWarnPulse = 1.6;
+    this.sfx("warn");
+    return true;
+  }
+
+  tickStrike(t) {
+    if (this.attractOnDemo || this.mode !== PLAYING || !this.hub.alive) return;
+    if (this.assaultIndex < strikeCfg.fromWave) return;
+    if (this.inTunnel()) return;
+    this.strikeTimer -= t;
+    if (this.strikeTimer > 0) return;
+    if (this.launchStrike()) this.strikeTimer = strikeCfg.every + rand(-strikeCfg.jitter, strikeCfg.jitter);
+    else this.strikeTimer = 14;
+  }
+
+  tickPacks(space) {
+    this.packs = this.packs.filter((pack) => {
+      pack.members = pack.members.filter((enemy) => enemy.alive);
+      return pack.members.length > 0;
+    });
+    for (const pack of this.packs) {
+      const lead = pack.members.find((enemy) => enemy.role === "destroyer")
+        || pack.members.find((enemy) => enemy.role === "raider")
+        || pack.members[0];
+      pack.lead = lead;
+      pack.heading = Math.atan2(
+        wrapDelta(this.hub.y - lead.y, space.height),
+        wrapDelta(this.hub.x - lead.x, space.width),
+      );
+      pack.cap = pack.members.some((enemy) => enemy.role === "destroyer") ? 118 : 280;
+    }
+  }
+
+  packOf(enemy) {
+    if (!enemy?.pack) return null;
+    return this.packs.find((pack) => pack.id === enemy.pack.id) || null;
+  }
+
   spawnCorvette(base) {
     const angle = Math.atan2(
       wrapDelta(this.hub.y - base.y, worldConfig.height),
@@ -1087,6 +1196,10 @@ export class Game {
     this.shake = 0;
     this.holdTunnel = true;
     this.leaveTunnel({ silent: true, dock: false });
+    this.strikeTimer = strikeCfg.first;
+    this.strikeWarn = 0;
+    this.packs = [];
+    this.packSeq = 0;
     this.clearRocks();
     this.clearEnemies();
     this.shots.forEach((shot) => shot.kill());
@@ -4105,23 +4218,29 @@ export class Game {
     }
     let count = 0;
     let nearest = Infinity;
+    let incoming = 0;
     for (const enemy of this.enemies) {
-      if (!enemy.alive || enemy.role !== "raider") continue;
+      if (!enemy.alive) continue;
       const dist = Math.hypot(
         wrapDelta(enemy.x - this.hub.x, space.width),
         wrapDelta(enemy.y - this.hub.y, space.height),
       );
-      if (dist > raid.warn) continue;
+      if (enemy.pack) {
+        incoming += 1;
+        if (dist < nearest) nearest = dist;
+      }
+      if (enemy.role !== "raider" || dist > raid.warn) continue;
       count += 1;
       if (dist < nearest) nearest = dist;
     }
-    this.hubThreat = count;
-    this.hubThreatClose = count > 0 && nearest < raid.warn * 0.45;
-    if (count && !this.hubAlertOn) {
+    const shown = incoming || count;
+    this.hubThreat = shown;
+    this.hubThreatClose = shown > 0 && nearest < raid.warn * 0.45;
+    if (shown && !this.hubAlertOn) {
       this.sfx("warn");
       this.hubWarnPulse = 1.6;
     }
-    this.hubAlertOn = count > 0;
+    this.hubAlertOn = shown > 0;
     if (this.hubAlertOn && !this.attractOnDemo) {
       this.hubWarnPulse -= t;
       if (this.hubWarnPulse <= 0) {
@@ -4132,8 +4251,15 @@ export class Game {
       this.hubWarnPulse = 0;
     }
     this.hud.setHubAlert(
-      count
-        ? { count, range: nearest, hull: this.hub.coreHp, shield: this.hub.shieldHp(), close: this.hubThreatClose }
+      shown
+        ? {
+            count: shown,
+            range: nearest,
+            hull: this.hub.coreHp,
+            shield: this.hub.shieldHp(),
+            close: this.hubThreatClose,
+            title: incoming ? "INCOMING ATTACK DETECTED" : undefined,
+          }
         : null,
     );
   }
@@ -4244,9 +4370,6 @@ export class Game {
     const snap = bloomConfig.snap || 64;
     const filterW = Math.max(snap, Math.ceil((screen.width * pad) / zoom / snap) * snap);
     const filterH = Math.max(snap, Math.ceil((screen.height * pad) / zoom / snap) * snap);
-    for (const filter of this.world.filters || []) {
-      if (filter) filter.enabled = !this.attractOnDemo;
-    }
     this.worldFilterArea.x = this.camX - filterW * 0.5;
     this.worldFilterArea.y = this.camY - filterH * 0.5;
     if (this.filterAreaDirty || this.worldFilterArea.width !== filterW || this.worldFilterArea.height !== filterH) {
@@ -4563,7 +4686,16 @@ export class Game {
               ? "CLEAR"
               : `WAVE  ${this.assaultIndex}`;
       if (this.yardWarn > 0) this.yardWarn = Math.max(0, this.yardWarn - t);
-      this.hud.setMode(this.saveFlash > 0 ? "SAVED" : this.yardWarn > 0 ? "BATTLESHIP BEING BUILT" : modeLabel);
+      if (this.strikeWarn > 0) this.strikeWarn = Math.max(0, this.strikeWarn - t);
+      this.hud.setMode(
+        this.saveFlash > 0
+          ? "SAVED"
+          : this.strikeWarn > 0
+            ? "INCOMING ATTACK DETECTED"
+            : this.yardWarn > 0
+              ? "BATTLESHIP BEING BUILT"
+              : modeLabel,
+      );
     } else if (this.mode === DYING) {
       this.leaveHubSeat();
       this.hud.hideDock();
@@ -4698,15 +4830,18 @@ export class Game {
           }
         }
         this.tickCastleWatch(t, space);
+        this.tickStrike(t);
       }
 
       this.tickCranes(t, space);
+      this.tickPacks(space);
       for (const enemy of this.enemies) {
         if (enemy.role === "crane") {
           enemy.update(t, this.craneAim(enemy, space), space, false);
           continue;
         }
-        const prey = this.pickHunt(enemy, space) || (this.ship.alive ? this.ship : null);
+        const pack = this.packOf(enemy);
+        const prey = this.pickHunt(enemy, space) || (this.ship.alive ? this.ship : null) || (pack && this.hub.alive ? this.hub : null);
         enemy.hunt = prey;
         if (!prey) continue;
         enemy.update(t, prey, space, this.aimedAt(enemy, space), {
@@ -4716,6 +4851,11 @@ export class Game {
           playerRot: this.ship.rotation,
           playerSteer: this.input.rotate,
           wave: this.attractOnDemo ? 1 : this.assaultIndex,
+          hubX: this.hub.x,
+          hubY: this.hub.y,
+          packLead: pack?.lead || null,
+          packHeading: pack?.heading,
+          packCap: pack?.cap,
         });
         if (enemy.didWarp) {
           enemy.didWarp = false;
