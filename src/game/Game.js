@@ -43,10 +43,10 @@ const WAVEPICK = "wavepick";
 const STARTPICK = "startpick";
 const GAMEOVER = "gameover";
 
-function strikeSlots(withDestroyer) {
+function strikeSlots(destroyerCount) {
   const slots = [];
-  const rows = [148, 88, 28, -32];
-  const cols = [-86, -43, 0, 43, 86];
+  const rows = [420, 200, -20, -240];
+  const cols = [-480, -240, 0, 240, 480];
   let raiders = 0;
   for (const fx of rows) {
     for (const fy of cols) {
@@ -56,15 +56,25 @@ function strikeSlots(withDestroyer) {
     }
   }
   const hunts = [
-    [78, -136], [18, -146], [-42, -126],
-    [78, 136], [18, 146], [-42, 126],
-    [168, -68], [168, 68],
-    [-98, -88], [-98, 88],
+    [560, -360], [560, -120], [560, 120], [560, 360],
+    [360, -680], [120, -720], [-120, -700], [-320, -620],
+    [360, 680], [120, 720], [-120, 700], [-320, 620],
+    [-420, -280], [-420, 0], [-420, 280],
+    [200, -520], [200, 520],
+    [-80, -820], [-80, 820],
+    [680, 0],
   ];
   for (let i = 0; i < strikeCfg.hunters && i < hunts.length; i += 1) {
     slots.push({ role: "hunter", fx: hunts[i][0], fy: hunts[i][1] });
   }
-  if (withDestroyer) slots.push({ role: "destroyer", fx: -118, fy: 0 });
+  const boats = [
+    [-80, 0],
+    [-40, -420],
+    [-40, 420],
+  ];
+  for (let i = 0; i < destroyerCount && i < boats.length; i += 1) {
+    slots.push({ role: "destroyer", fx: boats[i][0], fy: boats[i][1] });
+  }
   return slots;
 }
 
@@ -971,19 +981,19 @@ export class Game {
       wrapDelta(this.hub.y - base.y, worldConfig.height),
       wrapDelta(this.hub.x - base.x, worldConfig.width),
     );
-    const withDestroyer = this.destroyerCap() > 0 && strikeCfg.destroyers > 0;
+    const destroyerCount = this.destroyerCap() > 0 ? strikeCfg.destroyers : 0;
     const pack = {
       id: (this.packSeq += 1),
       members: [],
       heading,
       lead: null,
-      cap: withDestroyer ? 118 : 280,
+      cap: destroyerCount > 0 ? 118 : 280,
     };
     const c = Math.cos(heading);
     const s = Math.sin(heading);
-    const ox = wrapCoord(base.x + c * 160, worldConfig.width);
-    const oy = wrapCoord(base.y + s * 160, worldConfig.height);
-    for (const slot of strikeSlots(withDestroyer)) {
+    const ox = wrapCoord(base.x + c * 220, worldConfig.width);
+    const oy = wrapCoord(base.y + s * 220, worldConfig.height);
+    for (const slot of strikeSlots(destroyerCount)) {
       const enemy = new Enemy(
         wrapCoord(ox + c * slot.fx - s * slot.fy, worldConfig.width),
         wrapCoord(oy + s * slot.fx + c * slot.fy, worldConfig.height),
@@ -1815,6 +1825,9 @@ export class Game {
     this.storage.save(this.save);
     if (after.length > before.length) {
       const id = after[after.length - 1];
+      for (const hull of after) {
+        if (!before.includes(hull)) this.seedHullLoadout(hull);
+      }
       this.hud.setMode(id);
       this.sfx("up");
     }
@@ -2632,21 +2645,10 @@ export class Game {
     };
   }
 
-  dropLevels(src = this.levels) {
-    const row = this.packLevels(src);
-    return {
-      gun: Math.max(1, row.gun - 1),
-      missile: Math.max(1, row.missile - 1),
-      emp: Math.max(1, row.emp - 1),
-      shield: Math.max(1, row.shield - 1),
-      gunship: Math.max(0, row.gunship - 1),
-    };
-  }
-
-  seedHullLoadout(id, from = this.levels) {
+  seedHullLoadout(id) {
     if (!this.hullLoadouts) this.hullLoadouts = {};
     if (this.hullLoadouts[id]) return this.hullLoadouts[id];
-    const row = id === DEFAULT_SHIP_ID ? this.packLevels({ gun: 1, missile: 1, emp: 1, shield: 1, gunship: 0 }) : this.dropLevels(from);
+    const row = this.packLevels({ gun: 1, missile: 1, emp: 1, shield: 1, gunship: 0 });
     this.hullLoadouts[id] = row;
     return row;
   }
@@ -2654,7 +2656,7 @@ export class Game {
   freshLoadout() {
     this.hullLoadouts = {};
     const base = { gun: 1, missile: 1, emp: 1, shield: 1, gunship: 0 };
-    this.levels = this.shipId === DEFAULT_SHIP_ID ? { ...base } : this.dropLevels(base);
+    this.levels = { ...base };
     this.hullLoadouts[this.shipId] = this.packLevels(this.levels);
     this.points = 0;
     this.loadoutBank = 0;
@@ -3027,7 +3029,7 @@ export class Game {
       return;
     }
     this.hullLoadouts[this.shipId] = this.packLevels();
-    this.levels = { ...this.seedHullLoadout(next, this.levels) };
+    this.levels = { ...this.seedHullLoadout(next) };
     this.shipId = next;
     this.applyShipSkin();
     this.applyShieldLevel(true);
