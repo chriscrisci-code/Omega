@@ -18,21 +18,22 @@ const DEFAULT_SCORES = [
   { name: "DOT", score: 8000 },
 ];
 
-const DEFAULT_STREAKS = [
-  { name: "ACE", score: 36 },
-  { name: "MAX", score: 28 },
-  { name: "REX", score: 22 },
-  { name: "ZOE", score: 18 },
-  { name: "KAI", score: 14 },
-  { name: "NIX", score: 11 },
+const DEFAULT_ACES = [
+  { name: "ACE", score: 48 },
+  { name: "MAX", score: 36 },
+  { name: "REX", score: 28 },
+  { name: "ZOE", score: 22 },
+  { name: "KAI", score: 16 },
+  { name: "NIX", score: 12 },
   { name: "BOB", score: 8 },
-  { name: "DOT", score: 5 },
+  { name: "DOT", score: 4 },
 ];
 
 export const SCORE_BOARDS = [
   { id: "all", title: "ALL TIME" },
   { id: "daily", title: "DAILY" },
-  { id: "streak", title: "KILL STREAK" },
+  { id: "ace", title: "ALL TIME TOP ACE" },
+  { id: "aceDaily", title: "TODAY'S TOP ACE" },
 ];
 
 const empty = {
@@ -43,7 +44,8 @@ const empty = {
   macro: [],
   highScores: DEFAULT_SCORES,
   dailyScores: [],
-  killStreaks: DEFAULT_STREAKS,
+  aceScores: DEFAULT_ACES,
+  dailyAce: [],
   loadout: {
     gun: 1,
     missile: 1,
@@ -120,8 +122,15 @@ export function normalizeDailyScores(list) {
     .map(({ name, score, day: when }) => ({ name, score, day: when }));
 }
 
-export function normalizeStreaks(list) {
-  return rankRows(list, DEFAULT_STREAKS).map(({ name, score }) => ({ name, score }));
+export function normalizeAceScores(list) {
+  return rankRows(list, DEFAULT_ACES).map(({ name, score }) => ({ name, score }));
+}
+
+export function normalizeDailyAce(list) {
+  const day = todayKey();
+  return rankRows(list, null)
+    .filter((row) => row.day === day)
+    .map(({ name, score, day: when }) => ({ name, score, day: when }));
 }
 
 export function padScoreRows(list) {
@@ -148,8 +157,12 @@ export function insertDailyScore(table, name, score) {
   return normalizeDailyScores([...table, { name, score, day: todayKey() }]);
 }
 
-export function insertStreak(table, name, score) {
-  return normalizeStreaks([...table, { name, score }]);
+export function insertAceScore(table, name, score) {
+  return normalizeAceScores([...table, { name, score }]);
+}
+
+export function insertDailyAce(table, name, score) {
+  return normalizeDailyAce([...table, { name, score, day: todayKey() }]);
 }
 
 function clampLevel(value, max) {
@@ -258,12 +271,14 @@ function normalize(data) {
       macro: [],
       highScores: normalizeHighScores(null),
       dailyScores: normalizeDailyScores(null),
-      killStreaks: normalizeStreaks(null),
+      aceScores: normalizeAceScores(null),
+      dailyAce: normalizeDailyAce(null),
     };
   }
   const highScores = normalizeHighScores(data.highScores);
   const dailyScores = normalizeDailyScores(data.dailyScores);
-  const killStreaks = normalizeStreaks(data.killStreaks);
+  const aceScores = normalizeAceScores(data.aceScores);
+  const dailyAce = normalizeDailyAce(data.dailyAce);
   return {
     highScore: Math.max(Number(data.highScore) || 0, highScores[0]?.score || 0),
     xp: Math.max(0, Math.floor(Number(data.xp) || 0)),
@@ -274,7 +289,8 @@ function normalize(data) {
     macro: normalizeMacro(data.macro),
     highScores,
     dailyScores,
-    killStreaks,
+    aceScores,
+    dailyAce,
     settings: withControls(
       {
         fullscreen: Boolean(data.settings?.fullscreen),

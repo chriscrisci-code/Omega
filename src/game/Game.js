@@ -27,7 +27,7 @@ import { LockCam } from "./render/LockCam.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, SCORE_BOARDS, insertDailyScore, insertHighScore, insertStreak, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SCORE_BOARDS, insertAceScore, insertDailyAce, insertDailyScore, insertHighScore, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
 import { DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, unlockedShipIds } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -219,8 +219,8 @@ export class Game {
     this.attractPage = "title";
     this.attractBoard = 0;
     this.attractThenTitle = false;
-    this.killStreak = 0;
-    this.bestStreak = 0;
+    this.ace = 0;
+    this.bestAce = 0;
     this.attractTimer = ATTRACT_HOLD;
     this.attractScene = 0;
     this.attractAge = 0;
@@ -1067,8 +1067,8 @@ export class Game {
     this.wavePick = null;
     this.startPick = null;
     this.runDirty = false;
-    this.killStreak = 0;
-    this.bestStreak = 0;
+    this.ace = 0;
+    this.bestAce = 0;
     this.wave = 1;
     this.waveCooldown = 0;
     this.homeOn = false;
@@ -1460,7 +1460,8 @@ export class Game {
 
   scoreBoardOf(id) {
     if (id === "daily") return padScoreRows(this.save.dailyScores);
-    if (id === "streak") return padScoreRows(this.save.killStreaks);
+    if (id === "ace") return padScoreRows(this.save.aceScores);
+    if (id === "aceDaily") return padScoreRows(this.save.dailyAce);
     return padScoreRows(this.save.highScores);
   }
 
@@ -1473,14 +1474,24 @@ export class Game {
     return {
       all: scoreQualifies(this.score, this.save.highScores),
       daily: scoreQualifies(this.score, this.save.dailyScores),
-      streak: scoreQualifies(this.bestStreak, this.save.killStreaks),
+      ace: scoreQualifies(this.bestAce, this.save.aceScores),
+      aceDaily: scoreQualifies(this.bestAce, this.save.dailyAce),
     };
   }
 
-  noteKill() {
+  acePoints(role) {
+    if (role === "destroyer" || role === "corvette") return 10;
+    if (role === "raider" || role === "hunter") return 1;
+    return 0;
+  }
+
+  noteAce(via, role) {
     if (this.attractOnDemo || this.mode !== PLAYING) return;
-    this.killStreak += 1;
-    if (this.killStreak > this.bestStreak) this.bestStreak = this.killStreak;
+    if (via === "emp" || via === "missile" || via === "hole") return;
+    const n = this.acePoints(role);
+    if (!n) return;
+    this.ace += n;
+    if (this.ace > this.bestAce) this.bestAce = this.ace;
   }
 
   stopAttract() {
@@ -1489,13 +1500,29 @@ export class Game {
     this.hud.setAttractDemo(false);
   }
 
+  bailAttractDemo() {
+    if (!this.attractOnDemo) return;
+    this.endAttractDemo();
+    this.attractOnDemo = false;
+    this.hud.setAttractDemo(false);
+    this.attractPage = "title";
+    this.attractTimer = ATTRACT_HOLD;
+    this.mode = TITLE;
+    this.hud.showTitle();
+  }
+
   openAttractDemo() {
     this.paused = false;
     this.hud.setAttractDemo(true);
     this.attractOnDemo = true;
     this.attractTimer = ATTRACT_PLAY;
     this.attractAge = 0;
-    this.beginAttractScene();
+    try {
+      this.beginAttractScene();
+    } catch (err) {
+      console.error("[omega] attract scene", err);
+      this.bailAttractDemo();
+    }
   }
 
   closeAttractDemo() {
@@ -1539,7 +1566,6 @@ export class Game {
     this.attractCue = setup(this, demoSkinFor(this.attractScene)) || {};
     this.syncWingmen({ revive: true });
     this.snapCamera();
-    this.applyCamera(1 / 60, this.app.screen);
   }
 
   endAttractDemo() {
@@ -1611,10 +1637,6 @@ export class Game {
     if (!this.ship.alive) return;
     this.attractAge += t;
     const cue = this.attractCue || {};
-    if (cue.empAt && !cue.empDone && this.attractAge >= cue.empAt) {
-      cue.empDone = true;
-      this.fireEmp();
-    }
     if (cue.warpAt && !cue.warpDone && this.attractAge >= cue.warpAt) {
       cue.warpDone = true;
       this.fireWarp();
@@ -1644,7 +1666,6 @@ export class Game {
     else this.ship.tickShield(t, false);
     this.shoot(t);
     this.tickAssaultKit(t, space);
-    if (this.attractAge > 0.2) this.fireMissile();
     this.ship.view.visible = true;
     this.ship.view.alpha = 1;
   }
@@ -1871,6 +1892,10 @@ export class Game {
     if (!this.ship.alive || this.ship.docked) {
       this.ship.clearRail?.();
       this.fireWasOn = this.input.fireHeld;
+      return;
+    }
+    if (this.attractOnDemo && (this.ship.can("rockets") || this.ship.noseGunCfg?.()?.charge)) {
+      this.ship.clearRail?.();
       return;
     }
     if (this.ship.can("rockets")) {
@@ -3682,7 +3707,7 @@ export class Game {
       this.battleship.dropTow(enemy);
     }
     this.addScore(enemy.role === "raider" ? 150 : enemy.role === "destroyer" ? 250 : enemy.role === "corvette" ? corvetteCfg.score : enemy.role === "crane" ? craneCfg.score : 75);
-    this.noteKill();
+    this.noteAce(via, enemy.role);
     this.noteKillBounty(via);
     this.shake = Math.max(this.shake, 4);
     this.sfx("boom");
@@ -4014,7 +4039,7 @@ export class Game {
     this.leaveHubSeat();
     this.hud.hideDock();
     const rank = this.rankEntry();
-    if (reason === "final" || rank.all || rank.daily || rank.streak) {
+    if (reason === "final" || rank.all || rank.daily || rank.ace || rank.aceDaily) {
       this.beginInitials();
       return;
     }
@@ -4026,8 +4051,8 @@ export class Game {
     this.silenceLasers();
     this.initials = { letters: ["A", "A", "A"], i: 0 };
     const rank = this.rankEntry();
-    const shown = rank.all || rank.daily ? this.score : rank.streak ? this.bestStreak : this.score;
-    const label = rank.streak && !rank.all && !rank.daily ? "STREAK" : "SCORE";
+    const shown = rank.all || rank.daily ? this.score : rank.ace || rank.aceDaily ? this.bestAce : this.score;
+    const label = (rank.ace || rank.aceDaily) && !rank.all && !rank.daily ? "ACE" : "SCORE";
     this.hud.showInitials(shown, this.initials, label);
   }
 
@@ -4055,7 +4080,8 @@ export class Game {
     const rank = this.rankEntry();
     if (rank.all) this.save.highScores = insertHighScore(this.save.highScores, name, this.score);
     if (rank.daily) this.save.dailyScores = insertDailyScore(this.save.dailyScores, name, this.score);
-    if (rank.streak) this.save.killStreaks = insertStreak(this.save.killStreaks, name, this.bestStreak);
+    if (rank.ace) this.save.aceScores = insertAceScore(this.save.aceScores, name, this.bestAce);
+    if (rank.aceDaily) this.save.dailyAce = insertDailyAce(this.save.dailyAce, name, this.bestAce);
     this.save.highScore = this.save.highScores[0]?.score || this.score;
     this.storage.save(this.save);
     this.hud.setHigh(this.save.highScore);
@@ -4139,7 +4165,7 @@ export class Game {
     this.shake = 16;
     this.sfx("die");
     this.homeOn = false;
-    this.killStreak = 0;
+    this.ace = 0;
     this.lives -= 1;
     this.hud.setLives(Math.max(0, this.lives));
     this.cargo = 0;
@@ -4218,6 +4244,9 @@ export class Game {
     const snap = bloomConfig.snap || 64;
     const filterW = Math.max(snap, Math.ceil((screen.width * pad) / zoom / snap) * snap);
     const filterH = Math.max(snap, Math.ceil((screen.height * pad) / zoom / snap) * snap);
+    for (const filter of this.world.filters || []) {
+      if (filter) filter.enabled = !this.attractOnDemo;
+    }
     this.worldFilterArea.x = this.camX - filterW * 0.5;
     this.worldFilterArea.y = this.camY - filterH * 0.5;
     if (this.filterAreaDirty || this.worldFilterArea.width !== filterW || this.worldFilterArea.height !== filterH) {
@@ -5034,8 +5063,8 @@ export class Game {
   }
 
   tickLockCam(dt) {
-    const playing = this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE || this.attractOnDemo;
-    if (!playing) {
+    const playing = this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE;
+    if (!playing || this.attractOnDemo) {
       this.lockCam.clear();
       this.railPrey = null;
       this.railShot = null;

@@ -32,7 +32,14 @@ async function start() {
 
   console.log("[omega] before new Game");
   const game = new Game(app, { storage: localStorageAdapter });
-  app.ticker.add((ticker) => game.update(ticker.deltaMS / 1000));
+  app.ticker.add((ticker) => {
+    try {
+      game.update(ticker.deltaMS / 1000);
+    } catch (err) {
+      console.error("[omega] update", err);
+      game.bailAttractDemo?.();
+    }
+  });
 }
 
 start();
