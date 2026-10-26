@@ -201,6 +201,7 @@ export class Game {
     this.camRot = 0;
     this.camZoom = cameraConfig.zoom;
     this.camOn = true;
+    this.filterAreaDirty = true;
     this.hubThreat = 0;
     this.hubThreatClose = false;
     this.hubAlertOn = false;
@@ -986,7 +987,7 @@ export class Game {
       speed: 620,
       life: 1.15,
     });
-    const fire = enemy.role === "hunter" ? hunterScale(this.assaultIndex).fire : 1;
+    const fire = enemy.role === "hunter" ? hunterScale(this.attractOnDemo ? 1 : this.assaultIndex).fire : 1;
     enemy.cooldown = (enemy.role === "hunter" ? hunterCfg.cool : 0.85) / fire;
     this.sfx("enemy");
   }
@@ -1489,11 +1490,12 @@ export class Game {
   }
 
   openAttractDemo() {
+    this.paused = false;
+    this.hud.setAttractDemo(true);
     this.attractOnDemo = true;
     this.attractTimer = ATTRACT_PLAY;
     this.attractAge = 0;
     this.beginAttractScene();
-    this.hud.setAttractDemo(true);
   }
 
   closeAttractDemo() {
@@ -1504,14 +1506,19 @@ export class Game {
   }
 
   beginAttractScene() {
+    this.paused = false;
     this.clearEnemies();
+    this.clearRocks();
+    this.clearShards();
     this.shots.forEach((shot) => shot.kill());
     this.hostileShots.forEach((shot) => shot.kill());
     this.missiles.forEach((missile) => missile.kill(true));
     this.hubMissiles.forEach((missile) => missile.kill(true));
+    this.castleStars.forEach((star) => star.kill(true));
     this.emp.kill();
     this.hole.kill();
     this.clearMissileBursts();
+    this.lockCam.clear();
     this.selected = null;
     this.focusFire = false;
     this.lockMark.visible = false;
@@ -1521,10 +1528,18 @@ export class Game {
     this.holeCool = 0;
     this.warpCool = 0;
     this.cooldown = 0;
+    this.hubThreat = 0;
+    this.hubThreatClose = false;
+    this.castlesArmed = false;
+    this.assaultRest = false;
+    for (const base of this.bases) base.resetCombat();
+    this.sleepLateBases();
+    this.syncStation();
     const setup = ATTRACT_SCENES[this.attractScene] ?? ATTRACT_SCENES[0];
     this.attractCue = setup(this, demoSkinFor(this.attractScene)) || {};
     this.syncWingmen({ revive: true });
     this.snapCamera();
+    this.applyCamera(1 / 60, this.app.screen);
   }
 
   endAttractDemo() {
@@ -1688,7 +1703,7 @@ export class Game {
   }
 
   gunTier() {
-    if (this.attractOnDemo) return 5;
+    if (this.attractOnDemo) return 3;
     return Math.max(1, Math.min(5, this.levels?.gun || 1));
   }
 
@@ -4164,6 +4179,7 @@ export class Game {
     this.camY = this.ship.y;
     this.camRot = this.headingUp();
     this.camZoom = this.playZoom();
+    this.filterAreaDirty = true;
   }
 
   placeView(entity, width, height) {
@@ -4204,10 +4220,11 @@ export class Game {
     const filterH = Math.max(snap, Math.ceil((screen.height * pad) / zoom / snap) * snap);
     this.worldFilterArea.x = this.camX - filterW * 0.5;
     this.worldFilterArea.y = this.camY - filterH * 0.5;
-    if (this.worldFilterArea.width !== filterW || this.worldFilterArea.height !== filterH) {
+    if (this.filterAreaDirty || this.worldFilterArea.width !== filterW || this.worldFilterArea.height !== filterH) {
       this.worldFilterArea.width = filterW;
       this.worldFilterArea.height = filterH;
       this.world.filterArea = this.worldFilterArea;
+      this.filterAreaDirty = false;
     }
     this.far.sync(this.camX, this.camY, !mapping && this.mode !== SHIPS);
 
@@ -4660,15 +4677,16 @@ export class Game {
           enemy.update(t, this.craneAim(enemy, space), space, false);
           continue;
         }
-        const prey = this.pickHunt(enemy, space) || this.ship;
+        const prey = this.pickHunt(enemy, space) || (this.ship.alive ? this.ship : null);
         enemy.hunt = prey;
+        if (!prey) continue;
         enemy.update(t, prey, space, this.aimedAt(enemy, space), {
           seen: this.onScreen(enemy),
           playerX: this.ship.x,
           playerY: this.ship.y,
           playerRot: this.ship.rotation,
           playerSteer: this.input.rotate,
-          wave: this.assaultIndex,
+          wave: this.attractOnDemo ? 1 : this.assaultIndex,
         });
         if (enemy.didWarp) {
           enemy.didWarp = false;
@@ -4695,7 +4713,8 @@ export class Game {
           if (this.hub.missileCool <= 0) this.fireHubMissile(prey, space);
         }
       }
-      if (this.castlesArmed && !this.assaultRest && (this.mode === PLAYING || this.attractOnDemo) && this.ship.alive && this.assaultPlan().stars !== false) {
+      const wantStars = this.attractOnDemo ? Boolean(this.attractCue?.stars) : this.assaultPlan().stars !== false;
+      if (this.castlesArmed && !this.assaultRest && (this.mode === PLAYING || this.attractOnDemo) && this.ship.alive && wantStars) {
         for (const base of this.bases) {
           if (base.hub || !base.alive || !base.armed) continue;
           base.missileCool = Math.max(0, base.missileCool - t);

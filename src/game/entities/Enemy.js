@@ -521,6 +521,11 @@ export class Enemy {
       return;
     }
     this.view.alpha = 1;
+    if (!target || !space) {
+      this.tickFlashes(dt);
+      this.tickShield(dt);
+      return;
+    }
     const dx = wrapDelta(target.x - this.x, space.width);
     const dy = wrapDelta(target.y - this.y, space.height);
     const dist = Math.hypot(dx, dy) || 1;
