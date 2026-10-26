@@ -404,12 +404,13 @@ export class Hud {
     this.setAttractDemo(false);
     this.center.classList.remove("is-hidden", "is-scores");
     this.center.classList.add("is-initials");
-    this.center.classList.toggle("is-hub-over", reason === "hub");
+    const overLine = reason === "hub" ? "THE HUB HAS FALLEN" : reason === "dead" ? "YOU DIED" : "";
+    this.center.classList.toggle("is-hub-over", Boolean(overLine));
     this.hideWavePick();
     document.body.classList.add("is-scoreboard");
-    if (reason === "hub") {
+    if (overLine) {
       this.title.innerHTML = vectorTitleSvg("GAME OVER", 28, CYAN, HOT);
-      this.tag.innerHTML = `${vectorTextSvg("THE HUB HAS FALLEN", 14, MAGENTA, PINK, "center")}${vectorTextSvg(`${label}  ${score}`, 10, DIM, CYAN, "center")}`;
+      this.tag.innerHTML = `${vectorTextSvg(overLine, 14, MAGENTA, PINK, "center")}${vectorTextSvg(`${label}  ${score}`, 10, DIM, CYAN, "center")}`;
     } else {
       this.title.innerHTML = "";
       this.paint(this.tag, `${label}  ${score}`, 14, MAGENTA, PINK, "center");

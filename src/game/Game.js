@@ -279,7 +279,7 @@ export class Game {
       this.input._continueClick = true;
       this.acceptContinue();
     };
-    this.hud.onDecline = () => this.endRun("final");
+    this.hud.onDecline = () => this.endRun("dead");
     this.hud.onPickDevice = (id) => this.setControlProfile(id === "phone" ? "phone" : "mouse");
     this.hud.onPickWave = (n) => this.startRun(n);
     this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
@@ -4154,7 +4154,7 @@ export class Game {
     this.leaveHubSeat();
     this.hud.hideDock();
     const rank = this.rankEntry();
-    if (reason === "final" || reason === "hub" || rank.all || rank.daily || rank.ace || rank.aceDaily) {
+    if (reason === "final" || reason === "hub" || reason === "dead" || rank.all || rank.daily || rank.ace || rank.aceDaily) {
       this.beginInitials(reason);
       return;
     }
@@ -4530,7 +4530,7 @@ export class Game {
     if (this.mode === STARTPICK) this.tickStartPick();
 
     if ((this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE) && this.input.quitPressed) {
-      this.endRun(this.mode === CONTINUE ? "final" : "abort");
+      this.endRun(this.mode === CONTINUE ? "dead" : "abort");
     }
 
     if (this.mode !== INITIALS && this.mode !== CONTROLS) {
@@ -4572,7 +4572,7 @@ export class Game {
     } else if (this.mode === CONTINUE && (this.input.continueClick || this.input.startKeyPressed)) {
       this.acceptContinue();
     } else if (this.mode === CONTINUE && this.input.selectPressed) {
-      this.endRun("final");
+      this.endRun("dead");
     } else if (!this.pickingDevice && (this.mode === TITLE || this.mode === GAMEOVER) && this.titleHold <= 0 && this.input.startPressed) {
       this.offerStart();
     } else if (this.mode === PLAYING && !this.ship.docked) {
