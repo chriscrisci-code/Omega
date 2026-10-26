@@ -1,5 +1,5 @@
 import { Container, Graphics } from "pixi.js";
-import { castle, colors, corvette as corvetteCfg, crane as craneCfg, destroyer as destroyerConfig, raid } from "../config.js";
+import { castle, colors, corvette as corvetteCfg, crane as craneCfg, destroyer as destroyerConfig, hunter as hunterCfg, hunterScale, raid } from "../config.js";
 import { turnToward, wrap, wrapCoord, wrapDelta } from "../math.js";
 import { strokeGlow, strokeLine } from "../render/textures.js";
 
@@ -525,12 +525,13 @@ export class Enemy {
     const dy = wrapDelta(target.y - this.y, space.height);
     const dist = Math.hypot(dx, dy) || 1;
     const toTarget = Math.atan2(dy, dx);
+    const pace = this.role === "hunter" ? hunterScale(extras.wave).speed : 1;
     const turn = this.role === "raider" ? 2.2 : this.role === "destroyer" ? destroyerConfig.turn : this.role === "corvette" ? corvetteCfg.turn : this.role === "crane" ? craneCfg.turn : 2.8;
     const craneHold = this.job?.kind === "weld" || this.job?.phase === "haul" || this.job?.phase === "dock" ? 22 : craneCfg.hold;
     const hold = this.role === "raider" ? 210 : this.role === "destroyer" ? 420 : this.role === "crane" ? craneHold : 220;
-    const chase = this.role === "raider" ? 400 : this.role === "destroyer" ? 170 : this.role === "corvette" ? corvetteCfg.chase : this.role === "crane" ? craneCfg.speed : 320;
-    const back = this.role === "raider" ? 220 : this.role === "destroyer" ? 90 : this.role === "crane" ? 40 : 260;
-    const cap = this.role === "raider" ? 400 : this.role === "destroyer" ? 110 : this.role === "corvette" ? (this.evadeHold > 0 ? corvetteCfg.evadeSpeed || corvetteCfg.speed : corvetteCfg.speed) : this.role === "crane" ? craneCfg.speed : 340;
+    const chase = this.role === "raider" ? 400 : this.role === "destroyer" ? 170 : this.role === "corvette" ? corvetteCfg.chase : this.role === "crane" ? craneCfg.speed : hunterCfg.chase * pace;
+    const back = this.role === "raider" ? 220 : this.role === "destroyer" ? 90 : this.role === "crane" ? 40 : 260 * pace;
+    const cap = this.role === "raider" ? 400 : this.role === "destroyer" ? 110 : this.role === "corvette" ? (this.evadeHold > 0 ? corvetteCfg.evadeSpeed || corvetteCfg.speed : corvetteCfg.speed) : this.role === "crane" ? craneCfg.speed : hunterCfg.cap * pace;
     let ax = 0;
     let ay = 0;
     if (this.role === "corvette") {
@@ -573,8 +574,8 @@ export class Enemy {
         this.dodgeSign *= -1;
         this.dodgeUntil = 0.28 + Math.random() * 0.2;
       }
-      ax += (-dy / dist) * 520 * this.dodgeSign;
-      ay += (dx / dist) * 520 * this.dodgeSign;
+      ax += (-dy / dist) * hunterCfg.dodge * pace * this.dodgeSign;
+      ay += (dx / dist) * hunterCfg.dodge * pace * this.dodgeSign;
     }
     this.dodgeUntil = Math.max(0, this.dodgeUntil - dt);
 

@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
-import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, bloom as bloomConfig, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, bloom as bloomConfig, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, hunter as hunterCfg, hunterScale, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -986,7 +986,8 @@ export class Game {
       speed: 620,
       life: 1.15,
     });
-    enemy.cooldown = 0.85;
+    const fire = enemy.role === "hunter" ? hunterScale(this.assaultIndex).fire : 1;
+    enemy.cooldown = (enemy.role === "hunter" ? hunterCfg.cool : 0.85) / fire;
     this.sfx("enemy");
   }
 
@@ -4667,6 +4668,7 @@ export class Game {
           playerY: this.ship.y,
           playerRot: this.ship.rotation,
           playerSteer: this.input.rotate,
+          wave: this.assaultIndex,
         });
         if (enemy.didWarp) {
           enemy.didWarp = false;

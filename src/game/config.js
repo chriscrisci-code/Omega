@@ -222,6 +222,27 @@ export const rockets = {
   hot: colors.white,
 };
 
+/** Hunters reach 2× speed and 3× fire by wave 15. */
+export const hunter = {
+  chase: 320,
+  back: 260,
+  cap: 340,
+  cool: 0.85,
+  dodge: 520,
+  rampBy: 15,
+  speedAt: 2,
+  fireAt: 3,
+};
+
+export function hunterScale(wave) {
+  const span = Math.max(1, (hunter.rampBy || 15) - 1);
+  const t = Math.min(1, Math.max(0, (Number(wave) || 1) - 1) / span);
+  return {
+    speed: 1 + t * ((hunter.speedAt || 2) - 1),
+    fire: 1 + t * ((hunter.fireAt || 3) - 1),
+  };
+}
+
 export const castle = {
   shieldHits: [6, 5, 4],
   coreHits: 8,
