@@ -10,6 +10,7 @@ export const ACTIONS = [
   { id: "shield", name: "SHIELD" },
   { id: "warp", name: "WARP" },
   { id: "emp", name: "EMP" },
+  { id: "hole", name: "HOLE" },
   { id: "missile", name: "MISSILE" },
   { id: "map", name: "MAP" },
   { id: "lock", name: "LOCK" },
@@ -99,6 +100,7 @@ const KEYS = {
   save: [key("KeyV")],
   fullscreen: [key("KeyF")],
   quit: [key("Escape")],
+  hole: [key("KeyB")],
 };
 
 export const DEFAULTS = {
@@ -151,6 +153,7 @@ export const DEFAULTS = {
     shield: [gesture("doubleTap"), key("ShiftLeft")],
     warp: [gesture("flickFwd")],
     emp: [gesture("flickBack")],
+    hole: [key("KeyB")],
     missile: [gesture("twoFinger")],
     map: [key("KeyM")],
     lock: [key("KeyL")],

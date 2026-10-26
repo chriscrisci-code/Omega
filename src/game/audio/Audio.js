@@ -594,6 +594,24 @@ export const SFX = {
       });
     },
   },
+  hole: {
+    name: "HOLE",
+    fire: (audio) => {
+      audio.whoosh({ from: 220, to: 40, dur: 0.9, peak: 0.26, q: 0.4 });
+      audio.tone({ type: "sine", freq: 70, glide: 28, dur: 1.1, peak: 0.14, attack: 0.05 });
+      audio.gun({
+        dur: 0.28,
+        noisePeak: 0.14,
+        cutoff: 900,
+        endCutoff: 80,
+        q: 0.7,
+        type: "lowpass",
+        thump: 36,
+        thumpPeak: 0.2,
+        thumpDur: 0.28,
+      });
+    },
+  },
   main: {
     name: "MAIN",
     fire: (audio) => audio.enginePreview("main"),
@@ -801,7 +819,7 @@ export const SFX = {
 
 export const SFX_GROUPS = [
   { name: "GUNS", ids: ["thud", "rail", "turret", "enemy"] },
-  { name: "SPECIAL", ids: ["missile", "star", "warp", "emp", "laser"] },
+  { name: "SPECIAL", ids: ["missile", "star", "warp", "emp", "hole", "laser"] },
   { name: "THRUST", ids: ["main", "side"] },
   { name: "HITS", ids: ["hit", "rock", "boom", "die", "hub"] },
   { name: "ORE", ids: ["spawn", "ore", "dump", "up"] },

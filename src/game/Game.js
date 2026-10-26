@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
-import { applyDifficulty, assault, battleship as battleshipCfg, bloom as bloomConfig, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, bloom as bloomConfig, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -7,6 +7,7 @@ import { Battleship } from "./entities/Battleship.js";
 import { Station } from "./entities/Station.js";
 import { Tunnel } from "./entities/Tunnel.js";
 import { Bullet } from "./entities/Bullet.js";
+import { BlackHole } from "./entities/BlackHole.js";
 import { EmpPulse } from "./entities/EmpPulse.js";
 import { Enemy, HUNTER } from "./entities/Enemy.js";
 import { Missile } from "./entities/Missile.js";
@@ -120,12 +121,15 @@ export class Game {
     });
     this.emp = new EmpPulse();
     this.vectors.addChild(this.emp.view);
+    this.hole = new BlackHole();
+    this.vectors.addChild(this.hole.view);
     this.missileBursts = Array.from({ length: 8 }, () => {
       const burst = new MissileBurst();
       this.vectors.addChild(burst.view);
       return burst;
     });
     this.empCool = 0;
+    this.holeCool = 0;
     this.warpCool = 0;
     this.hubMissiles = Array.from({ length: 4 }, () => {
       const missile = new Missile();
@@ -448,7 +452,6 @@ export class Game {
   assaultDuration(n) {
     if (n <= 1) return assault.wave1;
     if (n === 2) return assault.wave2;
-    if (n === tunnelCfg.wave) return tunnelCfg.time;
     return assault.wave3 + (n - 3) * assault.grow;
   }
 
@@ -466,16 +469,14 @@ export class Game {
       base.spawnTimer = 0.6 + Math.random() * 1.4;
       base.screenDestroyerTimer = destroyers > 0 ? 3.5 + Math.random() * 2.5 : 8;
     }
-    if (!silent && this.assaultIndex !== tunnelCfg.wave) this.sfx("warn");
+    if (!silent) this.sfx("warn");
     this.syncStation();
     this.station.setBuild(this.assaultIndex);
     this.battleship.setBuild(this.assaultIndex);
     if (this.assaultIndex === 9) this.yardWarn = 6.5;
     if (this.assaultIndex >= 7 && this.assaultIndex < 9) this.clearCranes();
     if (this.assaultIndex === 8) this.cullRole("hunter");
-    if (this.assaultIndex === tunnelCfg.wave) {
-      if (!this.holdTunnel) this.enterTunnel();
-    } else this.leaveTunnel({ silent: true, dock: false });
+    this.leaveTunnel({ silent: true, dock: false });
   }
 
   syncStation() {
@@ -536,16 +537,6 @@ export class Game {
         starEvery: castle.starEvery / assault.starBoost,
       };
     }
-    if (n === tunnelCfg.wave) {
-      return {
-        hunterGlobal: 0,
-        hunterPerCastle: 0,
-        hunterEvery: 99,
-        raidMax: 0,
-        raidEvery: 99,
-        stars: false,
-      };
-    }
     return {
       hunterGlobal: Infinity,
       hunterPerCastle: castle.spawnMax,
@@ -557,7 +548,7 @@ export class Game {
   }
 
   destroyerCap() {
-    if (this.inTunnel() || this.assaultIndex === tunnelCfg.wave) return 0;
+    if (this.inTunnel()) return 0;
     const from = destroyerConfig.fromWave ?? 4;
     if (this.assaultIndex < from) return 0;
     return this.assaultIndex - from + 1;
@@ -1106,8 +1097,10 @@ export class Game {
     this.paused = false;
     this.saveFlash = 0;
     this.emp.kill();
+    this.hole.kill();
     this.clearMissileBursts();
     this.empCool = 0;
+    this.holeCool = 0;
     this.warpCool = 0;
     for (const base of this.bases) base.resetCombat();
     const resumed = resume && this.applyCheckpoint();
@@ -1165,8 +1158,7 @@ export class Game {
     this.scatterField();
     this.spawnWave();
     this.holdTunnel = false;
-    if (this.assaultIndex === tunnelCfg.wave && !this.assaultRest) this.enterTunnel();
-    else this.leaveTunnel({ silent: true, dock: false });
+    this.leaveTunnel({ silent: true, dock: false });
   }
 
   sleepLateBases() {
@@ -1517,6 +1509,7 @@ export class Game {
     this.missiles.forEach((missile) => missile.kill(true));
     this.hubMissiles.forEach((missile) => missile.kill(true));
     this.emp.kill();
+    this.hole.kill();
     this.clearMissileBursts();
     this.selected = null;
     this.focusFire = false;
@@ -1524,6 +1517,7 @@ export class Game {
     this.missileCool = 0;
     this.missileQueued = 0;
     this.empCool = 0;
+    this.holeCool = 0;
     this.warpCool = 0;
     this.cooldown = 0;
     const setup = ATTRACT_SCENES[this.attractScene] ?? ATTRACT_SCENES[0];
@@ -1544,6 +1538,7 @@ export class Game {
     this.hubMissiles.forEach((missile) => missile.kill(true));
     this.castleStars.forEach((star) => star.kill(true));
     this.emp.kill();
+    this.hole.kill();
     this.clearMissileBursts();
     this.selected = null;
     this.focusFire = false;
@@ -3079,15 +3074,100 @@ export class Game {
     this.fx.burst(this.ship.x, this.ship.y, colors.white, 8, 140);
   }
 
+  empReach() {
+    return Math.hypot(this.app.screen.width, this.app.screen.height) * 0.5 / (this.camZoom || cameraConfig.zoom);
+  }
+
   fireEmp(force = false) {
     if (this.empTier() <= 1) return;
     if ((!force && this.empCool > 0) || this.emp.alive || !this.ship.alive || this.ship.docked) return;
-    const reach = Math.hypot(this.app.screen.width, this.app.screen.height) * 0.5 / (this.camZoom || cameraConfig.zoom);
+    const reach = this.empReach();
     this.emp.fire(this.ship.x, this.ship.y, reach);
     this.empCool = emp.cooldown;
     this.fx.burst(this.ship.x, this.ship.y, colors.cyanHot, 18, 160);
     this.fx.burst(this.ship.x, this.ship.y, colors.white, 8, 90);
     this.sfx("emp");
+  }
+
+  fireHole() {
+    if (this.holeCool > 0 || this.hole.alive || !this.ship.alive || this.ship.docked || this.attractOnDemo) return;
+    const nose = this.ship.nose();
+    this.hole.fire(nose.x, nose.y, this.ship.rotation, this.empReach());
+    this.holeCool = holeCfg.cool || 8;
+    this.fx.burst(nose.x, nose.y, colors.magentaHot, 12, 140);
+    this.sfx("hole");
+    this.hud.setMode("HOLE");
+  }
+
+  holeDelta(body, space) {
+    const dx = wrapDelta(this.hole.x - body.x, space.width);
+    const dy = wrapDelta(this.hole.y - body.y, space.height);
+    return { dx, dy, dist: Math.hypot(dx, dy) };
+  }
+
+  holeFacing(body, space) {
+    const { dx, dy } = this.holeDelta(body, space);
+    const rot = body.rotation ?? body.angle ?? 0;
+    return Math.abs(wrapDelta(rot - Math.atan2(dy, dx), Math.PI * 2)) < Math.PI / 2;
+  }
+
+  applyHolePull(body, space, dt, opts = {}) {
+    if (!body || body.alive === false) return Infinity;
+    const { dx, dy, dist } = this.holeDelta(body, space);
+    if (dist > this.hole.radius || dist < 0.001) return dist;
+    if (opts.needFace && !this.holeFacing(body, space)) return dist;
+    const fall = 1 - dist / Math.max(1, this.hole.radius);
+    const accel = (holeCfg.pull || 1100) * (0.35 + fall * 0.65);
+    const nx = dx / dist;
+    const ny = dy / dist;
+    if (typeof body.pull === "function") body.pull(nx, ny, accel * dt);
+    else if (typeof body.kick === "function") body.kick(nx, ny, accel * dt);
+    else {
+      body.vx = (body.vx || 0) + nx * accel * dt;
+      body.vy = (body.vy || 0) + ny * accel * dt;
+    }
+    if (opts.steer && Number.isFinite(body.angle)) {
+      body.loseLock?.();
+      body.angle = turnToward(body.angle, Math.atan2(dy, dx), 6 * dt);
+    }
+    return dist;
+  }
+
+  tickHole(dt, space) {
+    this.holeCool = Math.max(0, this.holeCool - dt);
+    if (!this.hole.alive) return;
+    this.hole.update(dt, space);
+    if (this.hole.didOpen) {
+      this.hole.didOpen = false;
+      this.fx.burst(this.hole.x, this.hole.y, colors.magentaHot, 24, 220);
+      this.fx.burst(this.hole.x, this.hole.y, colors.white, 10, 100);
+      this.sfx("hole");
+      this.shake = Math.max(this.shake, 8);
+    }
+    if (this.hole.phase !== "pull") return;
+    const crush = holeCfg.crush || 32;
+    for (const enemy of [...this.enemies]) {
+      if (!enemy.alive || enemy.warping) continue;
+      if (this.applyHolePull(enemy, space, dt) < crush) this.killEnemy(enemy, "hole");
+    }
+    for (const wing of this.wingmen) {
+      if (!wing.flying()) continue;
+      if (this.applyHolePull(wing, space, dt) < crush) this.hurtFriendly(wing);
+    }
+    if (this.ship.alive && !this.ship.docked && !this.ship.warping) {
+      if (this.applyHolePull(this.ship, space, dt, { needFace: true }) < crush) this.hurtFriendly(this.ship);
+    }
+    for (const dart of [...this.missiles, ...this.hubMissiles, ...this.castleStars]) {
+      if (!dart.alive) continue;
+      if (this.applyHolePull(dart, space, dt, { steer: true }) < crush) dart.kill(true);
+    }
+    for (const rock of [...this.asteroids]) {
+      if (this.applyHolePull(rock, space, dt) < crush) this.killRock(rock, { vx: rock.vx, vy: rock.vy });
+    }
+    for (const flake of [...this.ores]) {
+      if (!flake.alive) continue;
+      if (this.applyHolePull(flake, space, dt) < crush) flake.kill();
+    }
   }
 
   missileFusePad(missile) {
@@ -4172,6 +4252,7 @@ export class Game {
       if (missile.view.visible) this.placeView(missile, space.width, space.height);
     }
     if (this.emp.view.visible) this.placeView(this.emp, space.width, space.height);
+    if (this.hole.view.visible) this.placeView(this.hole, space.width, space.height);
     for (const burst of this.missileBursts) {
       if (burst.view.visible) this.placeView(burst, space.width, space.height);
     }
@@ -4328,6 +4409,7 @@ export class Game {
     }
     if (this.mode === PLAYING && this.input.warpPressed) this.fireWarp();
     if (this.mode === PLAYING && !this.ship.docked && this.input.empPressed) this.fireEmp();
+    if (this.mode === PLAYING && !this.ship.docked && this.input.holePressed) this.fireHole();
     if (this.mode === PLAYING && !this.ship.docked && this.input.missilePressed) this.fireMissile();
     if (this.mode === PLAYING && this.input.mapHeld && this.input.selectPressed) this.selectAtPointer();
     if (this.mode === PLAYING && this.input.lockPressed) this.lockAtCrosshairs();
@@ -4431,8 +4513,6 @@ export class Game {
             ? `LOCK  ${this.selected.name || this.selected.kind}`
             : this.assaultRest
               ? "CLEAR"
-              : this.inTunnel()
-                ? "MAZE"
               : `WAVE  ${this.assaultIndex}`;
       if (this.yardWarn > 0) this.yardWarn = Math.max(0, this.yardWarn - t);
       this.hud.setMode(this.saveFlash > 0 ? "SAVED" : this.yardWarn > 0 ? "BATTLESHIP BEING BUILT" : modeLabel);
@@ -4486,6 +4566,7 @@ export class Game {
       }
     }
     this.emp.update(t, this.ship);
+    this.tickHole(t, space);
     this.tickMissileBursts(t, space);
     if (this.emp.alive) {
       for (const enemy of this.enemies) {
@@ -4561,7 +4642,6 @@ export class Game {
             this.hub.alive &&
             !this.inTunnel() &&
             this.assaultIndex >= corvetteCfg.fromWave &&
-            this.assaultIndex !== tunnelCfg.wave &&
             this.corvetteCount() < 1
           ) {
             const launchers = this.bases.filter((base) => !base.hub && base.alive);

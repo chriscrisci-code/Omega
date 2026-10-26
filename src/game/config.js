@@ -48,6 +48,16 @@ export const emp = {
   cooldown: 8,
 };
 
+/** B. Jets 2s, then pulls ships / missiles / rocks / ore. Same reach as EMP. Turn away to stay out. */
+export const blackHole = {
+  jetTime: 2,
+  jetSpeed: 420,
+  pullTime: 2.8,
+  pull: 1100,
+  crush: 32,
+  cool: 8,
+};
+
 /** Looping track. + / − is the play level. Title is muted; other screens sit lower. */
 export const music = {
   volume: 0.2,

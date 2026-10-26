@@ -466,6 +466,10 @@ export class Input {
     return this._empTicks > 0 || this.keysPressed("emp") || this.padEdge("emp");
   }
 
+  get holePressed() {
+    return this.keysPressed("hole") || this.padEdge("hole") || this.anyPressed(["KeyB"]);
+  }
+
   get missilePressed() {
     return this._missileTicks > 0 || this.keysPressed("missile") || this.padEdge("missile");
   }
