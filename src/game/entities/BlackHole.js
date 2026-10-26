@@ -1,20 +1,27 @@
 import { Graphics } from "pixi.js";
 import { blackHole as cfg, colors } from "../config.js";
 import { wrap } from "../math.js";
-import { strokeGlow, strokeLine } from "../render/textures.js";
 
-function ring(sides, radius, turn = 0) {
-  const points = [];
-  for (let i = 0; i < sides; i += 1) {
-    const a = turn + (i / sides) * Math.PI * 2;
-    points.push(Math.cos(a) * radius, Math.sin(a) * radius);
+function seedEmbers(count, tight) {
+  const list = [];
+  for (let i = 0; i < count; i += 1) {
+    const disk = i / count < 0.82;
+    const rx = tight
+      ? disk ? 14 + Math.random() * 8 : 8 + Math.random() * 18
+      : disk ? 46 + Math.random() * 18 : 22 + Math.random() * 38;
+    const ry = tight
+      ? disk ? 2.2 + Math.random() * 1.6 : 2 + Math.random() * 6
+      : disk ? 5 + Math.random() * 4.5 : 4 + Math.random() * 14;
+    list.push({
+      a: Math.random() * Math.PI * 2,
+      w: 9 + Math.random() * 10,
+      rx,
+      ry,
+      size: 0.7 + Math.random() * 1.7,
+      sign: Math.random() < 0.1 ? -1 : 1,
+    });
   }
-  return points;
-}
-
-function close(pts) {
-  if (!pts || pts.length < 4) return pts;
-  return [...pts, pts[0], pts[1]];
+  return list;
 }
 
 export class BlackHole {
@@ -30,8 +37,8 @@ export class BlackHole {
     this.radius = 8;
     this.maxRadius = 200;
     this.age = 0;
-    this.spin = 0;
     this.didOpen = false;
+    this.embers = [];
   }
 
   fire(x, y, angle, maxRadius) {
@@ -46,50 +53,68 @@ export class BlackHole {
     this.maxRadius = Math.max(80, maxRadius || 200);
     this.radius = 10;
     this.age = 0;
-    this.spin = 0;
     this.didOpen = false;
+    this.embers = seedEmbers(36, true);
     this.view.visible = true;
     this.view.alpha = 1;
     this.paint();
   }
 
+  emberDot(ember, scale) {
+    const x = Math.cos(ember.a) * ember.rx * scale;
+    const y = Math.sin(ember.a) * ember.ry * scale;
+    const s = ember.size * (0.75 + scale * 0.35);
+    return { x, y, s };
+  }
+
+  drawEmbers(g, scale, behind) {
+    for (const ember of this.embers) {
+      const { x, y, s } = this.emberDot(ember, scale);
+      if (behind ? y > 0.4 : y <= 0.4) continue;
+      g.circle(x, y, s * 2.1);
+      g.stroke({ width: s * 1.8, color: colors.white, alpha: 0.18 });
+      g.circle(x, y, s);
+      g.fill({ color: colors.white, alpha: 0.95 });
+    }
+  }
+
+  drawCore(g, r) {
+    g.circle(0, 0, r * 2.15);
+    g.stroke({ width: r * 0.85, color: colors.white, alpha: 0.16 });
+    g.circle(0, 0, r * 1.35);
+    g.stroke({ width: r * 0.42, color: colors.white, alpha: 0.55 });
+    g.circle(0, 0, r);
+    g.fill({ color: colors.white, alpha: 0.95 });
+    g.circle(0, 0, r * 0.42);
+    g.fill({ color: colors.white, alpha: 1 });
+  }
+
   paint() {
-    this.view.clear();
+    const g = this.view;
+    g.clear();
     if (!this.alive) return;
-    const glow = colors.magenta;
-    const hot = colors.magentaHot;
     if (this.phase === "jet") {
       const u = Math.min(1, this.age / (cfg.jetTime || 2));
-      const r = 7 + u * 9;
-      strokeGlow(this.view, ring(6, r, this.spin), glow, hot, 1.2 + u * 0.4);
-      strokeGlow(this.view, ring(4, r * 0.42, -this.spin), glow, colors.white, 0.95);
-      const nose = 16 + u * 8;
-      strokeLine(this.view, [Math.cos(this.angle) * nose, Math.sin(this.angle) * nose, -Math.cos(this.angle) * 10, -Math.sin(this.angle) * 10], glow, hot, 1.1);
-      this.view.alpha = 0.55 + u * 0.4;
+      const scale = 0.55 + u * 0.7;
+      const core = 5 + u * 7;
+      this.drawEmbers(g, scale, true);
+      this.drawCore(g, core);
+      this.drawEmbers(g, scale, false);
+      this.view.alpha = 0.7 + u * 0.3;
       return;
     }
     const u = Math.min(1, this.age / (cfg.pullTime || 2.8));
-    const reach = this.radius;
-    strokeGlow(this.view, ring(16, reach, this.spin * 0.18), glow, hot, 1.15);
-    strokeGlow(this.view, ring(8, reach * 0.62, -this.spin * 0.28), glow, hot, 1.05);
-    strokeGlow(this.view, ring(6, reach * 0.28, this.spin * 0.5), glow, colors.white, 1.2);
-    for (let i = 0; i < 8; i += 1) {
-      const a = this.spin * 0.7 + (i / 8) * Math.PI * 2;
-      strokeLine(
-        this.view,
-        close([Math.cos(a) * reach * 0.12, Math.sin(a) * reach * 0.12, Math.cos(a) * reach * 0.92, Math.sin(a) * reach * 0.92]),
-        glow,
-        hot,
-        0.7,
-      );
-    }
-    this.view.alpha = 0.42 + (1 - u) * 0.5;
+    const fade = 1 - u * 0.18;
+    this.drawEmbers(g, fade, true);
+    this.drawCore(g, 18 * fade);
+    this.drawEmbers(g, fade, false);
+    this.view.alpha = 0.82 + (1 - u) * 0.18;
   }
 
   update(dt, space) {
     if (!this.alive) return;
     this.age += dt;
-    this.spin += dt * (this.phase === "pull" ? 2.8 : 1.8);
+    for (const ember of this.embers) ember.a += ember.w * ember.sign * dt;
     if (this.phase === "jet") {
       this.x += this.vx * dt;
       this.y += this.vy * dt;
@@ -102,6 +127,7 @@ export class BlackHole {
         this.vy = 0;
         this.radius = this.maxRadius;
         this.didOpen = true;
+        this.embers = seedEmbers(64, false);
       }
     } else {
       const u = Math.min(1, this.age / (cfg.pullTime || 2.8));
@@ -115,6 +141,7 @@ export class BlackHole {
     this.alive = false;
     this.phase = "jet";
     this.didOpen = false;
+    this.embers = [];
     this.view.clear();
     this.view.visible = false;
   }
