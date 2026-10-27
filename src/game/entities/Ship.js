@@ -170,6 +170,9 @@ export class Ship {
     this.dockHold = 1;
     this.vx = 0;
     this.vy = 0;
+    this.shieldOn = false;
+    this.shieldEnergy = this.shieldMax || shieldConfig.max;
+    this.drawShield();
   }
 
   release(input) {
