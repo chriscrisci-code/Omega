@@ -261,6 +261,7 @@ export class Game {
     this.ace = 0;
     this.bestAce = 0;
     this.kills = 0;
+    this.killsBank = 0;
     this.attractTimer = ATTRACT_HOLD;
     this.attractScene = 0;
     this.attractAge = 0;
@@ -1191,6 +1192,7 @@ export class Game {
     this.ace = 0;
     this.bestAce = 0;
     this.kills = 0;
+    this.killsBank = 0;
     this.wave = 1;
     this.waveCooldown = 0;
     this.homeOn = false;
@@ -1255,7 +1257,7 @@ export class Game {
     this.hud.setXp(this.xp);
     this.hud.setPoints(this.points);
     this.hud.setLives(this.lives);
-    this.hud.setKills(this.kills);
+    this.hud.setKills(this.killsShown());
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
     this.refreshDock();
     this.syncMissileHud();
@@ -1618,9 +1620,10 @@ export class Game {
     const n = this.acePoints(role);
     if (!n) return;
     this.ace += n;
-    this.kills += n;
+    if (this.ship?.docked) this.killsBank += n;
+    else this.kills += n;
     if (this.ace > this.bestAce) this.bestAce = this.ace;
-    this.hud.setKills(this.kills);
+    this.hud.setKills(this.killsShown());
   }
 
   stopAttract() {
@@ -1996,6 +1999,17 @@ export class Game {
     this.bountyUnits = 0;
     const home = xpAwards.killHome || 5;
     this.payKillUnits(units * home);
+  }
+
+  killsShown() {
+    return (this.killsBank || 0) + (this.kills || 0);
+  }
+
+  bankKills() {
+    if (!(this.kills > 0)) return;
+    this.killsBank = (this.killsBank || 0) + this.kills;
+    this.kills = 0;
+    this.hud.setKills(this.killsShown());
   }
 
   buyUpgrade(id) {
@@ -4303,7 +4317,7 @@ export class Game {
     this.kills = 0;
     this.lives -= 1;
     this.hud.setLives(Math.max(0, this.lives));
-    this.hud.setKills(0);
+    this.hud.setKills(this.killsShown());
     this.cargo = 0;
     this.ship.setCargo(0);
     this.hud.setOre(0, this.hub.ore, this.hub.upgradeName());
@@ -4627,6 +4641,7 @@ export class Game {
           this.dockOpen = true;
           this.depositOre();
           this.cashKillBounty();
+          this.bankKills();
           this.reloadMissiles();
           this.refreshDock();
           this.hud.showDock(this.shipId);
