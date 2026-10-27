@@ -651,22 +651,22 @@ export class Ship {
     this.strafe = 0;
 
     const facing = Math.abs(wrapDelta(this.rotation - desired, Math.PI * 2));
-    if (dist > 220 && facing < 0.55) {
-      this.surge = 1;
+    if (dist > 40 && facing < 0.7) {
+      this.surge = dist > 180 ? 1 : 0.55;
       const accel = this.thrust() * dt;
       this.vx += Math.cos(desired) * accel;
       this.vy += Math.sin(desired) * accel;
     } else {
-      this.surge = dist > 90 ? 0.35 : 0;
-      this.vx *= 0.9;
-      this.vy *= 0.9;
+      this.surge = 0;
+      this.vx *= 0.82;
+      this.vy *= 0.82;
     }
 
     const drag = Math.pow(1 - shipConfig.drag, dt);
     this.vx *= drag;
     this.vy *= drag;
     const speed = Math.hypot(this.vx, this.vy);
-    const cap = dist < 260 ? 90 * this.speedMul() : this.maxSpeed();
+    const cap = dist < 180 ? 80 * this.speedMul() : this.maxSpeed();
     if (speed > cap) {
       this.vx *= cap / speed;
       this.vy *= cap / speed;

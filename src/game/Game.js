@@ -4644,6 +4644,10 @@ export class Game {
         if (this.hub.tryDock(this.ship)) {
           this.homeOn = false;
           this.sfx("dock");
+        } else if (this.overHub() && this.ship.undockLock <= 0) {
+          this.hub.forceDock(this.ship);
+          this.homeOn = false;
+          this.sfx("dock");
         }
       } else {
         this.ship.update(t, this.input, space);

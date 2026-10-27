@@ -137,7 +137,6 @@ export const warp = {
   range: 2560,
   duration: 1,
   cooldown: 2.4,
-  stopShort: 160,
 };
 
 export const bullets = {
