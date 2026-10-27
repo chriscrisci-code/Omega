@@ -86,6 +86,7 @@ body.is-scoreboard #game {
 
 .ore-label,
 .xp-label,
+.ships-label,
 .shield-label,
 .special-label,
 [data-label="pts"] {
@@ -130,6 +131,7 @@ body.is-scoreboard #game {
 
 #score,
 #lives,
+#kills,
 #ore,
 #xp {
   min-height: 34px;
@@ -141,6 +143,8 @@ body.is-scoreboard #game {
 }
 
 #lives .vector-text,
+#kills .vector-text,
+[data-label="kills"] .vector-text,
 [data-label="ships"] .vector-text,
 [data-label="shield"] .vector-text,
 [data-label="special"] .vector-text,

@@ -260,6 +260,7 @@ export class Game {
     this.attractThenTitle = false;
     this.ace = 0;
     this.bestAce = 0;
+    this.kills = 0;
     this.attractTimer = ATTRACT_HOLD;
     this.attractScene = 0;
     this.attractAge = 0;
@@ -301,6 +302,7 @@ export class Game {
     this.hud.setXp(this.xp);
     this.hud.setPoints(this.points);
     this.hud.setLives(0);
+    this.hud.setKills(0);
     this.hud.setShield(0, false, shieldConfig.max);
     this.hud.setSpecial("WARP EMP MSL");
     this.hud.setOre(0, 0, "");
@@ -1188,6 +1190,7 @@ export class Game {
     this.runDirty = false;
     this.ace = 0;
     this.bestAce = 0;
+    this.kills = 0;
     this.wave = 1;
     this.waveCooldown = 0;
     this.homeOn = false;
@@ -1252,6 +1255,7 @@ export class Game {
     this.hud.setXp(this.xp);
     this.hud.setPoints(this.points);
     this.hud.setLives(this.lives);
+    this.hud.setKills(this.kills);
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
     this.refreshDock();
     this.syncMissileHud();
@@ -1614,7 +1618,9 @@ export class Game {
     const n = this.acePoints(role);
     if (!n) return;
     this.ace += n;
+    this.kills += n;
     if (this.ace > this.bestAce) this.bestAce = this.ace;
+    this.hud.setKills(this.kills);
   }
 
   stopAttract() {
@@ -4294,8 +4300,10 @@ export class Game {
     this.sfx("die");
     this.homeOn = false;
     this.ace = 0;
+    this.kills = 0;
     this.lives -= 1;
     this.hud.setLives(Math.max(0, this.lives));
+    this.hud.setKills(0);
     this.cargo = 0;
     this.ship.setCargo(0);
     this.hud.setOre(0, this.hub.ore, this.hub.upgradeName());

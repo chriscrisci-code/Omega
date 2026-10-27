@@ -24,6 +24,7 @@ export class Hud {
     this.points = document.querySelector("#points");
     this.hubOre = document.querySelector("#hub-ore");
     this.lives = document.querySelector("#lives");
+    this.kills = document.querySelector("#kills");
     this.center = document.querySelector("#center");
     this.cta = document.querySelector("#cta");
     this.title = this.center.querySelector("h1");
@@ -104,6 +105,8 @@ export class Hud {
     this.paint(document.querySelector("[data-label=pts]"), "LOADOUT", 10, DIM, CYAN, "center");
     this.setXp(0);
     this.setPoints(0);
+    this.paint(document.querySelector("[data-label=kills]"), "KILLS", 10, DIM, CYAN, "right");
+    this.setKills(0);
     this.paint(document.querySelector("[data-label=ships]"), "SHIPS", 10, DIM, CYAN, "right");
     this.paint(document.querySelector("[data-label=shield]"), "SHIELD", 10, DIM, CYAN, "right");
     this.paint(document.querySelector("[data-label=special]"), "WHEEL", 10, DIM, CYAN, "right");
@@ -172,6 +175,10 @@ export class Hud {
     }
     this.mode.hidden = false;
     this.paint(this.mode, label, label.length > 16 ? 7 : 11, CYAN, HOT, "center");
+  }
+
+  setKills(count) {
+    this.paint(this.kills, String(Math.max(0, Math.floor(Number(count) || 0))), 26, CYAN, HOT, "right");
   }
 
   setLives(count) {
