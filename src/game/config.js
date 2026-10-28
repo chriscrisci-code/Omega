@@ -450,19 +450,12 @@ export const particles = {
 };
 
 export const bloom = {
-  threshold: 0.28,
-  bloomScale: 1.45,
-  brightness: 1.08,
-  blur: 6,
-  quality: 4,
+  threshold: 0.34,
+  bloomScale: 1.2,
+  brightness: 1.0,
+  blur: 5,
+  quality: 3,
   resolution: 1,
-  adaptBlur: 4,
-  adaptQuality: 2,
-  adaptLow: 50,
-  adaptHigh: 62,
-  adaptDown: 1.2,
-  adaptUp: 4,
-  adaptWarm: 2.5,
 };
 
 export const extraLifeEvery = 10000;
