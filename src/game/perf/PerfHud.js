@@ -139,6 +139,7 @@ export class PerfHud {
       `Shards   ${ratio(counts.shards, counts.shardsPool)}`,
       `Ores     ${ratio(counts.ores, counts.oresPool)}`,
       `Filters  ${counts.filters ?? "n/a"}`,
+      `Bloom    ${fmt(counts.bloomRes ?? 1)}`,
       `Draws    ${pixi.draws}`,
       `Textures ${pixi.textures}`,
     ].join("\n");

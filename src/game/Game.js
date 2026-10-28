@@ -24,7 +24,7 @@ import { ParticlePool } from "./particles/ParticlePool.js";
 import { ShipsGallery } from "./ships/ShipsGallery.js";
 import { FarGrid } from "./render/FarGrid.js";
 import { LockCam } from "./render/LockCam.js";
-import { createBloomFilter } from "./render/bloom.js";
+import { BloomAdapt, createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
 import { ALPHA, SCORE_BOARDS, insertAceScore, insertDailyAce, insertDailyScore, insertHighScore, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
@@ -104,6 +104,7 @@ export class Game {
     this.fxRoot = new Container();
     this.fxRoot.addChild(this.world);
     this.fxRoot.filters = [createBloomFilter()];
+    this.bloomAdapt = new BloomAdapt(this.fxRoot.filters[0]);
     this.fxFilterArea = new Rectangle(0, 0, 1, 1);
     this.fxRoot.filterArea = this.fxFilterArea;
     this.pips = new HudMarkers();
@@ -4536,6 +4537,7 @@ export class Game {
   }
 
   update(dt) {
+    this.bloomAdapt?.tick(dt);
     const t = Math.min(dt, 1 / 20);
     const screen = this.app.screen;
     const space = this.space();
@@ -5329,6 +5331,7 @@ export class Game {
       ores: live(this.ores),
       oresPool: this.ores.length,
       filters: (this.fxRoot.filters?.length || 0) + (this.hangar?.view.filters?.length || 0),
+      bloomRes: this.bloomAdapt?.res ?? 1,
     };
   }
 

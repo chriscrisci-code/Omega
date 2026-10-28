@@ -456,6 +456,12 @@ export const bloom = {
   blur: 6,
   quality: 4,
   resolution: 1,
+  adaptMin: 0.5,
+  adaptLow: 48,
+  adaptHigh: 64,
+  adaptDown: 1.2,
+  adaptUp: 4,
+  adaptWarm: 2.5,
 };
 
 export const extraLifeEvery = 10000;
