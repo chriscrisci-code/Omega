@@ -5331,7 +5331,7 @@ export class Game {
       ores: live(this.ores),
       oresPool: this.ores.length,
       filters: (this.fxRoot.filters?.length || 0) + (this.hangar?.view.filters?.length || 0),
-      bloomRes: this.bloomAdapt?.res ?? 1,
+      bloomTier: this.bloomAdapt?.tier ?? "full",
     };
   }
 

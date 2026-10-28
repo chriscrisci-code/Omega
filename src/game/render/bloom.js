@@ -3,10 +3,11 @@ import { bloom as bloomConfig } from "../config.js";
 
 const SAMPLE = 120;
 
-function p99fps(buf, n) {
+function meanFps(buf, n) {
   if (!n) return 60;
-  const copy = Array.from(buf.subarray(0, n)).sort((a, b) => a - b);
-  const ms = copy[Math.min(n - 1, Math.floor(n * 0.99))];
+  let sum = 0;
+  for (let i = 0; i < n; i += 1) sum += buf[i];
+  const ms = sum / n;
   return ms > 0 ? 1000 / ms : 60;
 }
 
@@ -28,11 +29,11 @@ export class BloomAdapt {
     this.buf = new Float32Array(SAMPLE);
     this.i = 0;
     this.n = 0;
-    this.res = bloomConfig.resolution;
+    this.tier = "full";
     this.down = 0;
     this.up = 0;
     this.warm = bloomConfig.adaptWarm ?? 2.5;
-    if (filter) filter.resolution = this.res;
+    this.apply("full");
   }
 
   tick(dt) {
@@ -44,21 +45,19 @@ export class BloomAdapt {
     if (this.n < SAMPLE) this.n += 1;
     if (this.n < 45) return;
 
-    const low = p99fps(this.buf, this.n);
-    const minRes = bloomConfig.adaptMin ?? 0.5;
-    const full = bloomConfig.resolution ?? 1;
-    if (low < (bloomConfig.adaptLow ?? 48)) {
+    const fps = meanFps(this.buf, this.n);
+    if (fps < (bloomConfig.adaptLow ?? 50)) {
       this.down += dt;
       this.up = 0;
-      if (this.down >= (bloomConfig.adaptDown ?? 1.2) && this.res > minRes) {
-        this.set(minRes);
+      if (this.down >= (bloomConfig.adaptDown ?? 1.2) && this.tier !== "low") {
+        this.apply("low");
         this.down = 0;
       }
-    } else if (low > (bloomConfig.adaptHigh ?? 64)) {
+    } else if (fps > (bloomConfig.adaptHigh ?? 62)) {
       this.up += dt;
       this.down = 0;
-      if (this.up >= (bloomConfig.adaptUp ?? 4) && this.res < full) {
-        this.set(full);
+      if (this.up >= (bloomConfig.adaptUp ?? 4) && this.tier !== "full") {
+        this.apply("full");
         this.up = 0;
       }
     } else {
@@ -67,8 +66,13 @@ export class BloomAdapt {
     }
   }
 
-  set(res) {
-    this.res = res;
-    this.filter.resolution = res;
+  apply(tier) {
+    this.tier = tier;
+    const filter = this.filter;
+    if (!filter) return;
+    const low = tier === "low";
+    filter.resolution = bloomConfig.resolution;
+    filter.blur = low ? (bloomConfig.adaptBlur ?? 4) : bloomConfig.blur;
+    filter.quality = low ? (bloomConfig.adaptQuality ?? 2) : bloomConfig.quality;
   }
 }
