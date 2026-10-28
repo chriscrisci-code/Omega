@@ -20,6 +20,12 @@ function fmt(value, digits = 1) {
   return Number.isFinite(value) ? value.toFixed(digits) : "n/a";
 }
 
+function ratio(live, pool) {
+  if (!Number.isFinite(live)) return "n/a";
+  if (!Number.isFinite(pool)) return String(live);
+  return `${live}/${pool}`;
+}
+
 function pixiStats(renderer) {
   let draws = "n/a";
   let textures = "n/a";
@@ -124,13 +130,15 @@ export class PerfHud {
       `1% low   ${fmt(lowFps, 0)}`,
       `JS       ${fmt(mean(this.js, this.n))} ms`,
       `Draw     ${fmt(mean(this.draw, this.n))} ms`,
-      `Sprites  ${counts.sprites ?? "n/a"}`,
-      `FX       ${counts.fx ?? "n/a"}`,
-      `Shots    ${counts.shots ?? "n/a"}`,
-      `Missiles ${counts.missiles ?? "n/a"}`,
-      `Foes     ${counts.foes ?? "n/a"}`,
+      `Sprites  ${ratio(counts.sprites, counts.spritesPool)}`,
+      `FX       ${ratio(counts.fx, counts.fxPool)}`,
+      `Shots    ${ratio(counts.shots, counts.shotsPool)}`,
+      `Missiles ${ratio(counts.missiles, counts.missilesPool)}${Number.isFinite(counts.missilesOn) ? ` vis ${counts.missilesOn}` : ""}`,
+      `Foes     ${ratio(counts.foes, counts.foesPool)}`,
       `Rocks    ${counts.rocks ?? "n/a"}`,
-      `Shards   ${counts.shards ?? "n/a"}`,
+      `Shards   ${ratio(counts.shards, counts.shardsPool)}`,
+      `Ores     ${ratio(counts.ores, counts.oresPool)}`,
+      `Filters  ${counts.filters ?? "n/a"}`,
       `Draws    ${pixi.draws}`,
       `Textures ${pixi.textures}`,
     ].join("\n");

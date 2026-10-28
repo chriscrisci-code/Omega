@@ -58,6 +58,10 @@ export class ParticlePool {
     return n;
   }
 
+  poolSize() {
+    return this.items.length;
+  }
+
   emit(count, options) {
     const {
       x,

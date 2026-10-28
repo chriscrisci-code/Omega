@@ -5302,14 +5302,33 @@ export class Game {
       }
       return n;
     };
+    const shown = (list) => {
+      let n = 0;
+      for (const item of list) if (item?.view?.visible) n += 1;
+      return n;
+    };
+    let spritesOn = 0;
+    for (const child of this.vectors.children) if (child.visible) spritesOn += 1;
+    const shotPool = this.shots.length + this.hostileShots.length;
+    const missilePool = this.missiles.length + this.hubMissiles.length + this.castleStars.length;
     return {
-      sprites: this.vectors.children.length,
+      sprites: spritesOn,
+      spritesPool: this.vectors.children.length,
       fx: this.fx.aliveCount(),
+      fxPool: this.fx.poolSize(),
       shots: live(this.shots) + live(this.hostileShots),
+      shotsPool: shotPool,
       missiles: live(this.missiles) + live(this.hubMissiles) + live(this.castleStars),
+      missilesOn: shown(this.missiles) + shown(this.hubMissiles) + shown(this.castleStars),
+      missilesPool: missilePool,
       foes: live(this.enemies),
-      rocks: live(this.asteroids),
+      foesPool: this.enemies.length,
+      rocks: this.asteroids.length,
       shards: live(this.shards),
+      shardsPool: this.shards.length,
+      ores: live(this.ores),
+      oresPool: this.ores.length,
+      filters: (this.fxRoot.filters?.length || 0) + (this.hangar?.view.filters?.length || 0),
     };
   }
 
