@@ -1488,3 +1488,52 @@ body.is-phone .ships-link {
   height: 1px;
   transform: translateY(-50%);
 }
+
+#perf-hud {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 30;
+  pointer-events: none;
+  font-family: "Share Tech Mono", "Cascadia Mono", ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #8ef6ff;
+  background: rgba(5, 6, 10, 0.72);
+  border: 1px solid rgba(142, 246, 255, 0.28);
+  padding: 8px 10px 6px;
+  min-width: 168px;
+}
+
+#perf-stats {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  white-space: pre;
+}
+
+#perf-hud .perf-toggles {
+  pointer-events: auto;
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  cursor: default;
+}
+
+#perf-hud label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: #8ef6ff;
+}
+
+#perf-hud input {
+  margin: 0;
+  accent-color: #66e0ff;
+  cursor: pointer;
+}
+
+body.perf-no-crt #crt {
+  display: none;
+}

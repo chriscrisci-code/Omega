@@ -1,6 +1,12 @@
 import { Texture } from "pixi.js";
 import { particles } from "../config.js";
 
+let glowPass = true;
+
+export function setGlowPass(on) {
+  glowPass = Boolean(on);
+}
+
 export function createGlowTexture(size = particles.textureSize) {
   const canvas = document.createElement("canvas");
   canvas.width = size;
@@ -18,8 +24,10 @@ export function createGlowTexture(size = particles.textureSize) {
 }
 
 export function strokeGlow(graphics, points, color, hotColor, width = 1.6) {
-  graphics.poly(points, true);
-  graphics.stroke({ width: width * 3.2, color, alpha: 0.2, join: "round" });
+  if (glowPass) {
+    graphics.poly(points, true);
+    graphics.stroke({ width: width * 3.2, color, alpha: 0.2, join: "round" });
+  }
   graphics.poly(points, true);
   graphics.stroke({ width, color: hotColor, alpha: 1, join: "round" });
 }
@@ -30,8 +38,10 @@ export function strokeLine(graphics, points, color, hotColor, width = 1.6) {
     graphics.moveTo(points[0], points[1]);
     for (let i = 2; i < points.length; i += 2) graphics.lineTo(points[i], points[i + 1]);
   };
-  draw();
-  graphics.stroke({ width: width * 3.2, color, alpha: 0.2, join: "round", cap: "round" });
+  if (glowPass) {
+    draw();
+    graphics.stroke({ width: width * 3.2, color, alpha: 0.2, join: "round", cap: "round" });
+  }
   draw();
   graphics.stroke({ width, color: hotColor, alpha: 1, join: "round", cap: "round" });
 }

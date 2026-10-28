@@ -32,9 +32,28 @@ async function start() {
 
   console.log("[omega] before new Game");
   const game = new Game(app, { storage: localStorageAdapter });
+  const wantPerf = new URLSearchParams(window.location.search).has("perf");
+  let perf = null;
+  if (wantPerf) {
+    const { PerfHud } = await import("./game/perf/PerfHud.js");
+    perf = new PerfHud(app, game);
+    let drawStart = 0;
+    const drawHook = {
+      prerender() {
+        drawStart = performance.now();
+      },
+      postrender() {
+        perf.noteDraw(performance.now() - drawStart);
+      },
+    };
+    app.renderer.runners?.prerender?.add(drawHook);
+    app.renderer.runners?.postrender?.add(drawHook);
+  }
   app.ticker.add((ticker) => {
     try {
+      const t0 = performance.now();
       game.update(ticker.deltaMS / 1000);
+      if (perf) perf.sample(ticker, performance.now() - t0);
     } catch (err) {
       console.error("[omega] update", err);
       game.bailAttractDemo?.();

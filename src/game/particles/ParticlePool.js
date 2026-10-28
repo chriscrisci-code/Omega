@@ -52,6 +52,12 @@ export class ParticlePool {
     this.container.boundsArea = new Rectangle(-80, -80, width + 160, height + 160);
   }
 
+  aliveCount() {
+    let n = 0;
+    for (const item of this.items) if (item.alive) n += 1;
+    return n;
+  }
+
   emit(count, options) {
     const {
       x,

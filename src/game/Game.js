@@ -5293,6 +5293,26 @@ export class Game {
     });
   }
 
+  perfSnapshot() {
+    const live = (list) => {
+      let n = 0;
+      for (const item of list) {
+        if (!item || item.alive === false) continue;
+        n += 1;
+      }
+      return n;
+    };
+    return {
+      sprites: this.vectors.children.length,
+      fx: this.fx.aliveCount(),
+      shots: live(this.shots) + live(this.hostileShots),
+      missiles: live(this.missiles) + live(this.hubMissiles) + live(this.castleStars),
+      foes: live(this.enemies),
+      rocks: live(this.asteroids),
+      shards: live(this.shards),
+    };
+  }
+
   applyMusicVol(value) {
     const vol = Math.max(0, Math.min(1, Math.round((Number(value) || 0) * 10) / 10));
     this.save.settings.music = vol;
