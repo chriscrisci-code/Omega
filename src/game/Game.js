@@ -304,7 +304,7 @@ export class Game {
     this.hud.setXp(this.xp);
     this.hud.setPoints(this.points);
     this.hud.setLives(0);
-    this.hud.setKills(0);
+    this.paintKills();
     this.hud.setShield(0, false, shieldConfig.max);
     this.hud.setSpecial("WARP EMP MSL");
     this.hud.setOre(0, 0, "");
@@ -1258,7 +1258,7 @@ export class Game {
     this.hud.setXp(this.xp);
     this.hud.setPoints(this.points);
     this.hud.setLives(this.lives);
-    this.hud.setKills(this.killsShown());
+    this.paintKills();
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
     this.refreshDock();
     this.syncMissileHud();
@@ -1624,7 +1624,7 @@ export class Game {
     if (this.ship?.docked) this.killsBank += n;
     else this.kills += n;
     if (this.ace > this.bestAce) this.bestAce = this.ace;
-    this.hud.setKills(this.killsShown());
+    this.paintKills();
   }
 
   stopAttract() {
@@ -2002,15 +2002,15 @@ export class Game {
     this.payKillUnits(units * home);
   }
 
-  killsShown() {
-    return (this.killsBank || 0) + (this.kills || 0);
+  paintKills() {
+    this.hud.setKills(this.kills || 0, this.killsBank || 0);
   }
 
   bankKills() {
     if (!(this.kills > 0)) return;
     this.killsBank = (this.killsBank || 0) + this.kills;
     this.kills = 0;
-    this.hud.setKills(this.killsShown());
+    this.paintKills();
   }
 
   buyUpgrade(id) {
@@ -4318,7 +4318,7 @@ export class Game {
     this.kills = 0;
     this.lives -= 1;
     this.hud.setLives(Math.max(0, this.lives));
-    this.hud.setKills(this.killsShown());
+    this.paintKills();
     this.cargo = 0;
     this.ship.setCargo(0);
     this.hud.setOre(0, this.hub.ore, this.hub.upgradeName());

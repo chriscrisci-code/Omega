@@ -177,8 +177,12 @@ export class Hud {
     this.paint(this.mode, label, label.length > 16 ? 7 : 11, CYAN, HOT, "center");
   }
 
-  setKills(count) {
-    this.paint(this.kills, String(Math.max(0, Math.floor(Number(count) || 0))), 26, CYAN, HOT, "right");
+  setKills(current = 0, banked = 0) {
+    const sortie = Math.max(0, Math.floor(Number(current) || 0));
+    const bank = Math.max(0, Math.floor(Number(banked) || 0));
+    const text = `${sortie}/${bank}`;
+    const size = text.length > 7 ? 20 : 26;
+    this.paint(this.kills, text, size, CYAN, HOT, "right");
   }
 
   setLives(count) {
