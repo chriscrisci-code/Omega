@@ -153,7 +153,7 @@ export class LockCam {
     return Math.max(0.55, Math.min(3.4, Math.min(this.w, this.h) / span));
   }
 
-  render(renderer, world, { screen, compact, placedX, placedY, radius, hide, scales, rotation = 0 }) {
+  render(renderer, world, { screen, compact, placedX, placedY, radius, hide, scales, rotation = 0, bloomHost }) {
     if (!this.active) {
       this.view.visible = false;
       return;
@@ -170,7 +170,7 @@ export class LockCam {
       px: world.pivot.x,
       py: world.pivot.y,
     };
-    const blooms = (world.filters || []).map((filter) => ({ filter, on: filter.enabled }));
+    const blooms = ((bloomHost || world).filters || []).map((filter) => ({ filter, on: filter.enabled }));
     const hidden = (hide || []).map((node) => ({ node, vis: node.visible }));
     const scaled = (scales || []).map((item) => ({ view: item.view, x: item.view.scale.x, y: item.view.scale.y }));
 

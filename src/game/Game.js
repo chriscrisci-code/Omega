@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle } from "pixi.js";
-import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, bloom as bloomConfig, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, hunter as hunterCfg, hunterScale, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, strike as strikeCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, hunter as hunterCfg, hunterScale, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, strike as strikeCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -100,14 +100,16 @@ export class Game {
     this.fx = new ParticlePool(createGlowTexture(), worldConfig.width, worldConfig.height);
     this.far = new FarGrid();
     this.world.addChild(this.far.view, this.vectors, this.fx.container);
-    this.world.filters = [createBloomFilter()];
-    this.worldFilterArea = new Rectangle(0, 0, 1, 1);
-    this.world.filterArea = this.worldFilterArea;
     this.world.scale.set(cameraConfig.zoom);
+    this.fxRoot = new Container();
+    this.fxRoot.addChild(this.world);
+    this.fxRoot.filters = [createBloomFilter()];
+    this.fxFilterArea = new Rectangle(0, 0, 1, 1);
+    this.fxRoot.filterArea = this.fxFilterArea;
     this.pips = new HudMarkers();
     this.hangar = new ShipsGallery();
     this.lockCam = new LockCam();
-    app.stage.addChild(this.world, this.pips.view, this.lockCam.view, this.hangar.view);
+    app.stage.addChild(this.fxRoot, this.pips.view, this.lockCam.view, this.hangar.view);
     this.hud.controlsLink?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -240,7 +242,6 @@ export class Game {
     this.camRot = 0;
     this.camZoom = cameraConfig.zoom;
     this.camOn = true;
-    this.filterAreaDirty = true;
     this.hubThreat = 0;
     this.hubThreatClose = false;
     this.hubAlertOn = false;
@@ -4355,7 +4356,17 @@ export class Game {
     this.camY = this.ship.y;
     this.camRot = this.headingUp();
     this.camZoom = this.playZoom();
-    this.filterAreaDirty = true;
+  }
+
+  syncBloomArea(screen) {
+    const w = Math.max(1, screen.width);
+    const h = Math.max(1, screen.height);
+    if (this.fxFilterArea.width === w && this.fxFilterArea.height === h) return;
+    this.fxFilterArea.x = 0;
+    this.fxFilterArea.y = 0;
+    this.fxFilterArea.width = w;
+    this.fxFilterArea.height = h;
+    this.fxRoot.filterArea = this.fxFilterArea;
   }
 
   placeView(entity, width, height) {
@@ -4389,19 +4400,7 @@ export class Game {
     this.world.pivot.set(this.camX, this.camY);
     this.world.position.set(screen.width / 2 + shakeX, screen.height / 2 + shakeY);
     this.world.rotation = this.camRot;
-    const zoom = Math.max(0.04, this.camZoom || this.playZoom());
-    const pad = bloomConfig.pad || 1.08;
-    const snap = bloomConfig.snap || 64;
-    const filterW = Math.max(snap, Math.ceil((screen.width * pad) / zoom / snap) * snap);
-    const filterH = Math.max(snap, Math.ceil((screen.height * pad) / zoom / snap) * snap);
-    this.worldFilterArea.x = this.camX - filterW * 0.5;
-    this.worldFilterArea.y = this.camY - filterH * 0.5;
-    if (this.filterAreaDirty || this.worldFilterArea.width !== filterW || this.worldFilterArea.height !== filterH) {
-      this.worldFilterArea.width = filterW;
-      this.worldFilterArea.height = filterH;
-      this.world.filterArea = this.worldFilterArea;
-      this.filterAreaDirty = false;
-    }
+    this.syncBloomArea(screen);
     this.far.sync(this.camX, this.camY, !mapping && this.mode !== SHIPS);
 
     const shipBoost = mapping ? 22 : this.attractOnDemo ? 1.45 : 1;
@@ -5290,6 +5289,7 @@ export class Game {
       hide: [this.far.view, this.lockMark, this.leadMark, this.sightMark],
       scales: [this.ship, ...this.enemies].filter((item) => item?.view),
       rotation: this.lockCam.sight ? this.railSightRot() : 0,
+      bloomHost: this.fxRoot,
     });
   }
 
