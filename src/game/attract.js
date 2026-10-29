@@ -7,7 +7,7 @@ export const DEMO_SHIPS = [DEFAULT_SHIP_ID, ASSAULT_ID, GUNSHIP_ID, SABRE_ID, AC
 export const ATTRACT_HOLD = 14;
 export const ATTRACT_PLAY = 10;
 export const ATTRACT_SCORES = 10;
-export const ATTRACT_FLASH = 0.5;
+export const ATTRACT_FLASH = 0.7;
 
 function placeShip(game, x, y, rotation, spec) {
   game.ship.reset(x, y);

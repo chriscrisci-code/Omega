@@ -1604,6 +1604,7 @@ export class Game {
   showScoreBoard() {
     const board = SCORE_BOARDS[this.attractBoard] || SCORE_BOARDS[0];
     this.hud.showScores(this.scoreBoardOf(board.id), board.title);
+    if (this.attractThenTitle) this.sfx("stab");
   }
 
   rankEntry() {

@@ -199,6 +199,30 @@ export class GameAudio {
     this.tone({ type: "sine", freq: freq * 1.5, dur: dur * 0.7, peak: peak * 0.45, at });
   }
 
+  stab({ root = 196, dur = 0.28, peak = 0.12, at = this.now() } = {}) {
+    const chord = [
+      [root, 1],
+      [root * 1.5, 0.78],
+      [root * 2, 0.55],
+      [root * 2.52, 0.42],
+    ];
+    for (const [freq, amt] of chord) {
+      this.tone({ type: "triangle", freq, dur, peak: peak * amt, attack: 0.002, at });
+      this.tone({ type: "sine", freq, dur: dur * 1.15, peak: peak * amt * 0.4, attack: 0.003, at });
+    }
+    this.gun({
+      dur: 0.05,
+      attack: 0.001,
+      noisePeak: 0.08,
+      cutoff: 2200,
+      endCutoff: 480,
+      q: 0.9,
+      type: "bandpass",
+      thumpPeak: 0,
+      at,
+    });
+  }
+
   enginePreview(kind) {
     const main = kind === "main";
     this.gun({
@@ -815,6 +839,10 @@ export const SFX = {
       audio.chime({ freq: 1320, dur: 0.22, peak: 0.08 });
     },
   },
+  stab: {
+    name: "STAB",
+    fire: (audio) => audio.stab(),
+  },
 };
 
 export const SFX_GROUPS = [
@@ -825,7 +853,7 @@ export const SFX_GROUPS = [
   { name: "ORE", ids: ["spawn", "ore", "dump", "up"] },
   { name: "STATION", ids: ["dock", "launch", "warn", "castle"] },
   { name: "SHIELD", ids: ["on", "off", "block", "pop"] },
-  { name: "SHIP", ids: ["life"] },
+  { name: "SHIP", ids: ["life", "stab"] },
 ];
 
 export const BULLET_SOUNDS = [
