@@ -26,7 +26,7 @@ import { FarGrid } from "./render/FarGrid.js";
 import { LockCam } from "./render/LockCam.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
-import { ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
+import { ATTRACT_FLASH, ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
 import { ALPHA, SCORE_BOARDS, insertAceScore, insertDailyAce, insertDailyScore, insertHighScore, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
 import { DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, unlockedShipIds } from "./ships/catalog.js";
@@ -259,6 +259,7 @@ export class Game {
     this.attractPage = "title";
     this.attractBoard = 0;
     this.attractThenTitle = false;
+    this.attractBoardHold = ATTRACT_SCORES;
     this.ace = 0;
     this.bestAce = 0;
     this.kills = 0;
@@ -1562,10 +1563,11 @@ export class Game {
     this.attractPage = page;
     this.attractBoard = 0;
     this.attractThenTitle = Boolean(options.thenTitle);
+    this.attractBoardHold = options.hold ?? ATTRACT_SCORES;
     this.attractAge = 0;
     this.attractCue = null;
     if (page === "scores") {
-      this.attractTimer = options.hold ?? ATTRACT_SCORES;
+      this.attractTimer = this.attractBoardHold;
       this.showScoreBoard();
       return;
     }
@@ -1574,7 +1576,7 @@ export class Game {
     this.hud.showTitle();
   }
 
-  goTitle() {
+  goTitle(options = {}) {
     this.leaveTunnel({ silent: true, dock: false });
     this.paused = false;
     this.initials = null;
@@ -1583,8 +1585,12 @@ export class Game {
     this.hud.hideDock();
     this.mode = TITLE;
     this.titleHold = 0.45;
-    this.hud.showTitle();
     this.syncMissileHud();
+    if (options.boards) {
+      this.beginAttractLoop("scores", { thenTitle: true, hold: ATTRACT_FLASH });
+      return;
+    }
+    this.hud.showTitle();
     this.beginAttractLoop("title");
   }
 
@@ -1735,19 +1741,17 @@ export class Game {
       if (this.attractPage === "title") {
         this.attractPage = "scores";
         this.attractBoard = 0;
-        this.attractTimer = ATTRACT_SCORES;
+        this.attractTimer = this.attractBoardHold || ATTRACT_SCORES;
         this.showScoreBoard();
       } else if (this.attractPage === "scores") {
         if (this.attractBoard < SCORE_BOARDS.length - 1) {
           this.attractBoard += 1;
-          this.attractTimer = this.attractThenTitle ? 3 : ATTRACT_SCORES;
+          this.attractTimer = this.attractBoardHold || ATTRACT_SCORES;
           this.showScoreBoard();
         } else if (this.attractThenTitle) {
           this.attractThenTitle = false;
-          this.attractPage = "title";
-          this.attractTimer = ATTRACT_HOLD;
-          this.mode = TITLE;
-          this.hud.showTitle();
+          this.titleHold = 0.45;
+          this.beginAttractLoop("title");
         } else {
           this.attractPage = "demo";
           this.openAttractDemo();
@@ -4221,7 +4225,7 @@ export class Game {
     this.save.highScore = this.save.highScores[0]?.score || this.score;
     this.storage.save(this.save);
     this.hud.setHigh(this.save.highScore);
-    this.goTitle();
+    this.goTitle({ boards: true });
   }
 
   tickInitials() {
@@ -4594,7 +4598,13 @@ export class Game {
       this.acceptContinue();
     } else if (this.mode === CONTINUE && this.input.selectPressed) {
       this.endRun("dead");
-    } else if (!this.pickingDevice && (this.mode === TITLE || this.mode === GAMEOVER) && this.titleHold <= 0 && this.input.startPressed) {
+    } else if (
+      !this.pickingDevice &&
+      !this.attractThenTitle &&
+      (this.mode === TITLE || this.mode === GAMEOVER) &&
+      this.titleHold <= 0 &&
+      this.input.startPressed
+    ) {
       this.offerStart();
     } else if (this.mode === PLAYING && !this.ship.docked) {
       this.shoot(t);
