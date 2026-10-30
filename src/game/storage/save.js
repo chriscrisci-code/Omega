@@ -1,4 +1,4 @@
-import { missiles, shipLevels } from "../config.js";
+import { missiles, shipLevels, xp } from "../config.js";
 import { guessProfile, normalizeBinds } from "../input/bindings.js";
 import { DEFAULT_SHIP_ID, PLAYABLE_SHIP_IDS, resolveShipId } from "../ships/catalog.js";
 
@@ -191,7 +191,7 @@ export function normalizeLoadout(data) {
     shield: clampLevel(src.shield, shipLevels.shield || 4),
     gunship: Math.max(0, Math.min(shipLevels.gunship || 2, Math.floor(Number(src.gunship) || 0))),
     points: Math.max(0, Math.floor(Number(src.points) || 0)),
-    bank: Math.max(0, Math.floor(Number(src.bank) || 0) % 3),
+    bank: Math.max(0, Math.floor(Number(src.bank) || 0) % (xp.orePerPoint || 5)),
     ammo,
   };
 }

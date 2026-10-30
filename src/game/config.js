@@ -462,15 +462,16 @@ export const extraLifeEvery = 10000;
 
 /** Ship stats and specials live in ships/kits.js. */
 
-/** Career XP. Persists across Continue and new runs. Not run score. */
+/** Career XP. Persists across Continue and new runs. Not run score.
+ *  Loadout points are ore only: dump orePerPoint flakes at the Hub for +1. */
 export const xp = {
   orePickup: 5,
   oreDump: 25,
+  orePerPoint: 5,
   upgrade: 40,
   killGun: 20,
   killShare: 3,
   killHome: 5,
-  killPoint: 1,
   shipUnlock: 30000,
 };
 

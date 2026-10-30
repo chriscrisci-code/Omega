@@ -2027,9 +2027,7 @@ export class Game {
     if (!n) return;
     const share = xpAwards.killShare || 3;
     const gun = xpAwards.killGun || 20;
-    const point = xpAwards.killPoint || 1;
     this.addXp(n * gun / share);
-    this.addPoints(n * point / share);
   }
 
   noteKillBounty(via) {
@@ -4135,9 +4133,10 @@ export class Game {
     this.cargo = 0;
     this.ship.setCargo(0);
     const result = this.hub.deposit(n);
+    const per = xpAwards.orePerPoint || 5;
     this.loadoutBank = (this.loadoutBank || 0) + n;
-    const gained = Math.floor(this.loadoutBank / 3);
-    this.loadoutBank -= gained * 3;
+    const gained = Math.floor(this.loadoutBank / per);
+    this.loadoutBank -= gained * per;
     this.addPoints(gained);
     this.addXp(n * xpAwards.oreDump);
     this.hud.setOre(0, this.hub.ore, this.hub.upgradeName());
