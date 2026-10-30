@@ -1622,9 +1622,17 @@ export class Game {
     return 0;
   }
 
+  gunVia(shot) {
+    const kit = shot?.kit || "";
+    if (kit === "rail") return "rail";
+    if (kit === "aiTurret") return "turret";
+    if (kit === "hub") return "hub";
+    return "shot";
+  }
+
   noteAce(via, role) {
     if (this.attractOnDemo || this.mode !== PLAYING) return;
-    if (via === "emp" || via === "missile" || via === "hole") return;
+    if (via !== "shot" && via !== "rail" && via !== "hub") return;
     const n = this.acePoints(role);
     if (!n) return;
     this.ace += n;
@@ -2248,7 +2256,7 @@ export class Game {
     const bullet = this.shots.find((shot) => !shot.alive);
     if (!bullet) return;
     const muzzle = this.gunnerOrigin();
-    bullet.fire(muzzle.x, muzzle.y, this.hubGunAngle);
+    bullet.fire(muzzle.x, muzzle.y, this.hubGunAngle, { kit: "hub" });
     this.cooldown = hubGunner.gunCool;
     this.sfx("thud");
   }
@@ -2299,7 +2307,7 @@ export class Game {
       vx: Math.cos(this.hubGunAngle) * 220,
       vy: Math.sin(this.hubGunAngle) * 220,
     };
-    if (kind === "enemy") this.chipEnemy(hit, impact);
+    if (kind === "enemy") this.chipEnemy(hit, impact, 1, "hub");
     else if (kind === "station") this.chipStationPart(hit, impact);
     else this.chipRock(hit, impact);
   }
@@ -3621,7 +3629,7 @@ export class Game {
       amount = leftover;
     }
     const hits = this.ship.turretsCfg()?.hits || 3;
-    const fromTurret = impact?.kit === "aiTurret" && (enemy.role === "hunter" || enemy.role === "raider");
+    const fromTurret = (via === "turret" || impact?.kit === "aiTurret") && (enemy.role === "hunter" || enemy.role === "raider");
     if (fromTurret) {
       enemy.hp -= (enemy.maxHp || hits) / hits;
       if (enemy.hp < 0.02) enemy.hp = 0;
@@ -4989,7 +4997,7 @@ export class Game {
           if (!shot.alive || shot.ignore === enemy) continue;
           if (!hitsBeam(shot, enemy, shot.streak || bullets.streak, space.width, space.height)) continue;
           if (shot.kit !== "rail" && enemy.role === "destroyer" && enemy.shieldHp > 0 && Math.random() < destroyerConfig.ricochet) {
-            this.chipEnemy(enemy, shot, shot.hits || 1);
+            this.chipEnemy(enemy, shot, shot.hits || 1, this.gunVia(shot));
             this.bounceShot(shot, enemy, space);
             continue;
           }
@@ -4997,8 +5005,9 @@ export class Game {
           const dmg = shot.hits || 1;
           const burst = shot.burst || "";
           const at = { x: shot.x, y: shot.y };
+          const via = this.gunVia(shot);
+          this.chipEnemy(enemy, shot, dmg, via);
           shot.kill();
-          this.chipEnemy(enemy, shot, dmg, rail ? "rail" : "shot");
           if (rail) this.burstRail(at, burst);
           break;
         }
