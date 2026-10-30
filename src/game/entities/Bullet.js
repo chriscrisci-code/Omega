@@ -12,6 +12,7 @@ export class Bullet {
     this.ignoreFor = 0;
     this.kit = "";
     this.hits = 1;
+    this.burst = "";
     this.streak = bullets.streak;
     this.alive = false;
     this.view.visible = false;
@@ -50,6 +51,7 @@ export class Bullet {
     this.ignore = null;
     this.ignoreFor = 0;
     this.kit = options.kit || "";
+    this.burst = options.burst || "";
     this.paint(options.color ?? colors.cyan, options.hot ?? colors.white, this.streak);
     this.view.visible = true;
     this.view.alpha = 1;
@@ -76,6 +78,7 @@ export class Bullet {
     this.alive = false;
     this.kit = "";
     this.hits = 1;
+    this.burst = "";
     this.streak = bullets.streak;
     this.view.visible = false;
   }

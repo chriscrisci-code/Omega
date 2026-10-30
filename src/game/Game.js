@@ -2046,13 +2046,8 @@ export class Game {
       this.fireWasOn = this.input.fireHeld;
       return;
     }
-    if (this.attractOnDemo && (this.ship.can("rockets") || this.ship.noseGunCfg?.()?.charge)) {
+    if (this.attractOnDemo && this.ship.noseGunCfg?.()?.charge) {
       this.ship.clearRail?.();
-      return;
-    }
-    if (this.ship.can("rockets")) {
-      this.ship.clearRail?.();
-      this.tickRockets();
       return;
     }
     const spec = this.ship.noseGunCfg?.();
@@ -2102,13 +2097,16 @@ export class Game {
       life: spec.life,
       hits: spec.hits,
       kit: "rail",
+      burst: spec.burst || "",
     });
-    this.railShot = bullet;
-    this.railLock = this.railPrey?.alive ? this.railPrey : null;
-    this.railHold = 0;
-    this.railAimX = muzzle.x;
-    this.railAimY = muzzle.y;
-    this.railAimA = this.ship.rotation;
+    if (spec.sight !== false) {
+      this.railShot = bullet;
+      this.railLock = this.railPrey?.alive ? this.railPrey : null;
+      this.railHold = 0;
+      this.railAimX = muzzle.x;
+      this.railAimY = muzzle.y;
+      this.railAimA = this.ship.rotation;
+    }
     const gun = this.gunTier();
     this.cooldown = (shipLevels.gunCool[gun - 1] ?? bullets.cooldown) * (spec.coolMul || 1);
     this.ship.clearRail();
@@ -2126,14 +2124,6 @@ export class Game {
     if (dual) this.gun ^= 1;
     this.cooldown = shipLevels.gunCool[gun - 1] ?? bullets.cooldown;
     this.sfx("thud");
-  }
-
-  tickRockets() {
-    const held = this.attractOnDemo || this.input.fireHeld;
-    this.fireWasOn = this.input.fireHeld;
-    if (!held || this.cooldown > 0) return;
-    if (!this.attractOnDemo && this.missileAmmo <= 0) return;
-    this.fireRocket();
   }
 
   fireRocket() {
@@ -2160,7 +2150,7 @@ export class Game {
       this.missileAmmo = Math.max(0, this.missileAmmo - 1);
       this.syncMissileHud();
     }
-    this.cooldown = spec.cool ?? rockets.cooldown ?? shipLevels.gunCool[0];
+    this.missileCool = spec.cool ?? rockets.cooldown ?? shipLevels.gunCool[0];
     this.sfx("thud");
   }
 
@@ -3189,7 +3179,14 @@ export class Game {
   }
 
   fireMissile() {
-    if (!this.ship.alive || this.ship.docked || !this.ship.can("missiles")) return;
+    if (!this.ship.alive || this.ship.docked) return;
+    if (this.ship.can("rockets")) {
+      if (this.missileCool > 0) return;
+      if (!this.attractOnDemo && this.missileAmmo <= 0) return;
+      this.fireRocket();
+      return;
+    }
+    if (!this.ship.can("missiles")) return;
     if (this.missileCool > 0) return;
     const want = this.ship.missileVolley();
     let left = this.attractOnDemo ? want : this.missileAmmo;
@@ -3485,10 +3482,24 @@ export class Game {
     missile.kill(Boolean(missile.star));
   }
 
-  burstRail(at) {
+  burstRail(at, burst = "") {
     if (!at) return;
-    this.spawnMissileBurst(at.x, at.y, missiles.color ?? colors.cyan, missiles.hot ?? colors.cyanHot);
-    this.shake = Math.max(this.shake, 12);
+    const rocket = burst === "rocket";
+    this.spawnMissileBurst(
+      at.x,
+      at.y,
+      missiles.color ?? colors.cyan,
+      missiles.hot ?? colors.cyanHot,
+      rocket
+        ? {
+            count: rockets.rays,
+            range: rockets.rayRange,
+            lifeMin: rockets.rayLifeMin,
+            lifeMax: rockets.rayLifeMax,
+          }
+        : {},
+    );
+    this.shake = Math.max(this.shake, rocket ? 6 : 12);
     this.sfx("boom");
   }
 
@@ -4959,10 +4970,11 @@ export class Game {
           if (shot.alive && hitsBeam(shot, rock, shot.streak || bullets.streak, space.width, space.height)) {
             const rail = shot.kit === "rail";
             const dmg = shot.hits || 1;
+            const burst = shot.burst || "";
             const at = { x: shot.x, y: shot.y };
             shot.kill();
             this.chipRock(rock, shot, dmg);
-            if (rail) this.burstRail(at);
+            if (rail) this.burstRail(at, burst);
             break;
           }
         }
@@ -4980,10 +4992,11 @@ export class Game {
           }
           const rail = shot.kit === "rail";
           const dmg = shot.hits || 1;
+          const burst = shot.burst || "";
           const at = { x: shot.x, y: shot.y };
           shot.kill();
           this.chipEnemy(enemy, shot, dmg, rail ? "rail" : "shot");
-          if (rail) this.burstRail(at);
+          if (rail) this.burstRail(at, burst);
           break;
         }
       }
@@ -4994,10 +5007,11 @@ export class Game {
           if (!hitsBeam(shot, part, shot.streak || bullets.streak, space.width, space.height)) continue;
           const rail = shot.kit === "rail";
           const dmg = shot.hits || 1;
+          const burst = shot.burst || "";
           const at = { x: shot.x, y: shot.y };
           shot.kill();
           this.chipStationPart(part, shot, dmg);
-          if (rail) this.burstRail(at);
+          if (rail) this.burstRail(at, burst);
           break;
         }
       }
