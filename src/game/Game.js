@@ -1391,7 +1391,7 @@ export class Game {
 
   confirmStart(id) {
     if (id === "new") {
-      this.offerWavePick();
+      this.startRun(1);
       return;
     }
     this.loadSlot(id);
