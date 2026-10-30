@@ -152,6 +152,7 @@ export class Input {
       this.hasPointer = false;
       this.leftHeld = false;
       this.rightHeld = false;
+      this.mouseHeld = { 0: false, 1: false, 2: false };
     });
     window.addEventListener("gamepadconnected", () => {
       this.padConnected = true;
@@ -472,6 +473,11 @@ export class Input {
 
   get missilePressed() {
     return this._missileTicks > 0 || this.keysPressed("missile") || this.padEdge("missile");
+  }
+
+  get missileHeld() {
+    if (this.layout === "phone") return this.keysDown("missile") || this.padDown("missile");
+    return this.keysDown("missile") || this.mouseDown("missile") || this.padDown("missile");
   }
 
   get mapHeld() {

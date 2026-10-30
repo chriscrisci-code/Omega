@@ -2126,6 +2126,13 @@ export class Game {
     this.sfx("thud");
   }
 
+  tickRockets() {
+    const held = this.attractOnDemo || this.input.missileHeld;
+    if (!held || this.missileCool > 0) return;
+    if (!this.attractOnDemo && this.missileAmmo <= 0) return;
+    this.fireRocket();
+  }
+
   fireRocket() {
     const bolt = this.missiles.find((item) => !item.alive);
     if (!bolt) return;
@@ -3179,14 +3186,7 @@ export class Game {
   }
 
   fireMissile() {
-    if (!this.ship.alive || this.ship.docked) return;
-    if (this.ship.can("rockets")) {
-      if (this.missileCool > 0) return;
-      if (!this.attractOnDemo && this.missileAmmo <= 0) return;
-      this.fireRocket();
-      return;
-    }
-    if (!this.ship.can("missiles")) return;
+    if (!this.ship.alive || this.ship.docked || !this.ship.can("missiles")) return;
     if (this.missileCool > 0) return;
     const want = this.ship.missileVolley();
     let left = this.attractOnDemo ? want : this.missileAmmo;
@@ -4626,7 +4626,10 @@ export class Game {
     if (this.mode === PLAYING && this.input.warpPressed) this.fireWarp();
     if (this.mode === PLAYING && !this.ship.docked && this.input.empPressed) this.fireEmp();
     if (this.mode === PLAYING && !this.ship.docked && this.input.holePressed) this.fireHole();
-    if (this.mode === PLAYING && !this.ship.docked && this.input.missilePressed) this.fireMissile();
+    if (this.mode === PLAYING && !this.ship.docked) {
+      if (this.ship.can("rockets")) this.tickRockets();
+      else if (this.input.missilePressed) this.fireMissile();
+    }
     if (this.mode === PLAYING && this.input.mapHeld && this.input.selectPressed) this.selectAtPointer();
     if (this.mode === PLAYING && this.input.lockPressed) this.lockAtCrosshairs();
 
