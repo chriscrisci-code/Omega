@@ -330,6 +330,7 @@ export class Hud {
 
   paintWavePick(maxWave, selected) {
     if (!this.waveRow) return;
+    this.waveRow.classList.toggle("is-slots", false);
     const max = Math.max(1, Math.floor(Number(maxWave) || 1));
     const on = Math.max(1, Math.min(max, Math.floor(Number(selected) || 1)));
     this.waveRow.innerHTML = "";
@@ -349,20 +350,20 @@ export class Hud {
   }
 
   hideWavePick() {
-    this.center?.classList.remove("is-wave");
+    this.center?.classList.remove("is-wave", "is-save-pick");
     this.wavePick?.classList.add("is-hidden");
   }
 
-  showStartPick(label, selected) {
+  showStartPick(slots, selected) {
     this.attract(true);
     this.setAttractDemo(false);
-    this.center.classList.remove("is-hidden", "is-scores", "is-initials", "is-hub-over");
+    this.center.classList.remove("is-hidden", "is-scores", "is-initials", "is-hub-over", "is-save-pick");
     this.center.classList.add("is-wave");
     this.title.innerHTML = "";
-    this.paint(this.tag, label || "SAVE", 18, MAGENTA, PINK, "center");
-    this.paintStartPick(selected);
+    this.paint(this.tag, "START", 18, MAGENTA, PINK, "center");
+    this.paintSlotPick(slots, selected, true);
     this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP TO START" : "FIRE START", 18, CYAN, HOT);
-    this.paint(this.credit, this.layout === "phone" ? "TAP A CHOICE" : "WHEEL OR ARROWS   ESC", 8, DIM, CYAN, "center");
+    this.paint(this.credit, this.layout === "phone" ? "TAP A CHOICE" : "1-5 SLOT   WHEEL   ESC", 8, DIM, CYAN, "center");
     this.shipsPage?.classList.add("is-hidden");
     this.hideScores();
     this.hideContinue();
@@ -370,24 +371,69 @@ export class Hud {
     this.setMode("");
   }
 
-  paintStartPick(selected) {
+  showSavePick(slots, selected) {
+    this.attract(false);
+    this.setAttractDemo(false);
+    this.center.classList.remove("is-hidden", "is-scores", "is-initials", "is-hub-over");
+    this.center.classList.add("is-wave", "is-save-pick");
+    this.title.innerHTML = "";
+    this.paint(this.tag, "SAVE", 18, MAGENTA, PINK, "center");
+    this.paintSlotPick(slots, selected, false);
+    this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP A SLOT" : "FIRE SAVE", 18, CYAN, HOT);
+    this.paint(this.credit, this.layout === "phone" ? "TAP A SLOT" : "1-5 SLOT   ESC CANCEL", 8, DIM, CYAN, "center");
+    this.shipsPage?.classList.add("is-hidden");
+    this.hideScores();
+    this.hideContinue();
+    this.setHubAlert(null);
+    this.setMode("SAVE");
+  }
+
+  paintSlotPick(slots, selected, includeNew) {
     if (!this.waveRow) return;
-    const on = selected === "new" ? "new" : "continue";
-    const rows = [
-      { id: "continue", name: "CONTINUE" },
-      { id: "new", name: "NEW GAME" },
-    ];
     this.waveRow.innerHTML = "";
-    for (const row of rows) {
-      const lit = row.id === on;
+    this.waveRow.classList.toggle("is-slots", true);
+    if (includeNew) {
+      const lit = selected === "new";
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = `wave-btn start-btn${lit ? " is-on" : ""}`;
-      btn.innerHTML = vectorTextSvg(row.name, lit ? 16 : 13, lit ? CYAN : DIM, lit ? HOT : CYAN, "center");
+      btn.innerHTML = vectorTextSvg("NEW GAME", lit ? 14 : 12, lit ? CYAN : DIM, lit ? HOT : CYAN, "center");
       btn.addEventListener("pointerdown", (event) => {
         event.preventDefault();
         event.stopPropagation();
-        this.onPickStart?.(row.id);
+        this.onPickStart?.("new");
+      });
+      this.waveRow.appendChild(btn);
+    }
+    const list = Array.isArray(slots) ? slots : [];
+    for (let i = 0; i < 5; i += 1) {
+      const slot = list[i];
+      const filled = Boolean(slot?.checkpoint);
+      const lit = selected === i;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `wave-btn slot-btn${lit ? " is-on" : ""}${filled ? "" : " is-empty"}`;
+      const thumb = document.createElement("span");
+      thumb.className = "slot-thumb";
+      if (slot?.thumb) {
+        const img = document.createElement("img");
+        img.alt = "";
+        img.src = slot.thumb;
+        thumb.appendChild(img);
+      }
+      const label = document.createElement("span");
+      label.className = "slot-label";
+      const title = `SLOT ${i + 1}`;
+      const sub = filled ? `WAVE  ${slot.wave || slot.checkpoint?.wave || 1}` : "EMPTY";
+      label.innerHTML =
+        vectorTextSvg(title, lit ? 11 : 10, lit ? CYAN : DIM, lit ? HOT : CYAN, "center") +
+        vectorTextSvg(sub, 8, filled ? CYAN : DIM, filled ? HOT : CYAN, "center");
+      btn.appendChild(thumb);
+      btn.appendChild(label);
+      btn.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.onPickStart?.(i);
       });
       this.waveRow.appendChild(btn);
     }

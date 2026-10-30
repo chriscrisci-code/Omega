@@ -5,6 +5,7 @@ import { DEFAULT_SHIP_ID, PLAYABLE_SHIP_IDS, resolveShipId } from "../ships/cata
 const KEY = "vector-game-save";
 
 export const SCORE_SLOTS = 8;
+export const SAVE_SLOT_COUNT = 5;
 export const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 const DEFAULT_SCORES = [
@@ -57,6 +58,7 @@ const empty = {
     ammo: 6,
   },
   checkpoint: null,
+  slots: [null, null, null, null, null],
   settings: {
     fullscreen: false,
     difficulty: "easy",
@@ -234,6 +236,36 @@ export function normalizeCheckpoint(data) {
   };
 }
 
+function clipThumb(value) {
+  const text = String(value || "");
+  if (!text.startsWith("data:image/")) return "";
+  if (text.length > 140000) return "";
+  return text;
+}
+
+export function makeSlot(checkpoint, thumb = "") {
+  const cp = normalizeCheckpoint(checkpoint);
+  if (!cp) return null;
+  return {
+    checkpoint: cp,
+    thumb: clipThumb(thumb),
+    wave: cp.wave,
+    shipId: cp.shipId,
+  };
+}
+
+export function normalizeSlot(data) {
+  if (!data || typeof data !== "object") return null;
+  return makeSlot(data.checkpoint || data, data.thumb);
+}
+
+export function normalizeSlots(list, fallback = null) {
+  const src = Array.isArray(list) ? list : [];
+  const slots = Array.from({ length: SAVE_SLOT_COUNT }, (_, i) => normalizeSlot(src[i]));
+  if (!slots[0] && fallback) slots[0] = makeSlot(fallback);
+  return slots;
+}
+
 function migrateCheckpoint(data) {
   const saved = normalizeCheckpoint(data?.checkpoint);
   if (saved) return saved;
@@ -268,6 +300,7 @@ function normalize(data) {
       settings: withControls({ ...empty.settings }, null),
       loadout: { ...empty.loadout },
       checkpoint: null,
+      slots: normalizeSlots(null),
       macro: [],
       highScores: normalizeHighScores(null),
       dailyScores: normalizeDailyScores(null),
@@ -285,7 +318,8 @@ function normalize(data) {
     maxWave: Math.max(1, Math.floor(Number(data.maxWave) || 1)),
     shipId: resolveShipId(data.shipId, Math.max(0, Math.floor(Number(data.xp) || 0))),
     loadout: normalizeLoadout(data.loadout),
-    checkpoint: migrateCheckpoint(data),
+    checkpoint: null,
+    slots: normalizeSlots(data.slots, Array.isArray(data.slots) ? null : migrateCheckpoint(data)),
     macro: normalizeMacro(data.macro),
     highScores,
     dailyScores,

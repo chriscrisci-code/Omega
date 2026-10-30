@@ -439,6 +439,13 @@ export class Input {
     return this.keysPressed("save") || this.anyPressed(["KeyV"]);
   }
 
+  get slotDigit() {
+    for (let n = 1; n <= 5; n += 1) {
+      if (this.pressed.has(`Digit${n}`) || this.pressed.has(`Numpad${n}`)) return n;
+    }
+    return 0;
+  }
+
   get musicDownPressed() {
     return this.anyPressed(["Minus", "NumpadSubtract"]);
   }

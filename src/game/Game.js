@@ -27,7 +27,7 @@ import { LockCam } from "./render/LockCam.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_FLASH, ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, SCORE_BOARDS, insertAceScore, insertDailyAce, insertDailyScore, insertHighScore, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SAVE_SLOT_COUNT, SCORE_BOARDS, insertAceScore, insertDailyAce, insertDailyScore, insertHighScore, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
 import { DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, unlockedShipIds } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -271,7 +271,11 @@ export class Game {
     this.titleHold = 0;
     this.initials = null;
     this.wavePick = null;
-    this.startPick = null;
+    this.startPick = "new";
+    this.savePick = false;
+    this.saveLatchFire = false;
+    this.resumeSlot = null;
+    this.save.slots = normalizeSlots(this.save.slots);
     this.shipId = resolveShipId(this.save.shipId, this.xp);
     this.save.shipId = this.shipId;
     this.save.xp = this.xp;
@@ -289,7 +293,10 @@ export class Game {
     this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
     this.hud.bay.onSeat = (id) => this.enterHubSeat(id);
     this.hud.bay.onBay = () => this.leaveHubSeat();
-    this.hud.onPickStart = (id) => this.confirmStart(id);
+    this.hud.onPickStart = (id) => {
+      if (this.savePick) this.confirmSaveSlot(id);
+      else this.confirmStart(id);
+    };
     this.hud.controls.onProfile = (id) => this.setControlProfile(id);
     this.hud.controls.onCapture = (id) => this.listenBind(id);
     this.hud.controls.onRemove = (id, key) => this.dropBind(id, key);
@@ -1189,7 +1196,8 @@ export class Game {
     this.audio.restartMusic(this.musicOutLevel());
     this.enterFullscreen();
     this.wavePick = null;
-    this.startPick = null;
+    this.startPick = "new";
+    this.closeSavePick({ silent: true });
     this.runDirty = false;
     this.ace = 0;
     this.bestAce = 0;
@@ -1236,13 +1244,13 @@ export class Game {
     this.warpCool = 0;
     for (const base of this.bases) base.resetCombat();
     const resumed = resume && this.applyCheckpoint();
+    this.resumeSlot = null;
     if (!resumed) {
       this.score = 0;
       this.freshLoadout();
       this.lives = shipConfig.lives;
       this.cargo = 0;
       this.nextLifeAt = this.lifeEvery;
-      this.save.checkpoint = null;
       const startWave = Math.max(1, Math.min(Math.floor(Number(wave) || 1), this.save.maxWave || 1));
       this.beginAssault(startWave, true);
       this.seedWorldForWave(startWave);
@@ -1361,31 +1369,61 @@ export class Game {
 
   offerStart() {
     if (this.titleHold > 0) return;
-    if (!this.hasCheckpoint()) {
-      this.offerWavePick();
-      return;
-    }
     this.stopAttract();
     this.audio.unlock();
     this.enterFullscreen();
     this.mode = STARTPICK;
-    this.startPick = "continue";
-    this.hud.showStartPick(this.checkpointLabel(), "continue");
+    this.startPick = "new";
+    this.hud.showStartPick(this.save.slots, this.startPick);
+  }
+
+  startChoices(includeNew) {
+    const slots = Array.from({ length: SAVE_SLOT_COUNT }, (_, i) => i);
+    return includeNew ? ["new", ...slots] : slots;
+  }
+
+  moveStartPick(dir, includeNew) {
+    const choices = this.startChoices(includeNew);
+    const at = Math.max(0, choices.indexOf(this.startPick));
+    const next = (at + dir + choices.length) % choices.length;
+    this.startPick = choices[next];
   }
 
   confirmStart(id) {
-    if (id === "continue") this.startRun(1, true);
-    else this.offerWavePick();
+    if (id === "new") {
+      this.offerWavePick();
+      return;
+    }
+    this.loadSlot(id);
+  }
+
+  loadSlot(index) {
+    const i = Math.floor(Number(index));
+    const slot = this.save.slots?.[i];
+    if (!normalizeCheckpoint(slot?.checkpoint)) {
+      this.sfx("off");
+      return;
+    }
+    this.resumeSlot = i;
+    this.startRun(1, true);
   }
 
   tickStartPick() {
-    if (this.input.letterLeft || this.input.letterRight) {
-      this.startPick = this.startPick === "continue" ? "new" : "continue";
-      this.hud.showStartPick(this.checkpointLabel(), this.startPick);
+    const digit = this.input.slotDigit;
+    if (digit) {
+      this.confirmStart(digit - 1);
+      return;
     }
-    if (this.input.startPressed || this.input.firePressed) this.confirmStart(this.startPick || "continue");
+    if (this.input.letterLeft) {
+      this.moveStartPick(-1, true);
+      this.hud.showStartPick(this.save.slots, this.startPick);
+    } else if (this.input.letterRight) {
+      this.moveStartPick(1, true);
+      this.hud.showStartPick(this.save.slots, this.startPick);
+    }
+    if (this.input.startPressed || this.input.firePressed) this.confirmStart(this.startPick ?? "new");
     else if (this.input.quitPressed) {
-      this.startPick = null;
+      this.startPick = "new";
       this.mode = TITLE;
       this.hud.showTitle();
       this.beginAttractLoop();
@@ -1862,7 +1900,6 @@ export class Game {
     this.shipId = DEFAULT_SHIP_ID;
     this.save.shipId = DEFAULT_SHIP_ID;
     this.hullLoadouts = {};
-    if (this.save.checkpoint) this.save.checkpoint.shipId = DEFAULT_SHIP_ID;
     this.applyShipSkin();
     this.hud.bay.setRoster(unlockedShipIds(0), 0);
     this.hud.bay.setState(this.shipId);
@@ -2049,6 +2086,14 @@ export class Game {
   }
 
   shoot(dt = 0) {
+    if (this.saveLatchFire) {
+      if (this.input.fireHeld) {
+        this.ship.clearRail?.();
+        this.fireWasOn = true;
+        return;
+      }
+      this.saveLatchFire = false;
+    }
     if (!this.ship.alive || this.ship.docked) {
       this.ship.clearRail?.();
       this.fireWasOn = this.input.fireHeld;
@@ -2694,30 +2739,13 @@ export class Game {
     this.bountyUnits = 0;
   }
 
-  hasCheckpoint() {
-    return Boolean(normalizeCheckpoint(this.save.checkpoint));
-  }
-
-  checkpointLabel() {
-    const cp = normalizeCheckpoint(this.save.checkpoint);
-    if (!cp) return "";
-    return `WAVE  ${cp.wave}`;
-  }
-
-  stampCheckpoint() {
-    if (!this.save.checkpoint?.active) return;
-    this.save.checkpoint.score = Math.max(0, Math.floor(Number(this.score) || 0));
-    this.save.checkpoint.lives = Math.max(1, Math.floor(Number(this.lives) || 0) || shipConfig.lives);
-    this.save.checkpoint.cargo = Math.max(0, Math.floor(Number(this.cargo) || 0));
-    this.save.checkpoint.nextLifeAt = Math.max(0, Math.floor(Number(this.nextLifeAt) || 0));
-    this.save.checkpoint.bountyUnits = Math.max(0, Math.floor(Number(this.bountyUnits) || 0));
-    if (this.save.checkpoint.loadout) {
-      this.save.checkpoint.loadout.points = Math.max(0, Math.floor(Number(this.points) || 0));
-      this.save.checkpoint.loadout.bank = Math.max(0, Math.floor(Number(this.loadoutBank) || 0) % 3);
-    }
-  }
+  stampCheckpoint() {}
 
   togglePause() {
+    if (this.savePick) {
+      this.closeSavePick();
+      return;
+    }
     if (this.mode !== PLAYING || this.attractOnDemo) return;
     this.paused = !this.paused;
     if (this.paused) this.hud.setMode("PAUSE");
@@ -2725,17 +2753,93 @@ export class Game {
 
   manualSave() {
     if (this.attractOnDemo) return;
-    if (this.mode !== PLAYING && this.mode !== DYING && this.mode !== CONTINUE) return;
-    this.writeCheckpoint({ force: true });
+    if (this.mode !== PLAYING) return;
+    if (this.savePick) {
+      this.closeSavePick();
+      return;
+    }
+    this.openSavePick();
+  }
+
+  openSavePick() {
+    this.savePick = true;
+    this.paused = true;
+    this.startPick = 0;
+    this.hud.showSavePick(this.save.slots, this.startPick);
+  }
+
+  closeSavePick(options = {}) {
+    const was = this.savePick;
+    this.savePick = false;
+    if (!was) return;
+    this.saveLatchFire = true;
+    if (this.mode === PLAYING) this.paused = false;
+    if (this.mode === PLAYING) this.hud.hideCenter();
+    else this.hud.hideWavePick();
+    if (!options.silent && this.mode === PLAYING) this.hud.setMode("");
+  }
+
+  tickSavePick() {
+    const digit = this.input.slotDigit;
+    if (digit) {
+      this.confirmSaveSlot(digit - 1);
+      return;
+    }
+    if (this.input.letterLeft) {
+      this.moveStartPick(-1, false);
+      this.hud.showSavePick(this.save.slots, this.startPick);
+    } else if (this.input.letterRight) {
+      this.moveStartPick(1, false);
+      this.hud.showSavePick(this.save.slots, this.startPick);
+    }
+    if (this.input.startPressed || this.input.firePressed) this.confirmSaveSlot(this.startPick);
+    else if (this.input.quitPressed || this.input.savePressed) this.closeSavePick();
+  }
+
+  confirmSaveSlot(index) {
+    const i = Math.floor(Number(index));
+    if (i < 0 || i >= SAVE_SLOT_COUNT) {
+      this.sfx("off");
+      return;
+    }
+    if (!this.writeSlot(i)) {
+      this.sfx("off");
+      return;
+    }
+    this.closeSavePick({ silent: true });
     this.saveFlash = 1.1;
     this.hud.setMode("SAVED");
     this.sfx("dump");
   }
 
-  writeCheckpoint(options = {}) {
-    if (this.attractOnDemo) return;
-    const force = Boolean(options.force);
-    if (!force && (this.mode !== PLAYING || this.lives <= 0)) return;
+  captureShipThumb() {
+    try {
+      const canvas = this.app?.canvas;
+      const view = this.ship?.view;
+      if (!canvas || !view) return "";
+      const bounds = view.getBounds();
+      const pad = 120;
+      const res = this.app.renderer?.resolution || 1;
+      const sx = Math.max(0, Math.floor((bounds.x - pad) * res));
+      const sy = Math.max(0, Math.floor((bounds.y - pad) * res));
+      const sw = Math.min(canvas.width - sx, Math.max(8, Math.floor((bounds.width + pad * 2) * res)));
+      const sh = Math.min(canvas.height - sy, Math.max(8, Math.floor((bounds.height + pad * 2) * res)));
+      if (sw < 8 || sh < 8) return "";
+      const out = document.createElement("canvas");
+      out.width = 160;
+      out.height = 100;
+      const ctx = out.getContext("2d");
+      if (!ctx) return "";
+      ctx.fillStyle = "#05060a";
+      ctx.fillRect(0, 0, 160, 100);
+      ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, 160, 100);
+      return out.toDataURL("image/jpeg", 0.65);
+    } catch {
+      return "";
+    }
+  }
+
+  buildCheckpoint() {
     const loadout = {
       gun: this.levels?.gun,
       missile: this.levels?.missile,
@@ -2747,7 +2851,7 @@ export class Game {
       ammo: this.missileAmmo,
     };
     const hulls = { ...this.hullLoadouts, [this.shipId]: this.packLevels() };
-    const cp = normalizeCheckpoint({
+    return normalizeCheckpoint({
       active: true,
       wave: this.assaultIndex,
       rest: this.assaultRest,
@@ -2765,11 +2869,41 @@ export class Game {
       castlesArmed: this.castlesArmed,
       bountyUnits: this.bountyUnits,
     });
-    if (!cp) return;
-    this.save.checkpoint = cp;
-    this.save.loadout = normalizeLoadout(loadout);
+  }
+
+  writeSlot(index) {
+    const i = Math.max(0, Math.min(SAVE_SLOT_COUNT - 1, Math.floor(Number(index))));
+    const cp = this.buildCheckpoint();
+    if (!cp) return false;
+    if (!Array.isArray(this.save.slots) || this.save.slots.length !== SAVE_SLOT_COUNT) {
+      this.save.slots = normalizeSlots(this.save.slots);
+    }
+    this.save.slots[i] = makeSlot(cp, this.captureShipThumb());
+    this.save.loadout = normalizeLoadout(cp.loadout);
     this.save.shipId = this.shipId;
     this.save.xp = this.xp;
+    this.storage.save(this.save);
+    return true;
+  }
+
+  writeCheckpoint(options = {}) {
+    if (this.attractOnDemo) return;
+    const force = Boolean(options.force);
+    if (!force && (this.mode !== PLAYING || this.lives <= 0)) return;
+    this.save.shipId = this.shipId;
+    this.save.xp = this.xp;
+    if (this.levels) {
+      this.save.loadout = normalizeLoadout({
+        gun: this.levels.gun,
+        missile: this.levels.missile,
+        emp: this.levels.emp,
+        shield: this.levels.shield,
+        gunship: this.levels.gunship || 0,
+        points: this.points,
+        bank: this.loadoutBank,
+        ammo: this.missileAmmo,
+      });
+    }
     this.storage.save(this.save);
   }
 
@@ -2799,7 +2933,8 @@ export class Game {
   }
 
   applyCheckpoint() {
-    const cp = normalizeCheckpoint(this.save.checkpoint);
+    const slot = this.save.slots?.[this.resumeSlot];
+    const cp = normalizeCheckpoint(slot?.checkpoint);
     if (!cp) return false;
     this.shipId = resolveShipId(cp.shipId, this.xp);
     this.levels = {
@@ -4185,6 +4320,7 @@ export class Game {
 
   endRun(reason = "final") {
     if (this.mode === TITLE || this.mode === GAMEOVER || this.mode === INITIALS) return;
+    this.closeSavePick({ silent: true });
     this.paused = false;
     this.missileQueued = 0;
     if (this.runDirty || this.score > 0 || this.points > 0) this.writeCheckpoint({ force: true });
@@ -4565,7 +4701,7 @@ export class Game {
     const space = this.space();
 
     this.touch.tick();
-    this.input.fineWheel = this.mode === INITIALS || this.mode === WAVEPICK || this.mode === STARTPICK;
+    this.input.fineWheel = this.mode === INITIALS || this.mode === WAVEPICK || this.mode === STARTPICK || this.savePick;
     if (this.titleHold > 0) this.titleHold = Math.max(0, this.titleHold - t);
     if (this.input.fullscreenPressed) this.toggleFullscreen();
     this.hud.setPad(this.input.padConnected);
@@ -4573,6 +4709,23 @@ export class Game {
     if (this.mode === INITIALS) this.tickInitials();
     if (this.mode === WAVEPICK) this.tickWavePick();
     if (this.mode === STARTPICK) this.tickStartPick();
+
+    if (this.savePick) {
+      this.tickSavePick();
+      if (this.saveFlash > 0) this.saveFlash = Math.max(0, this.saveFlash - t);
+      this.shake *= 0.86;
+      if (this.shake < 0.2) this.shake = 0;
+      this.applyCamera(t, screen);
+      this.tickLockCam(0);
+      this.audio.tickEngine(0, 0, 0, 0);
+      this.audio.tickLaser(false);
+      this.audio.tickRail(0, false);
+      this.tickMusicInput();
+      this.audio.tickMusic(this.musicOutLevel());
+      this.renderLockCam(screen);
+      this.input.endFrame();
+      return;
+    }
 
     if ((this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE) && this.input.quitPressed) {
       this.endRun(this.mode === CONTINUE ? "dead" : "abort");

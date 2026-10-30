@@ -219,9 +219,62 @@ body.is-attract .hud-center.is-demo .score-board {
   margin: 0 auto;
 }
 
+.wave-row.is-slots {
+  gap: 10px;
+  max-width: min(980px, 96vw);
+  align-items: stretch;
+}
+
 .start-btn {
   min-width: 168px;
   padding: 10px 16px;
+}
+
+.slot-btn {
+  min-width: 112px;
+  padding: 8px 8px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.slot-btn.is-empty {
+  opacity: 0.72;
+}
+
+.slot-thumb {
+  display: block;
+  width: 96px;
+  height: 60px;
+  background: rgba(5, 8, 14, 0.85);
+  border: 1px solid rgba(102, 224, 255, 0.22);
+  overflow: hidden;
+}
+
+.slot-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.slot-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.slot-label .vector-text {
+  width: 96px;
+  height: auto;
+  display: block;
+}
+
+.hud-center.is-save-pick {
+  pointer-events: auto;
+  background: rgba(4, 6, 12, 0.72);
 }
 
 .wave-btn {
