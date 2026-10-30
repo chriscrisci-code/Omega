@@ -491,19 +491,25 @@ export const SFX = {
   rail: {
     name: "RAIL",
     fire: (audio) => {
-      audio.whoosh({ from: 2600, to: 160, dur: 0.4, peak: 0.3, q: 0.4 });
+      const t = audio.now();
+      audio.whoosh({ from: 3400, to: 240, dur: 0.28, peak: 0.3, q: 0.55, at: t });
+      audio.tone({ type: "sine", freq: 1860, glide: 180, dur: 0.22, peak: 0.1, attack: 0.001, at: t });
       audio.gun({
-        dur: 0.24,
+        dur: 0.7,
         attack: 0.001,
-        noisePeak: 0.38,
-        cutoff: 2400,
-        endCutoff: 110,
-        q: 0.52,
-        thump: 40,
-        thumpPeak: 0.36,
-        thumpDur: 0.2,
+        noisePeak: 0.34,
+        cutoff: 2600,
+        endCutoff: 70,
+        q: 0.46,
+        thump: 34,
+        thumpPeak: 0.42,
+        thumpDur: 0.72,
+        at: t,
       });
-      audio.tone({ type: "sine", freq: 240, glide: 52, dur: 0.3, peak: 0.14, attack: 0.002 });
+      audio.whoosh({ from: 1600, to: 60, dur: 1.7, peak: 0.2, q: 0.36, at: t + 0.04 });
+      audio.tone({ type: "sine", freq: 78, glide: 26, dur: 1.45, peak: 0.16, attack: 0.01, at: t });
+      audio.tone({ type: "triangle", freq: 210, glide: 48, dur: 1.85, peak: 0.09, attack: 0.016, at: t + 0.05 });
+      audio.tone({ type: "sine", freq: 420, glide: 70, dur: 1.15, peak: 0.05, attack: 0.02, at: t + 0.08 });
     },
   },
   thud: {
