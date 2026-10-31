@@ -1,4 +1,4 @@
-import { Container, Graphics, Rectangle } from "pixi.js";
+import { Container, Graphics, Rectangle, RenderTexture } from "pixi.js";
 import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, hunter as hunterCfg, hunterScale, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, strike as strikeCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
@@ -274,6 +274,8 @@ export class Game {
     this.startPick = "new";
     this.savePick = false;
     this.saveLatchFire = false;
+    this.pendingThumb = "";
+    this.thumbRt = null;
     this.resumeSlot = null;
     this.save.slots = normalizeSlots(this.save.slots);
     this.shipId = resolveShipId(this.save.shipId, this.xp);
@@ -2763,6 +2765,7 @@ export class Game {
     this.savePick = true;
     this.paused = true;
     this.startPick = 0;
+    this.pendingThumb = this.captureShipThumb();
     this.hud.showSavePick(this.save.slots, this.startPick);
   }
 
@@ -2771,6 +2774,7 @@ export class Game {
     this.savePick = false;
     if (!was) return;
     this.saveLatchFire = true;
+    this.pendingThumb = "";
     if (this.mode === PLAYING) this.paused = false;
     if (this.mode === PLAYING) this.hud.hideCenter();
     else this.hud.hideWavePick();
@@ -2812,26 +2816,59 @@ export class Game {
 
   captureShipThumb() {
     try {
-      const canvas = this.app?.canvas;
-      const view = this.ship?.view;
-      if (!canvas || !view) return "";
-      const bounds = view.getBounds();
-      const pad = 120;
-      const res = this.app.renderer?.resolution || 1;
-      const sx = Math.max(0, Math.floor((bounds.x - pad) * res));
-      const sy = Math.max(0, Math.floor((bounds.y - pad) * res));
-      const sw = Math.min(canvas.width - sx, Math.max(8, Math.floor((bounds.width + pad * 2) * res)));
-      const sh = Math.min(canvas.height - sy, Math.max(8, Math.floor((bounds.height + pad * 2) * res)));
-      if (sw < 8 || sh < 8) return "";
-      const out = document.createElement("canvas");
-      out.width = 160;
-      out.height = 100;
-      const ctx = out.getContext("2d");
-      if (!ctx) return "";
-      ctx.fillStyle = "#05060a";
-      ctx.fillRect(0, 0, 160, 100);
-      ctx.drawImage(canvas, sx, sy, sw, sh, 0, 0, 160, 100);
-      return out.toDataURL("image/jpeg", 0.65);
+      const renderer = this.app?.renderer;
+      const world = this.world;
+      const ship = this.ship;
+      if (!renderer || !world || !ship?.view) return "";
+      const w = 160;
+      const h = 100;
+      if (!this.thumbRt || this.thumbRt.width !== w || this.thumbRt.height !== h) {
+        this.thumbRt?.destroy(true);
+        this.thumbRt = RenderTexture.create({ width: w, height: h });
+      }
+      const space = this.space();
+      const placedX = this.camX + wrapDelta(ship.x - this.camX, space.width);
+      const placedY = this.camY + wrapDelta(ship.y - this.camY, space.height);
+      const saved = {
+        x: world.position.x,
+        y: world.position.y,
+        rot: world.rotation,
+        sx: world.scale.x,
+        sy: world.scale.y,
+        px: world.pivot.x,
+        py: world.pivot.y,
+      };
+      const blooms = (this.fxRoot?.filters || []).map((filter) => ({ filter, on: filter.enabled }));
+      for (const row of blooms) row.filter.enabled = false;
+      const hidden = [];
+      if (ship.docked) {
+        for (const base of this.bases || []) {
+          if (!base?.view) continue;
+          hidden.push({ node: base.view, vis: base.view.visible });
+          base.view.visible = false;
+        }
+      }
+      const shipScale = { x: ship.view.scale.x, y: ship.view.scale.y };
+      ship.view.scale.set(1);
+      const span = Math.max(48, (ship.radius || shipConfig.radius || 14) * 4);
+      world.pivot.set(placedX, placedY);
+      world.position.set(w * 0.5, h * 0.5);
+      world.rotation = this.camRot || 0;
+      world.scale.set(Math.min(w, h) / span);
+      try {
+        renderer.render({ container: world, target: this.thumbRt, clear: true });
+      } finally {
+        world.pivot.set(saved.px, saved.py);
+        world.position.set(saved.x, saved.y);
+        world.rotation = saved.rot;
+        world.scale.set(saved.sx, saved.sy);
+        ship.view.scale.set(shipScale.x, shipScale.y);
+        for (const row of blooms) row.filter.enabled = row.on;
+        for (const row of hidden) row.node.visible = row.vis;
+      }
+      const snap = renderer.extract?.canvas?.({ target: this.thumbRt }) || renderer.extract?.canvas?.(this.thumbRt);
+      if (!snap?.toDataURL) return "";
+      return snap.toDataURL("image/jpeg", 0.72);
     } catch {
       return "";
     }
@@ -2876,7 +2913,7 @@ export class Game {
     if (!Array.isArray(this.save.slots) || this.save.slots.length !== SAVE_SLOT_COUNT) {
       this.save.slots = normalizeSlots(this.save.slots);
     }
-    this.save.slots[i] = makeSlot(cp, this.captureShipThumb());
+    this.save.slots[i] = makeSlot(cp, this.pendingThumb || this.captureShipThumb());
     this.save.loadout = normalizeLoadout(cp.loadout);
     this.save.shipId = this.shipId;
     this.save.xp = this.xp;
