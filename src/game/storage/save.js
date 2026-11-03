@@ -59,6 +59,7 @@ const empty = {
   },
   checkpoint: null,
   slots: [null, null, null, null, null],
+  credits: 0,
   settings: {
     fullscreen: false,
     difficulty: "easy",
@@ -84,6 +85,10 @@ function cleanName(name) {
     .slice(0, 3)
     .padEnd(3, "A");
   return letters;
+}
+
+export function clampCredits(value) {
+  return Math.max(0, Math.min(99, Math.floor(Number(value) || 0)));
 }
 
 function clampMusic(value) {
@@ -301,6 +306,7 @@ function normalize(data) {
       loadout: { ...empty.loadout },
       checkpoint: null,
       slots: normalizeSlots(null),
+      credits: 0,
       macro: [],
       highScores: normalizeHighScores(null),
       dailyScores: normalizeDailyScores(null),
@@ -320,6 +326,7 @@ function normalize(data) {
     loadout: normalizeLoadout(data.loadout),
     checkpoint: null,
     slots: normalizeSlots(data.slots, Array.isArray(data.slots) ? null : migrateCheckpoint(data)),
+    credits: clampCredits(data.credits),
     macro: normalizeMacro(data.macro),
     highScores,
     dailyScores,

@@ -27,7 +27,7 @@ import { LockCam } from "./render/LockCam.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_FLASH, ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, SAVE_SLOT_COUNT, SCORE_BOARDS, insertAceScore, insertDailyAce, insertDailyScore, insertHighScore, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SAVE_SLOT_COUNT, SCORE_BOARDS, clampCredits, insertAceScore, insertDailyAce, insertDailyScore, insertHighScore, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
 import { DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, unlockedShipIds } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -277,8 +277,9 @@ export class Game {
     this.saveLatchFire = false;
     this.startLatchFire = false;
     this.startingRun = false;
-    this.credits = 0;
+    this.credits = clampCredits(this.save.credits);
     this.freePlay = false;
+    this.save.credits = this.credits;
     this.continueClock = null;
     this.pendingThumb = "";
     this.thumbRt = null;
@@ -1198,11 +1199,17 @@ export class Game {
     this.hud.setCredits(this.credits, this.freePlay);
   }
 
+  storeCredits() {
+    this.save.credits = clampCredits(this.credits);
+    this.storage.save(this.save);
+  }
+
   addCredit() {
-    this.credits = Math.min(99, (this.credits || 0) + 1);
+    this.credits = clampCredits((this.credits || 0) + 1);
     this.audio.unlock();
     this.audio.play("up");
     this.paintCredits();
+    this.storeCredits();
     this.holdContinueClock();
   }
 
@@ -1236,6 +1243,7 @@ export class Game {
     if (this.credits < 1) return false;
     this.credits -= 1;
     this.paintCredits();
+    this.storeCredits();
     return true;
   }
 
