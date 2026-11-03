@@ -418,7 +418,8 @@ export const ore = {
   radius: 8,
   life: 48,
   pickup: 24,
-  magnet: 180,
+  magnet: 250,
+  magnetSpeed: 190,
   drift: 22,
 };
 

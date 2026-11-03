@@ -5269,9 +5269,14 @@ export class Game {
         const dx = wrapDelta(this.ship.x - flake.x, space.width);
         const dy = wrapDelta(this.ship.y - flake.y, space.height);
         const dist = Math.hypot(dx, dy);
-        if (this.ship.alive && dist < ore.magnet) {
-          const mag = dist || 1;
-          flake.pull(dx / mag, dy / mag, 520 * t);
+        if (this.ship.alive && dist < ore.magnet && dist > 0.001) {
+          const nx = dx / dist;
+          const ny = dy / dist;
+          const near = 1 - dist / ore.magnet;
+          const speed = (ore.magnetSpeed || 190) * (0.34 + near * 0.66);
+          const mix = Math.min(1, (2.2 + near * 6) * t);
+          flake.vx += (nx * speed - flake.vx) * mix;
+          flake.vy += (ny * speed - flake.vy) * mix;
         }
         if (this.ship.alive && dist < ore.pickup + this.ship.radius) this.collectOre(flake);
       }
