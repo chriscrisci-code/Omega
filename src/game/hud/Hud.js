@@ -47,6 +47,11 @@ export class Hud {
     this.shipsHeading = document.querySelector("#ships-heading");
     this.shipsHint = document.querySelector("#ships-hint");
     this.credit = document.querySelector("#credit");
+    this.credits = document.querySelector("#credits");
+    this.insertCoin = document.querySelector("#insert-coin");
+    this.creditCount = 0;
+    this.freePlay = false;
+    this.onInsertCoin = null;
     this.version = document.querySelector("#version");
     this.musicLabel = document.querySelector("#music-label");
     this.musicDown = document.querySelector("#music-down");
@@ -131,6 +136,13 @@ export class Hud {
     this.paint(this.xpReset, "RESET XP", 12, DIM, CYAN, "center");
     this.shipsHeading && (this.shipsHeading.innerHTML = vectorTitleSvg("SHIPS", 36, CYAN, HOT));
     this.paint(this.shipsHint, "ESC RETURN  SPACE START", 11, DIM, CYAN, "center");
+    this.paint(this.insertCoin, "INSERT", 12, CYAN, HOT, "center");
+    this.insertCoin?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onInsertCoin?.();
+    });
+    this.setCredits(0, false);
   }
 
   paint(node, text, size, color, hot, align = "left") {
@@ -154,6 +166,37 @@ export class Hud {
     }
     const line = name ? `HUB ${banked}  ${name}` : banked ? `HUB ${banked}` : "";
     this.paint(this.hubOre, line, 10, DIM, CYAN, "center");
+  }
+
+  setCredits(count, freePlay = false) {
+    this.creditCount = Math.max(0, Math.floor(Number(count) || 0));
+    this.freePlay = Boolean(freePlay);
+    if (this.credits) this.credits.dataset.count = this.freePlay ? "free" : String(this.creditCount);
+    this.paint(
+      this.credits,
+      this.freePlay ? "FREE PLAY" : `CREDITS  ${this.creditCount}`,
+      10,
+      this.freePlay || this.creditCount > 0 ? CYAN : DIM,
+      this.freePlay || this.creditCount > 0 ? HOT : CYAN,
+      "right",
+    );
+    this.refreshStartPrompt();
+  }
+
+  canPlay() {
+    return this.freePlay || this.creditCount > 0;
+  }
+
+  refreshStartPrompt() {
+    if (!this.cta) return;
+    if (this.center?.classList.contains("is-wave")) return;
+    if (this.center?.classList.contains("is-initials")) return;
+    if (this.center?.classList.contains("is-save-pick")) return;
+    if (this.shipsPage && !this.shipsPage.classList.contains("is-hidden")) return;
+    if (this.controlsPage && !this.controlsPage.classList.contains("is-hidden")) return;
+    const ready = this.canPlay();
+    const line = ready ? (this.layout === "phone" ? "TAP TO START" : "PRESS FIRE") : "INSERT COIN";
+    this.cta.innerHTML = vectorTitleSvg(line, 20, CYAN, HOT);
   }
 
   setPoints(value) {
@@ -278,6 +321,7 @@ export class Hud {
     this.paint(this.controlsLink, this.layout === "phone" ? "CONTROLS" : "C CONTROLS", 14, DIM, CYAN, "center");
     this.paint(this.xpReset, "RESET XP", 12, DIM, CYAN, "center");
     this.paintHelp();
+    this.refreshStartPrompt();
   }
 
   setProfile(id) {
@@ -300,8 +344,8 @@ export class Hud {
     this.title.innerHTML = vectorTitleSvg("2DSG", 44, CYAN, HOT, { motion: true, block: true });
     this.applyTrailState();
     this.paint(this.tag, "FLOWSTATE SPACE COMBAT", 12, MAGENTA, PINK, "center");
-    this.cta.innerHTML = vectorTitleSvg(this.layout === "phone" ? "TAP TO START" : "PRESS FIRE", 20, CYAN, HOT);
     this.paint(this.credit, "C 1984  2DSG", 9, DIM, CYAN, "center");
+    this.refreshStartPrompt();
     this.paintHelp();
     this.shipsPage?.classList.add("is-hidden");
     this.hideWavePick();
@@ -447,8 +491,8 @@ export class Hud {
     this.center.classList.add("is-scores");
     document.body.classList.add("is-scoreboard");
     this.paintScoreBoard(rows, heading);
-    this.cta.innerHTML = vectorTitleSvg("PRESS FIRE", 20, CYAN, HOT);
     this.paint(this.credit, "C 1984  2DSG", 9, DIM, CYAN, "center");
+    this.refreshStartPrompt();
     this.shipsPage?.classList.add("is-hidden");
     this.hideWavePick();
     this.hideContinue();
@@ -526,8 +570,8 @@ export class Hud {
     const line =
       reason === "hub" ? `HUB LOST  ${score}` : reason === "abort" ? `RUN ABORTED  ${score}` : `FINAL  ${score}`;
     this.paint(this.tag, line, 14, MAGENTA, PINK, "center");
-    this.cta.innerHTML = vectorTitleSvg("PRESS FIRE", 20, CYAN, HOT);
     this.paint(this.credit, "C 1984  2DSG", 9, DIM, CYAN, "center");
+    this.refreshStartPrompt();
     this.shipsPage?.classList.add("is-hidden");
     this.hideWavePick();
     this.hideScores();

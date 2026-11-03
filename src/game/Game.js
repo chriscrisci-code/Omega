@@ -274,6 +274,10 @@ export class Game {
     this.startPick = "new";
     this.savePick = false;
     this.saveLatchFire = false;
+    this.startLatchFire = false;
+    this.startingRun = false;
+    this.credits = 0;
+    this.freePlay = false;
     this.pendingThumb = "";
     this.thumbRt = null;
     this.resumeSlot = null;
@@ -304,6 +308,7 @@ export class Game {
     this.hud.controls.onRemove = (id, key) => this.dropBind(id, key);
     this.hud.controls.onReset = () => this.resetBinds();
     this.hud.onMusic = (delta) => this.nudgeMusic(delta);
+    this.hud.onInsertCoin = () => this.addCredit();
     this.input.onCapture = (id, bind) => this.addBind(id, bind);
     this.applyMusicVol(this.save.settings.music);
     this.input.setBinds(this.save.settings.profile, this.save.settings.binds);
@@ -318,6 +323,7 @@ export class Game {
     this.hud.setShield(0, false, shieldConfig.max);
     this.hud.setSpecial("WARP EMP MSL");
     this.hud.setOre(0, 0, "");
+    this.paintCredits();
     this.storage.save(this.save);
     this.beginAttractLoop();
     this.offerDevicePick();
@@ -1182,7 +1188,39 @@ export class Game {
     }
   }
 
+  canPlay() {
+    return Boolean(this.freePlay) || this.credits > 0;
+  }
+
+  paintCredits() {
+    this.hud.setCredits(this.credits, this.freePlay);
+  }
+
+  addCredit() {
+    this.credits = Math.min(99, (this.credits || 0) + 1);
+    this.audio.unlock();
+    this.audio.play("up");
+    this.paintCredits();
+  }
+
+  takeCredit() {
+    if (this.freePlay) return true;
+    if (this.credits < 1) return false;
+    this.credits -= 1;
+    this.paintCredits();
+    return true;
+  }
+
   startRun(wave = 1, resume = false) {
+    if (this.startingRun || this.mode === PLAYING) return;
+    this.startingRun = true;
+    if (!resume && !this.takeCredit()) {
+      this.startingRun = false;
+      this.sfx("off");
+      this.paintCredits();
+      return;
+    }
+    this.mode = PLAYING;
     this.shipId = resolveShipId(this.shipId, this.xp);
     this.save.shipId = this.shipId;
     this.hud.bay.setRoster(unlockedShipIds(this.xp), this.xp);
@@ -1193,7 +1231,6 @@ export class Game {
     this.storage.save(this.save);
     this.stopAttract();
     this.audio.unlock();
-    this.mode = PLAYING;
     if (!(this.save.settings.music > 0)) this.applyMusicVol(music.volume);
     this.audio.restartMusic(this.musicOutLevel());
     this.enterFullscreen();
@@ -1302,6 +1339,7 @@ export class Game {
     this.spawnWave();
     this.holdTunnel = false;
     this.leaveTunnel({ silent: true, dock: false });
+    this.startingRun = false;
   }
 
   sleepLateBases() {
@@ -1371,11 +1409,17 @@ export class Game {
 
   offerStart() {
     if (this.titleHold > 0) return;
+    if (!this.canPlay()) {
+      this.sfx("off");
+      this.paintCredits();
+      return;
+    }
     this.stopAttract();
     this.audio.unlock();
     this.enterFullscreen();
     this.mode = STARTPICK;
     this.startPick = "new";
+    this.startLatchFire = true;
     this.hud.showStartPick(this.save.slots, this.startPick);
   }
 
@@ -1392,6 +1436,7 @@ export class Game {
   }
 
   confirmStart(id) {
+    if (this.mode !== STARTPICK) return;
     if (id === "new") {
       this.startRun(1);
       return;
@@ -1423,12 +1468,18 @@ export class Game {
       this.moveStartPick(1, true);
       this.hud.showStartPick(this.save.slots, this.startPick);
     }
-    if (this.input.startPressed || this.input.firePressed) this.confirmStart(this.startPick ?? "new");
-    else if (this.input.quitPressed) {
-      this.startPick = "new";
-      this.mode = TITLE;
-      this.hud.showTitle();
-      this.beginAttractLoop();
+    const fire = this.input.startPressed || this.input.firePressed;
+    if (fire) {
+      if (this.startLatchFire) return;
+      this.confirmStart(this.startPick ?? "new");
+    } else {
+      this.startLatchFire = false;
+      if (this.input.quitPressed) {
+        this.startPick = "new";
+        this.mode = TITLE;
+        this.hud.showTitle();
+        this.beginAttractLoop();
+      }
     }
   }
 

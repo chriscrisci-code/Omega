@@ -891,11 +891,55 @@ body.is-phone .music-vol {
   display: none;
 }
 
+.coin-slot {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+body:not(.is-attract) .coin-slot {
+  display: none;
+}
+
+.coin-slot #credits .vector-text {
+  width: 120px;
+  height: auto;
+  margin-left: auto;
+}
+
+#insert-coin {
+  appearance: none;
+  background: transparent;
+  border: 1px solid rgba(102, 224, 255, 0.45);
+  color: #66e0ff;
+  cursor: pointer;
+  padding: 8px 12px;
+  pointer-events: auto;
+  box-shadow: 0 0 12px rgba(102, 224, 255, 0.18);
+}
+
+#insert-coin:hover {
+  border-color: rgba(200, 248, 255, 0.85);
+  box-shadow: 0 0 16px rgba(142, 246, 255, 0.35);
+}
+
+#insert-coin .vector-text {
+  width: 88px;
+  height: auto;
+  display: block;
+}
+
 .version {
   display: none;
   position: absolute;
   right: max(14px, env(safe-area-inset-right));
-  bottom: max(10px, env(safe-area-inset-bottom));
+  bottom: max(92px, calc(env(safe-area-inset-bottom) + 80px));
   z-index: 4;
   opacity: 0.4;
   pointer-events: none;
