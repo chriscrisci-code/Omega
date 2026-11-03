@@ -58,7 +58,7 @@ export const SHIP_KITS = {
     id: "GUNSHIP",
     entitlement: "base",
     stats: {
-      speedMul: 0.5,
+      speedMul: 420 / 520,
       turnMul: 0.5,
       hullHits: 3,
       hullIFrames: 0.55,
