@@ -713,6 +713,12 @@ body.is-attract .cta {
   display: none;
 }
 
+.continue-row.is-wait .continue-btn {
+  min-width: 88px;
+  pointer-events: none;
+  cursor: default;
+}
+
 .continue-btn {
   margin: 0;
   padding: 10px 22px;
@@ -905,6 +911,10 @@ body.is-phone .music-vol {
 
 body:not(.is-attract) .coin-slot {
   display: none;
+}
+
+body.is-continue .coin-slot {
+  display: flex;
 }
 
 .coin-slot #credits .vector-text {

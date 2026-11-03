@@ -625,13 +625,23 @@ export class Hud {
     if (this.continueNo) this.paint(this.continueNo, "NO", 18, MAGENTA, PINK, "center");
   }
 
-  showContinue() {
-    this.paintContinue();
+  showContinue({ ready = true, seconds = 0 } = {}) {
     this.continueRow?.classList.remove("is-hidden");
+    this.continueRow?.classList.toggle("is-wait", !ready);
+    document.body.classList.add("is-continue");
+    if (!ready) {
+      this.paint(this.continueTitle, "ADD CREDIT", 16, CYAN, HOT, "center");
+      this.paint(this.continueBtn, String(Math.max(0, Math.ceil(Number(seconds) || 0))), 22, CYAN, HOT, "center");
+      if (this.continueNo) this.paint(this.continueNo, "NO", 18, MAGENTA, PINK, "center");
+      return;
+    }
+    this.paintContinue();
   }
 
   hideContinue() {
     this.continueRow?.classList.add("is-hidden");
+    this.continueRow?.classList.remove("is-wait");
+    document.body.classList.remove("is-continue");
   }
 
   hideCenter() {

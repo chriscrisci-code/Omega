@@ -42,6 +42,7 @@ const INITIALS = "initials";
 const WAVEPICK = "wavepick";
 const STARTPICK = "startpick";
 const GAMEOVER = "gameover";
+const CONTINUE_WAIT = 30;
 
 function strikeSlots(destroyerCount) {
   const slots = [];
@@ -278,6 +279,7 @@ export class Game {
     this.startingRun = false;
     this.credits = 0;
     this.freePlay = false;
+    this.continueClock = null;
     this.pendingThumb = "";
     this.thumbRt = null;
     this.resumeSlot = null;
@@ -1201,6 +1203,32 @@ export class Game {
     this.audio.unlock();
     this.audio.play("up");
     this.paintCredits();
+    this.holdContinueClock();
+  }
+
+  holdContinueClock() {
+    if (this.mode !== CONTINUE || !this.continueClock) return;
+    this.continueClock.held = true;
+    this.refreshContinuePrompt();
+  }
+
+  refreshContinuePrompt() {
+    this.hud.showContinue({
+      ready: this.canPlay(),
+      seconds: this.continueClock ? Math.ceil(this.continueClock.left) : 0,
+      held: Boolean(this.continueClock?.held),
+    });
+  }
+
+  tickContinueClock(t) {
+    if (this.mode !== CONTINUE || !this.continueClock || this.continueClock.held) return;
+    const before = Math.ceil(this.continueClock.left);
+    this.continueClock.left = Math.max(0, this.continueClock.left - t);
+    const after = Math.ceil(this.continueClock.left);
+    if (after !== before) this.refreshContinuePrompt();
+    if (this.continueClock.left > 0) return;
+    this.continueClock = null;
+    this.endRun("dead");
   }
 
   takeCredit() {
@@ -1214,7 +1242,7 @@ export class Game {
   startRun(wave = 1, resume = false) {
     if (this.startingRun || this.mode === PLAYING) return;
     this.startingRun = true;
-    if (!resume && !this.takeCredit()) {
+    if (!this.takeCredit()) {
       this.startingRun = false;
       this.sfx("off");
       this.paintCredits();
@@ -1676,6 +1704,7 @@ export class Game {
     this.hud.hideDock();
     this.mode = TITLE;
     this.titleHold = 0.45;
+    this.paintCredits();
     this.syncMissileHud();
     if (options.boards) {
       this.beginAttractLoop("scores", { thenTitle: true, hold: ATTRACT_FLASH });
@@ -4384,11 +4413,20 @@ export class Game {
     this.hud.setMode("");
     this.writeCheckpoint({ force: true });
     this.hud.setPoints(this.points);
-    this.hud.showContinue();
+    this.continueClock = this.canPlay() ? null : { left: CONTINUE_WAIT, held: false };
+    this.paintCredits();
+    this.refreshContinuePrompt();
   }
 
   acceptContinue() {
     if (this.mode !== CONTINUE) return;
+    if (!this.takeCredit()) {
+      this.sfx("off");
+      if (!this.continueClock) this.continueClock = { left: CONTINUE_WAIT, held: false };
+      this.refreshContinuePrompt();
+      return;
+    }
+    this.continueClock = null;
     this.score = 0;
     this.nextLifeAt = this.lifeEvery;
     this.lives = shipConfig.lives;
@@ -4411,6 +4449,7 @@ export class Game {
     this.paused = false;
     this.missileQueued = 0;
     if (this.runDirty || this.score > 0 || this.points > 0) this.writeCheckpoint({ force: true });
+    this.continueClock = null;
     this.hud.hideContinue();
     if (this.ship.alive) this.ship.kill();
     for (const wing of this.wingmen) wing.kill();
@@ -4796,6 +4835,7 @@ export class Game {
     if (this.mode === INITIALS) this.tickInitials();
     if (this.mode === WAVEPICK) this.tickWavePick();
     if (this.mode === STARTPICK) this.tickStartPick();
+    if (this.mode === CONTINUE) this.tickContinueClock(t);
 
     if (this.savePick) {
       this.tickSavePick();
