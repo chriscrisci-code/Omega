@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>2DSG — Operator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #05060a;
+        --cyan: #66e0ff;
+        --hot: #c8f8ff;
+        --dim: #6d8a99;
+        --line: #1a2a33;
+        --card: #0a0e14;
+        --magenta: #ff4d9a;
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--hot);
+        font-family: "Share Tech Mono", "Cascadia Mono", ui-monospace, monospace;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        padding: 32px 16px;
+      }
+      main {
+        width: min(520px, 100%);
+        border: 1px solid var(--line);
+        background: var(--card);
+        padding: 36px 28px 28px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+        font-weight: 400;
+        letter-spacing: 0.28em;
+        color: var(--cyan);
+      }
+      .sub {
+        margin: 0 0 28px;
+        color: var(--dim);
+        letter-spacing: 0.14em;
+        font-size: 12px;
+      }
+      .now {
+        margin: 0 0 22px;
+        color: var(--cyan);
+        letter-spacing: 0.16em;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+      button {
+        appearance: none;
+        background: transparent;
+        border: 1px solid rgba(102, 224, 255, 0.35);
+        color: var(--cyan);
+        font: inherit;
+        letter-spacing: 0.18em;
+        padding: 18px 12px;
+        cursor: pointer;
+      }
+      button:hover,
+      button.is-on {
+        border-color: var(--hot);
+        box-shadow: 0 0 18px rgba(142, 246, 255, 0.28);
+        color: var(--hot);
+      }
+      .bank {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-top: 1px solid var(--line);
+        padding-top: 20px;
+      }
+      .credits {
+        color: var(--dim);
+        letter-spacing: 0.14em;
+      }
+      .credits strong {
+        color: var(--cyan);
+        font-weight: 400;
+      }
+      .note {
+        margin: 22px 0 0;
+        color: var(--dim);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>2DSG</h1>
+      <p class="sub">OPERATOR</p>
+      <p class="now" id="now">MODE  COIN</p>
+      <div class="row">
+        <button id="coin" type="button">COIN</button>
+        <button id="free" type="button">FREE PLAY</button>
+      </div>
+      <div class="bank">
+        <p class="credits">CREDITS  <strong id="credits">0</strong></p>
+        <button id="insert" type="button">INSERT</button>
+      </div>
+      <p class="note">The arcade shows only the active mode. Keep this page off the cabinet floor. Same browser, same machine as the game.</p>
+    </main>
+    <script>
+      const KEY = "vector-game-save";
+      const CHANNEL = "2dsg-cabinet";
+
+      function clampCredits(value) {
+        return Math.max(0, Math.min(99, Math.floor(Number(value) || 0)));
+      }
+
+      function load() {
+        try {
+          const data = JSON.parse(localStorage.getItem(KEY) || "null");
+          return data && typeof data === "object" ? data : {};
+        } catch {
+          return {};
+        }
+      }
+
+      function save(data) {
+        localStorage.setItem(KEY, JSON.stringify(data));
+        try {
+          channel?.postMessage({ type: "cabinet" });
+        } catch {
+          /* ignore */
+        }
+      }
+
+      function state() {
+        const data = load();
+        return {
+          data,
+          freePlay: Boolean(data.settings?.freePlay),
+          credits: clampCredits(data.credits),
+        };
+      }
+
+      function paint() {
+        const { freePlay, credits } = state();
+        document.getElementById("now").textContent = freePlay ? "MODE  FREE PLAY" : "MODE  COIN";
+        document.getElementById("coin").classList.toggle("is-on", !freePlay);
+        document.getElementById("free").classList.toggle("is-on", freePlay);
+        document.getElementById("credits").textContent = String(credits);
+      }
+
+      function setFreePlay(on) {
+        const data = load();
+        data.settings = { ...(data.settings || {}), freePlay: Boolean(on) };
+        save(data);
+        paint();
+      }
+
+      function addCredit() {
+        const data = load();
+        data.credits = clampCredits((data.credits || 0) + 1);
+        save(data);
+        paint();
+      }
+
+      let channel = null;
+      try {
+        channel = new BroadcastChannel(CHANNEL);
+        channel.onmessage = () => paint();
+      } catch {
+        channel = null;
+      }
+
+      window.addEventListener("storage", (event) => {
+        if (event.key === KEY) paint();
+      });
+
+      document.getElementById("coin").addEventListener("click", () => setFreePlay(false));
+      document.getElementById("free").addEventListener("click", () => setFreePlay(true));
+      document.getElementById("insert").addEventListener("click", addCredit);
+      paint();
+    </script>
+  </body>
+</html>

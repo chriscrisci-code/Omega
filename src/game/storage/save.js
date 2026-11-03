@@ -26,7 +26,8 @@ export {
   todayKey,
 } from "./boards.js";
 
-const KEY = "vector-game-save";
+export const SAVE_KEY = "vector-game-save";
+const KEY = SAVE_KEY;
 
 export const SAVE_SLOT_COUNT = 5;
 export const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -62,6 +63,7 @@ const empty = {
     binds: null,
     music: 0.2,
     song: 2,
+    freePlay: false,
   },
 };
 
@@ -250,6 +252,7 @@ function normalize(data) {
         controls: data.settings?.controls === "phone" || data.settings?.controls === "desktop" ? data.settings.controls : "",
         music: data.settings?.song === 2 ? clampMusic(data.settings?.music) : 0.2,
         song: 2,
+        freePlay: Boolean(data.settings?.freePlay),
       },
       data.settings,
     ),

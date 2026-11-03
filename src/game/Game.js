@@ -28,7 +28,7 @@ import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_FLASH, ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
 import { applyScoreToBoards, fetchGlobalBoards, submitGlobalScore } from "./storage/boards.js";
-import { ALPHA, SAVE_SLOT_COUNT, SCORE_BOARDS, clampCredits, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SAVE_KEY, SAVE_SLOT_COUNT, SCORE_BOARDS, clampCredits, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
 import { DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, unlockedShipIds } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -279,8 +279,9 @@ export class Game {
     this.startLatchFire = false;
     this.startingRun = false;
     this.credits = clampCredits(this.save.credits);
-    this.freePlay = false;
+    this.freePlay = Boolean(this.save.settings.freePlay);
     this.save.credits = this.credits;
+    this.save.settings.freePlay = this.freePlay;
     this.continueClock = null;
     this.pendingThumb = "";
     this.thumbRt = null;
@@ -313,6 +314,15 @@ export class Game {
     this.hud.controls.onReset = () => this.resetBinds();
     this.hud.onMusic = (delta) => this.nudgeMusic(delta);
     this.hud.onInsertCoin = () => this.addCredit();
+    window.addEventListener("storage", (event) => {
+      if (event.key === SAVE_KEY) this.pullCabinetMode();
+    });
+    try {
+      this.cabinet = new BroadcastChannel("2dsg-cabinet");
+      this.cabinet.onmessage = () => this.pullCabinetMode();
+    } catch {
+      this.cabinet = null;
+    }
     this.input.onCapture = (id, bind) => this.addBind(id, bind);
     this.applyMusicVol(this.save.settings.music);
     this.input.setBinds(this.save.settings.profile, this.save.settings.binds);
@@ -1210,7 +1220,41 @@ export class Game {
 
   storeCredits() {
     this.save.credits = clampCredits(this.credits);
+    this.save.settings.freePlay = Boolean(this.freePlay);
     this.storage.save(this.save);
+    try {
+      this.cabinet?.postMessage({ type: "cabinet" });
+    } catch {
+      /* ignore */
+    }
+  }
+
+  syncContinueClock() {
+    if (this.mode !== CONTINUE) return;
+    if (this.canPlay()) this.continueClock = null;
+    else if (!this.continueClock) this.continueClock = { left: CONTINUE_WAIT, held: false };
+    this.refreshContinuePrompt();
+  }
+
+  setFreePlay(on) {
+    this.freePlay = Boolean(on);
+    this.paintCredits();
+    this.storeCredits();
+    this.syncContinueClock();
+  }
+
+  pullCabinetMode() {
+    const next = this.storage.load();
+    this.credits = clampCredits(next.credits);
+    this.freePlay = Boolean(next.settings?.freePlay);
+    this.save.credits = this.credits;
+    this.save.settings.freePlay = this.freePlay;
+    this.paintCredits();
+    this.syncContinueClock();
+  }
+
+  toggleFreePlay() {
+    this.setFreePlay(!this.freePlay);
   }
 
   addCredit() {

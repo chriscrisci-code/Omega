@@ -918,9 +918,13 @@ body.is-continue .coin-slot {
 }
 
 .coin-slot #credits .vector-text {
-  width: 120px;
+  width: 132px;
   height: auto;
   margin-left: auto;
+}
+
+body.is-free-play #insert-coin {
+  display: none;
 }
 
 #insert-coin {

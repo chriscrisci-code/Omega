@@ -171,6 +171,7 @@ export class Hud {
   setCredits(count, freePlay = false) {
     this.creditCount = Math.max(0, Math.floor(Number(count) || 0));
     this.freePlay = Boolean(freePlay);
+    document.body.classList.toggle("is-free-play", this.freePlay);
     if (this.credits) this.credits.dataset.count = this.freePlay ? "free" : String(this.creditCount);
     this.paint(
       this.credits,
