@@ -27,7 +27,8 @@ import { LockCam } from "./render/LockCam.js";
 import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_FLASH, ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
-import { ALPHA, SAVE_SLOT_COUNT, SCORE_BOARDS, clampCredits, insertAceScore, insertDailyAce, insertDailyScore, insertHighScore, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { applyScoreToBoards, fetchGlobalBoards, submitGlobalScore } from "./storage/boards.js";
+import { ALPHA, SAVE_SLOT_COUNT, SCORE_BOARDS, clampCredits, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
 import { DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, unlockedShipIds } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -327,6 +328,12 @@ export class Game {
     this.hud.setSpecial("WARP EMP MSL");
     this.hud.setOre(0, 0, "");
     this.paintCredits();
+    this.boards = {
+      all: this.save.highScores,
+      daily: this.save.dailyScores,
+      ace: this.save.aceScores,
+      aceDaily: this.save.dailyAce,
+    };
     this.storage.save(this.save);
     this.beginAttractLoop();
     this.offerDevicePick();
@@ -1693,6 +1700,7 @@ export class Game {
     this.attractBoardHold = options.hold ?? ATTRACT_SCORES;
     this.attractAge = 0;
     this.attractCue = null;
+    this.pullBoards();
     if (page === "scores") {
       this.attractTimer = this.attractBoardHold;
       this.showScoreBoard();
@@ -1723,10 +1731,30 @@ export class Game {
   }
 
   scoreBoardOf(id) {
-    if (id === "daily") return padScoreRows(this.save.dailyScores);
-    if (id === "ace") return padScoreRows(this.save.aceScores);
-    if (id === "aceDaily") return padScoreRows(this.save.dailyAce);
-    return padScoreRows(this.save.highScores);
+    const boards = this.boards || this.save;
+    if (id === "daily") return padScoreRows(boards.daily || this.save.dailyScores);
+    if (id === "ace") return padScoreRows(boards.ace || this.save.aceScores);
+    if (id === "aceDaily") return padScoreRows(boards.aceDaily || this.save.dailyAce);
+    return padScoreRows(boards.all || this.save.highScores);
+  }
+
+  applyBoards(boards) {
+    if (!boards) return;
+    this.boards = boards;
+    this.save.highScores = boards.all;
+    this.save.dailyScores = boards.daily;
+    this.save.aceScores = boards.ace;
+    this.save.dailyAce = boards.aceDaily;
+    this.save.highScore = boards.all?.[0]?.score || this.save.highScore;
+    this.storage.save(this.save);
+    this.hud.setHigh(this.save.highScore);
+  }
+
+  async pullBoards() {
+    const boards = await fetchGlobalBoards();
+    if (!boards) return;
+    this.applyBoards(boards);
+    if ((this.mode === TITLE || this.mode === GAMEOVER) && this.attractPage === "scores") this.showScoreBoard();
   }
 
   showScoreBoard() {
@@ -1736,11 +1764,12 @@ export class Game {
   }
 
   rankEntry() {
+    const boards = this.boards || {};
     return {
-      all: scoreQualifies(this.score, this.save.highScores),
-      daily: scoreQualifies(this.score, this.save.dailyScores),
-      ace: scoreQualifies(this.bestAce, this.save.aceScores),
-      aceDaily: scoreQualifies(this.bestAce, this.save.dailyAce),
+      all: scoreQualifies(this.score, boards.all || this.save.highScores),
+      daily: scoreQualifies(this.score, boards.daily || this.save.dailyScores),
+      ace: scoreQualifies(this.bestAce, boards.ace || this.save.aceScores),
+      aceDaily: scoreQualifies(this.bestAce, boards.aceDaily || this.save.dailyAce),
     };
   }
 
@@ -4504,17 +4533,12 @@ export class Game {
     this.commitInitials();
   }
 
-  commitInitials() {
+  async commitInitials() {
     if (!this.initials) return;
     const name = this.initials.letters.join("");
-    const rank = this.rankEntry();
-    if (rank.all) this.save.highScores = insertHighScore(this.save.highScores, name, this.score);
-    if (rank.daily) this.save.dailyScores = insertDailyScore(this.save.dailyScores, name, this.score);
-    if (rank.ace) this.save.aceScores = insertAceScore(this.save.aceScores, name, this.bestAce);
-    if (rank.aceDaily) this.save.dailyAce = insertDailyAce(this.save.dailyAce, name, this.bestAce);
-    this.save.highScore = this.save.highScores[0]?.score || this.score;
-    this.storage.save(this.save);
-    this.hud.setHigh(this.save.highScore);
+    this.initials = null;
+    const posted = await submitGlobalScore(name, this.score, this.bestAce);
+    this.applyBoards(posted || applyScoreToBoards(this.boards, name, this.score, this.bestAce));
     this.goTitle({ boards: true });
   }
 

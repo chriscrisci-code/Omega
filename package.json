@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@upstash/redis": "^1.41.0",
     "pixi-filters": "^6.1.5",
     "pixi.js": "^8.8.1"
   },
