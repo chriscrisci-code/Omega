@@ -340,6 +340,8 @@ export const assault = {
   w2PerCastle: 2,
   hunterBoost: 10,
   starBoost: 10,
+  /** Non-wave-8 star interval multiplier. 2 = half production. Wave 8 still uses starBoost. */
+  starPace: 2,
 };
 
 /** Wave 11: fight inside a huge asteroid. Walled corridors, bounce, no wrap. */

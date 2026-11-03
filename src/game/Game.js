@@ -585,6 +585,7 @@ export class Game {
         raidMax: Math.max(each, castles * each),
         raidEvery: castle.spawnEvery,
         stars: true,
+        starEvery: castle.starEvery * (assault.starPace || 2),
       };
     }
     if (n === 7) {
@@ -615,6 +616,7 @@ export class Game {
       raidMax: raid.max,
       raidEvery: raid.every,
       stars: true,
+      starEvery: castle.starEvery * (assault.starPace || 2),
     };
   }
 
@@ -4356,7 +4358,7 @@ export class Game {
       life: castle.starLife,
       radius: castle.starRadius,
     });
-    const every = this.assaultPlan().starEvery ?? castle.starEvery;
+    const every = this.assaultPlan().starEvery ?? castle.starEvery * (assault.starPace || 2);
     base.missileCool = every + rand(-every * 0.2, every * 0.25);
   }
 
