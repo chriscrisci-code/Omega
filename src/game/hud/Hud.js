@@ -345,7 +345,7 @@ export class Hud {
     this.title.innerHTML = vectorTitleSvg("2DSG", 44, CYAN, HOT, { motion: true, block: true });
     this.applyTrailState();
     this.paint(this.tag, "FLOWSTATE SPACE COMBAT", 12, MAGENTA, PINK, "center");
-    this.paint(this.credit, "C 1984  2DSG", 9, DIM, CYAN, "center");
+    this.paint(this.credit, "C 2026 CURIOUS RODEO", 9, DIM, CYAN, "center");
     this.refreshStartPrompt();
     this.paintHelp();
     this.shipsPage?.classList.add("is-hidden");
@@ -492,7 +492,7 @@ export class Hud {
     this.center.classList.add("is-scores");
     document.body.classList.add("is-scoreboard");
     this.paintScoreBoard(rows, heading);
-    this.paint(this.credit, "C 1984  2DSG", 9, DIM, CYAN, "center");
+    this.paint(this.credit, "C 2026 CURIOUS RODEO", 9, DIM, CYAN, "center");
     this.refreshStartPrompt();
     this.shipsPage?.classList.add("is-hidden");
     this.hideWavePick();
@@ -571,7 +571,7 @@ export class Hud {
     const line =
       reason === "hub" ? `HUB LOST  ${score}` : reason === "abort" ? `RUN ABORTED  ${score}` : `FINAL  ${score}`;
     this.paint(this.tag, line, 14, MAGENTA, PINK, "center");
-    this.paint(this.credit, "C 1984  2DSG", 9, DIM, CYAN, "center");
+    this.paint(this.credit, "C 2026 CURIOUS RODEO", 9, DIM, CYAN, "center");
     this.refreshStartPrompt();
     this.shipsPage?.classList.add("is-hidden");
     this.hideWavePick();
