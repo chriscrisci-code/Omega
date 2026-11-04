@@ -406,6 +406,27 @@ export class Base {
     }
   }
 
+  revive() {
+    if (!this.hub) return;
+    this.alive = true;
+    this.view.visible = true;
+    this.view.alpha = 1;
+    this.flash = 0.28;
+    this.coreHp = this.maxCoreHp;
+    this.core.alpha = 1;
+    this.core.visible = true;
+    this.laserBeam?.clear();
+    this.regenLock = 0;
+    this.regenClock = 0;
+    this.regenWave = 0;
+    this.missileCool = 0;
+    for (const shield of this.shields) {
+      shield.hp = shield.maxHp;
+      shield.graphic.alpha = 1;
+      shield.graphic.visible = shield.graphic !== this.skin || this.skin.visible;
+    }
+  }
+
   sleep() {
     this.alive = false;
     this.view.visible = false;

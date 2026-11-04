@@ -235,6 +235,8 @@ export class Game {
     this.missileAmmo = 0;
     this.missileDropSide = 1;
     this.paused = false;
+    this.hubDown = false;
+    this.hubDownLatch = false;
     this.saveFlash = 0;
     this.timer = 0;
     this.shake = 0;
@@ -1363,6 +1365,8 @@ export class Game {
     this.missileQueued = 0;
     this.missileDropSide = 1;
     this.paused = false;
+    this.hubDown = false;
+    this.hubDownLatch = false;
     this.saveFlash = 0;
     this.emp.kill();
     this.hole.kill();
@@ -1760,6 +1764,9 @@ export class Game {
   goTitle(options = {}) {
     this.leaveTunnel({ silent: true, dock: false });
     this.paused = false;
+    this.hubDown = false;
+    this.hubDownLatch = false;
+    this.hud.hideHubDown();
     this.initials = null;
     this.stopAttract();
     this.hud.hideContinue();
@@ -2909,13 +2916,14 @@ export class Game {
       this.closeSavePick();
       return;
     }
+    if (this.hubDown) return;
     if (this.mode !== PLAYING || this.attractOnDemo) return;
     this.paused = !this.paused;
     if (this.paused) this.hud.setMode("PAUSE");
   }
 
   manualSave() {
-    if (this.attractOnDemo) return;
+    if (this.attractOnDemo || this.hubDown) return;
     if (this.mode !== PLAYING) return;
     if (this.savePick) {
       this.closeSavePick();
@@ -2938,7 +2946,7 @@ export class Game {
     if (!was) return;
     this.saveLatchFire = true;
     this.pendingThumb = "";
-    if (this.mode === PLAYING) this.paused = false;
+    if (this.mode === PLAYING && !this.hubDown) this.paused = false;
     if (this.mode === PLAYING) this.hud.hideCenter();
     else this.hud.hideWavePick();
     if (!options.silent && this.mode === PLAYING) this.hud.setMode("");
@@ -4483,7 +4491,107 @@ export class Game {
     this.fx.burst(this.hub.x, this.hub.y, colors.white, 16, 180);
     this.shake = 18;
     this.sfx("die");
-    this.endRun("hub");
+    if (this.attractOnDemo) return;
+    if (this.hubDown) return;
+    if (this.mode !== PLAYING && this.mode !== DYING) return;
+
+    const alreadyDying = this.mode === DYING || !this.ship.alive;
+
+    this.leaveHubSeat();
+    this.homeOn = false;
+    this.hud.hideDock();
+    this.hud.setHubAlert(null);
+    this.ace = 0;
+    this.kills = 0;
+    if (!alreadyDying) {
+      this.lives -= 1;
+      this.hud.setLives(Math.max(0, this.lives));
+    }
+    this.paintKills();
+    this.silenceLasers();
+
+    if (this.ship.alive) {
+      for (const wing of this.wingmen) wing.park();
+      this.ship.kill();
+      this.spawnShards(HULL, this.ship, {
+        color: colors.cyan,
+        hotColor: colors.cyanHot,
+        kick: debrisConfig.shipKick,
+        life: debrisConfig.shipLife,
+      });
+      this.fx.burst(this.ship.x, this.ship.y, colors.cyan, 22, 220);
+      this.fx.burst(this.ship.x, this.ship.y, colors.white, 10, 160);
+      this.cargo = 0;
+      this.ship.setCargo(0);
+      this.hud.setOre(0, this.hub.ore, this.hub.upgradeName());
+    }
+
+    this.closeSavePick({ silent: true });
+    this.paused = true;
+    this.hubDown = true;
+    this.hubDownLatch = true;
+    this.hud.showHubDown(this.lives <= 0);
+  }
+
+  finishHubDown() {
+    if (!this.hubDown) return;
+    this.hubDown = false;
+    this.hubDownLatch = false;
+    this.hud.hideHubDown();
+    if (this.lives <= 0) {
+      this.paused = true;
+      this.offerContinue();
+      return;
+    }
+    this.restartWaveAfterHub();
+  }
+
+  restartWaveAfterHub() {
+    this.hubDown = false;
+    this.hubDownLatch = false;
+    this.paused = false;
+    this.hud.hideHubDown();
+    this.leaveHubSeat();
+    this.homeOn = false;
+    this.hud.hideDock();
+    this.hud.setHubAlert(null);
+    this.hub.revive();
+    this.cullRole("hunter");
+    this.cullRole("raider");
+    this.cullRole("destroyer");
+    this.cullRole("corvette");
+    this.clearCranes();
+    this.packs = [];
+    this.shots.forEach((shot) => shot.kill());
+    this.hostileShots.forEach((shot) => shot.kill());
+    this.missiles.forEach((missile) => missile.kill(true));
+    this.hubMissiles.forEach((missile) => missile.kill(true));
+    this.castleStars.forEach((star) => star.kill(true));
+    this.emp.kill();
+    this.hole.kill();
+    this.clearMissileBursts();
+    this.selected = null;
+    this.focusFire = false;
+    this.lockMark.visible = false;
+    this.hubThreat = 0;
+    this.hubThreatClose = false;
+    this.strikeWarn = 0;
+    this.beginAssault(this.assaultIndex, true);
+    this.strikeTimer = strikeCfg.first;
+    this.mode = PLAYING;
+    this.dockOpen = false;
+    this.ship.reset(worldConfig.width / 2, worldConfig.height / 2);
+    this.applyShipSkin();
+    this.ship.setCargo(this.cargo);
+    this.hub.forceDock(this.ship, 0);
+    this.ship.invuln = Math.max(this.ship.invuln || 0, shipConfig.invulnTime);
+    this.syncWingmen({ revive: true });
+    this.snapCamera();
+    this.hud.setOre(this.cargo, this.hub.ore, this.hub.upgradeName());
+    this.hud.setLives(Math.max(0, this.lives));
+    this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
+    this.syncMissileHud();
+    this.syncStation();
   }
 
   offerContinue() {
@@ -4519,9 +4627,13 @@ export class Game {
     this.hud.setPoints(this.points);
     this.hud.hideContinue();
     this.mode = PLAYING;
-    this.ship.reset(this.ship.x, this.ship.y);
-    this.applyShipSkin();
-    this.snapCamera();
+    if (!this.hub.alive) this.restartWaveAfterHub();
+    else {
+      this.paused = false;
+      this.ship.reset(this.ship.x, this.ship.y);
+      this.applyShipSkin();
+      this.snapCamera();
+    }
     this.syncMissileHud();
     this.writeCheckpoint({ force: true });
   }
@@ -4530,6 +4642,9 @@ export class Game {
     if (this.mode === TITLE || this.mode === GAMEOVER || this.mode === INITIALS) return;
     this.closeSavePick({ silent: true });
     this.paused = false;
+    this.hubDown = false;
+    this.hubDownLatch = false;
+    this.hud.hideHubDown();
     this.missileQueued = 0;
     if (this.runDirty || this.score > 0 || this.points > 0) this.writeCheckpoint({ force: true });
     this.continueClock = null;
@@ -4943,7 +5058,24 @@ export class Game {
     if (this.saveFlash > 0) this.saveFlash = Math.max(0, this.saveFlash - t);
 
     if (this.paused) {
-      this.hud.setMode(this.saveFlash > 0 ? "SAVED" : "PAUSE");
+      if (this.hubDown) {
+        this.hud.setMode("HUB WENT DOWN");
+        if (this.hubDownLatch) {
+          if (!this.input.fireHeld) this.hubDownLatch = false;
+        } else if (
+          this.input.firePressed ||
+          this.input.startKeyPressed ||
+          this.input.startPressed ||
+          this.input.shieldPressed
+        ) {
+          this.finishHubDown();
+        }
+      } else if (this.mode === CONTINUE) {
+        if (this.input.continueClick || this.input.startKeyPressed) this.acceptContinue();
+        else if (this.input.selectPressed) this.endRun("dead");
+      } else {
+        this.hud.setMode(this.saveFlash > 0 ? "SAVED" : "PAUSE");
+      }
       this.shake *= 0.86;
       if (this.shake < 0.2) this.shake = 0;
       this.applyCamera(t, screen);

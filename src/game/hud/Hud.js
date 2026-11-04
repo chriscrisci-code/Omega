@@ -341,7 +341,7 @@ export class Hud {
   showTitle() {
     this.attract(true);
     this.setAttractDemo(false);
-    this.center.classList.remove("is-hidden");
+    this.center.classList.remove("is-hidden", "is-hub-down");
     this.title.innerHTML = vectorTitleSvg("2DSG", 44, CYAN, HOT, { motion: true, block: true });
     this.applyTrailState();
     this.paint(this.tag, "FLOWSTATE SPACE COMBAT", 12, MAGENTA, PINK, "center");
@@ -645,9 +645,38 @@ export class Hud {
     document.body.classList.remove("is-continue");
   }
 
+  showHubDown(lastLife = false) {
+    this.attract(false);
+    this.setAttractDemo(false);
+    this.center.classList.remove("is-hidden", "is-scores", "is-initials", "is-wave", "is-hub-over", "is-save-pick");
+    this.center.classList.add("is-hub-down");
+    this.title.innerHTML = vectorTitleSvg("HUB WENT DOWN", 28, MAGENTA, PINK);
+    const phone = this.layout === "phone";
+    const line = lastLife ? (phone ? "TAP TO CONTINUE" : "FIRE TO CONTINUE") : phone ? "TAP TO RESTART WAVE" : "FIRE TO RESTART WAVE";
+    this.paint(this.tag, line, 12, CYAN, HOT, "center");
+    this.cta.innerHTML = "";
+    this.paint(this.credit, "", 8, DIM, CYAN, "center");
+    this.shipsPage?.classList.add("is-hidden");
+    this.hideWavePick();
+    this.hideScores();
+    this.hideContinue();
+    this.setHubAlert(null);
+    this.setMode("HUB WENT DOWN");
+  }
+
+  hideHubDown() {
+    this.center?.classList.remove("is-hub-down");
+    this.center?.classList.add("is-hidden");
+    if (this.title) this.title.innerHTML = "";
+    if (this.tag) this.tag.innerHTML = "";
+    if (this.cta) this.cta.innerHTML = "";
+    this.setMode("");
+  }
+
   hideCenter() {
     this.attract(false);
     this.center.classList.add("is-hidden");
+    this.center.classList.remove("is-hub-down");
     this.shipsPage?.classList.add("is-hidden");
     this.hideControls();
     this.hideDock();
