@@ -281,9 +281,11 @@ export class Game {
     this.startLatchFire = false;
     this.startingRun = false;
     this.credits = clampCredits(this.save.credits);
-    this.freePlay = Boolean(this.save.settings.freePlay);
+    this.operatorFreePlay = Boolean(this.save.settings.freePlay);
+    this.happyHour = false;
+    this.freePlay = this.operatorFreePlay;
     this.save.credits = this.credits;
-    this.save.settings.freePlay = this.freePlay;
+    this.save.settings.freePlay = this.operatorFreePlay;
     this.ensurePayId();
     this.account = null;
     this.payOpen = false;
@@ -327,12 +329,14 @@ export class Game {
     this.hud.onPayEmail = (email) => this.requestPayAuth(email);
     this.hud.onPayCancel = () => this.closePayPortal();
     window.addEventListener("focus", () => {
+      this.syncHappyHour();
       if (this.payOpen) {
         this.syncAccount();
         this.claimPaid();
       }
     });
     this.bootPayReturn();
+    this.bootHappyHour();
     window.addEventListener("storage", (event) => {
       if (event.key === SAVE_KEY) this.pullCabinetMode();
     });
@@ -1239,7 +1243,7 @@ export class Game {
 
   storeCredits() {
     this.save.credits = clampCredits(this.credits);
-    this.save.settings.freePlay = Boolean(this.freePlay);
+    this.save.settings.freePlay = Boolean(this.operatorFreePlay);
     this.storage.save(this.save);
     try {
       this.cabinet?.postMessage({ type: "cabinet" });
@@ -1255,27 +1259,54 @@ export class Game {
     this.refreshContinuePrompt();
   }
 
-  setFreePlay(on) {
-    this.freePlay = Boolean(on);
+  refreshFreePlay() {
+    const on = Boolean(this.operatorFreePlay || this.happyHour);
+    const changed = on !== this.freePlay;
+    this.freePlay = on;
+    if (changed && on && this.payOpen) this.closePayPortal();
     this.paintCredits();
-    this.storeCredits();
     this.syncContinueClock();
+  }
+
+  setFreePlay(on) {
+    this.operatorFreePlay = Boolean(on);
+    this.save.settings.freePlay = this.operatorFreePlay;
+    this.storeCredits();
+    this.refreshFreePlay();
   }
 
   pullCabinetMode() {
     const next = this.storage.load();
-    this.freePlay = Boolean(next.settings?.freePlay);
-    this.save.settings.freePlay = this.freePlay;
+    this.operatorFreePlay = Boolean(next.settings?.freePlay);
+    this.save.settings.freePlay = this.operatorFreePlay;
     if (!this.account) {
       this.credits = clampCredits(next.credits);
       this.save.credits = this.credits;
     }
-    this.paintCredits();
-    this.syncContinueClock();
+    this.refreshFreePlay();
   }
 
   toggleFreePlay() {
-    this.setFreePlay(!this.freePlay);
+    this.setFreePlay(!this.operatorFreePlay);
+  }
+
+  bootHappyHour() {
+    this.syncHappyHour();
+    window.setInterval(() => this.syncHappyHour(), 20000);
+  }
+
+  async syncHappyHour() {
+    let on = false;
+    try {
+      const res = await fetch("/api/freeplay");
+      const data = await res.json().catch(() => ({}));
+      on = Boolean(res.ok && data.freePlay);
+    } catch {
+      on = false;
+    }
+    if (on === this.happyHour) return;
+    this.happyHour = on;
+    this.refreshFreePlay();
   }
 
   ensurePayId() {

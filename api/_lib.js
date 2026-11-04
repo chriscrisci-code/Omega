@@ -30,6 +30,24 @@ export function noStore(res) {
   res.setHeader("cache-control", "no-store");
 }
 
+const FREE_PLAY_ZONE = "America/New_York";
+const FREE_PLAY_START_MIN = 15 * 60;
+const FREE_PLAY_END_MIN = 16 * 60;
+
+export function isEasternFreePlay(now = Date.now()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: FREE_PLAY_ZONE,
+    hour: "numeric",
+    minute: "numeric",
+    hourCycle: "h23",
+  }).formatToParts(new Date(now));
+  const hour = Number(parts.find((part) => part.type === "hour")?.value);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return false;
+  const mins = hour * 60 + minute;
+  return mins >= FREE_PLAY_START_MIN && mins < FREE_PLAY_END_MIN;
+}
+
 export function requestOrigin(req) {
   const host = String(req.headers["x-forwarded-host"] || req.headers.host || "")
     .split(",")[0]

@@ -115,7 +115,7 @@
         <p class="credits">CREDITS  <strong id="credits">0</strong></p>
         <button id="insert" type="button">INSERT</button>
       </div>
-      <p class="note">The arcade shows only the active mode. Keep this page off the cabinet floor. Same browser, same machine as the game.</p>
+      <p class="note">Public Free Play is 3–4 PM Eastern every day. These buttons override this browser only. Keep this page off the cabinet floor. Same browser, same machine as the game.</p>
     </main>
     <script>
       const KEY = "vector-game-save";
@@ -152,12 +152,26 @@
         };
       }
 
+      let happyHour = false;
+
       function paint() {
         const { freePlay, credits } = state();
-        document.getElementById("now").textContent = freePlay ? "MODE  FREE PLAY" : "MODE  COIN";
-        document.getElementById("coin").classList.toggle("is-on", !freePlay);
-        document.getElementById("free").classList.toggle("is-on", freePlay);
+        const on = freePlay || happyHour;
+        document.getElementById("now").textContent = on ? "MODE  FREE PLAY" : "MODE  COIN";
+        document.getElementById("coin").classList.toggle("is-on", !freePlay && !happyHour);
+        document.getElementById("free").classList.toggle("is-on", freePlay || happyHour);
         document.getElementById("credits").textContent = String(credits);
+      }
+
+      async function syncHappyHour() {
+        try {
+          const res = await fetch("/api/freeplay");
+          const data = await res.json().catch(() => ({}));
+          happyHour = Boolean(res.ok && data.freePlay);
+        } catch {
+          happyHour = false;
+        }
+        paint();
       }
 
       function setFreePlay(on) {
@@ -190,6 +204,8 @@
       document.getElementById("free").addEventListener("click", () => setFreePlay(true));
       document.getElementById("insert").addEventListener("click", addCredit);
       paint();
+      syncHappyHour();
+      setInterval(syncHappyHour, 20000);
     </script>
   </body>
 </html>
