@@ -84,9 +84,21 @@ export class Hud {
     this.deviceTitle = document.querySelector("#device-title");
     this.pickDesktop = document.querySelector("#pick-desktop");
     this.pickPhone = document.querySelector("#pick-phone");
+    this.payPortal = document.querySelector("#pay-portal");
+    this.payKicker = document.querySelector("#pay-kicker");
+    this.payTitle = document.querySelector("#pay-title");
+    this.payTag = document.querySelector("#pay-tag");
+    this.payRow = document.querySelector("#pay-row");
+    this.payNote = document.querySelector("#pay-note");
+    this.payEmail = document.querySelector("#pay-email");
+    this.payCancel = document.querySelector("#pay-cancel");
     this.onContinue = null;
     this.onDecline = null;
     this.onPickDevice = null;
+    this.onPickPack = null;
+    this.onPickDest = null;
+    this.onPayEmail = null;
+    this.onPayCancel = null;
     this.layout = "desktop";
     this.profile = "mouse";
     this.trailTimer = 0;
@@ -141,6 +153,16 @@ export class Hud {
       event.preventDefault();
       event.stopPropagation();
       this.onInsertCoin?.();
+    });
+    this.payCancel?.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onPayCancel?.();
+    });
+    this.payEmail?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      this.onPayEmail?.(this.payEmail.value);
     });
     this.setCredits(0, false);
   }
@@ -336,6 +358,87 @@ export class Hud {
 
   hideDevicePick() {
     this.devicePick?.classList.add("is-hidden");
+  }
+
+  showPayPortal({ step = "packs", waiting = false, error = "", email = "" } = {}) {
+    this.payPortal?.classList.remove("is-hidden");
+    this.payRow.innerHTML = "";
+    this.payRow.classList.toggle("is-stack", step === "dest");
+    this.payEmail?.classList.toggle("is-hidden", step !== "email");
+    this.paint(this.payKicker, "2DSG  INSERT CREDITS", 8, DIM, CYAN, "center");
+    if (waiting) step = "wait";
+
+    if (step === "dest") {
+      this.paint(this.payTitle, "WHERE SHOULD WE SAVE YOUR CREDITS?", 14, CYAN, HOT, "center");
+      this.paint(this.payTag, "CHOOSE HOW YOU'D LIKE TO PLAY.", 9, MAGENTA, PINK, "center");
+      this.addPayChoice("SAVE MY CREDITS", "Sign in with your email. Your credits will be available on any device.", () => this.onPickDest?.("account"));
+      this.addPayChoice("PLAY AS GUEST", "No account needed. Credits stay in this browser and may be lost if its data is cleared.", () => this.onPickDest?.("guest"));
+      this.paint(this.payNote, "", 8, DIM, CYAN, "center");
+    } else if (step === "email") {
+      this.paint(this.payTitle, "SAVE MY CREDITS", 16, CYAN, HOT, "center");
+      this.paint(this.payTag, error || "ENTER EMAIL  WE SEND A SIGN-IN LINK", 9, error ? MAGENTA : CYAN, error ? PINK : HOT, "center");
+      this.payEmail.value = email || this.payEmail.value || "";
+      const send = document.createElement("button");
+      send.type = "button";
+      send.className = "pay-btn";
+      send.innerHTML = vectorTextSvg("SEND LINK", 11, CYAN, HOT, "center");
+      send.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.onPayEmail?.(this.payEmail.value);
+      });
+      this.payRow.appendChild(send);
+      this.paint(this.payNote, "NO PASSWORD  LINK EXPIRES IN 15 MIN", 8, DIM, CYAN, "center");
+      queueMicrotask(() => this.payEmail?.focus());
+    } else if (step === "mail") {
+      this.paint(this.payTitle, "CHECK YOUR EMAIL", 16, CYAN, HOT, "center");
+      this.paint(this.payTag, "OPEN THE 2DSG LINK TO SIGN IN", 10, MAGENTA, PINK, "center");
+      this.paint(this.payNote, email ? `SENT TO  ${email}` : "", 8, DIM, CYAN, "center");
+    } else if (step === "wait") {
+      this.paint(this.payTitle, "INSERT", 22, CYAN, HOT, "center");
+      this.paint(this.payTag, "WAITING FOR PAYMENT", 12, MAGENTA, PINK, "center");
+      this.paint(this.payNote, "ALL SALES FINAL  NO REFUNDS", 8, DIM, CYAN, "center");
+    } else {
+      this.paint(this.payTitle, "INSERT", 22, CYAN, HOT, "center");
+      this.paint(this.payTag, error || (email ? `SIGNED IN  ${email}` : "CHOOSE A PACK"), 10, error ? MAGENTA : CYAN, error ? PINK : HOT, "center");
+      for (const pack of [
+        { sku: "pack5", line: "5 CREDITS  $2" },
+        { sku: "pack50", line: "50 CREDITS  $10" },
+      ]) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "pay-btn";
+        btn.innerHTML = vectorTextSvg(pack.line, 11, CYAN, HOT, "center");
+        btn.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          this.onPickPack?.(pack.sku);
+        });
+        this.payRow.appendChild(btn);
+      }
+      this.paint(this.payNote, "ALL SALES FINAL  NO REFUNDS", 8, DIM, CYAN, "center");
+    }
+    this.paint(this.payCancel, "ESC CLOSE", 10, DIM, CYAN, "center");
+  }
+
+  addPayChoice(title, copy, onPick) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "pay-choice";
+    btn.innerHTML = `${vectorTextSvg(title, 12, CYAN, HOT, "left")}<p class="pay-copy">${copy}</p>`;
+    btn.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      onPick?.();
+    });
+    this.payRow.appendChild(btn);
+  }
+
+  hidePayPortal() {
+    this.payPortal?.classList.add("is-hidden");
+    if (this.payRow) this.payRow.innerHTML = "";
+    this.payEmail?.classList.add("is-hidden");
+    if (this.payEmail) this.payEmail.value = "";
   }
 
   showTitle() {
@@ -683,6 +786,7 @@ export class Hud {
     this.hideContinue();
     this.hideWavePick();
     this.hideScores();
+    this.hidePayPortal();
   }
 
   showDock(shipId) {

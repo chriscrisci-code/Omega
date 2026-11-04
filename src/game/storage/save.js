@@ -55,6 +55,7 @@ const empty = {
   checkpoint: null,
   slots: [null, null, null, null, null],
   credits: 0,
+  payId: "",
   settings: {
     fullscreen: false,
     difficulty: "easy",
@@ -75,7 +76,16 @@ function normalizeMacro(list) {
 }
 
 export function clampCredits(value) {
-  return Math.max(0, Math.min(99, Math.floor(Number(value) || 0)));
+  return Math.max(0, Math.min(199, Math.floor(Number(value) || 0)));
+}
+
+export function normalizePayId(value) {
+  const id = String(value || "").toLowerCase();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id) ? id : "";
+}
+
+export function makePayId() {
+  return globalThis.crypto?.randomUUID?.() || "";
 }
 
 function clampMusic(value) {
@@ -220,6 +230,7 @@ function normalize(data) {
       checkpoint: null,
       slots: normalizeSlots(null),
       credits: 0,
+      payId: "",
       macro: [],
       highScores: normalizeHighScores(null),
       dailyScores: normalizeDailyScores(null),
@@ -240,6 +251,7 @@ function normalize(data) {
     checkpoint: null,
     slots: normalizeSlots(data.slots, Array.isArray(data.slots) ? null : migrateCheckpoint(data)),
     credits: clampCredits(data.credits),
+    payId: normalizePayId(data.payId),
     macro: normalizeMacro(data.macro),
     highScores,
     dailyScores,

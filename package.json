@@ -11,7 +11,9 @@
   "dependencies": {
     "@upstash/redis": "^1.41.0",
     "pixi-filters": "^6.1.5",
-    "pixi.js": "^8.8.1"
+    "pixi.js": "^8.8.1",
+    "resend": "^6.37.0",
+    "stripe": "^23.1.0"
   },
   "devDependencies": {
     "vite": "^6.3.5"

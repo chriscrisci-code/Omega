@@ -28,7 +28,7 @@ import { createBloomFilter } from "./render/bloom.js";
 import { createGlowTexture } from "./render/textures.js";
 import { ATTRACT_FLASH, ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCENES, demoSkinFor } from "./attract.js";
 import { applyScoreToBoards, fetchGlobalBoards, submitGlobalScore } from "./storage/boards.js";
-import { ALPHA, SAVE_KEY, SAVE_SLOT_COUNT, SCORE_BOARDS, clampCredits, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
+import { ALPHA, SAVE_KEY, SAVE_SLOT_COUNT, SCORE_BOARDS, clampCredits, makePayId, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizePayId, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
 import { DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, unlockedShipIds } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
@@ -284,6 +284,12 @@ export class Game {
     this.freePlay = Boolean(this.save.settings.freePlay);
     this.save.credits = this.credits;
     this.save.settings.freePlay = this.freePlay;
+    this.ensurePayId();
+    this.account = null;
+    this.payOpen = false;
+    this.paySession = "";
+    this.payTimer = 0;
+    this.payClaiming = false;
     this.continueClock = null;
     this.pendingThumb = "";
     this.thumbRt = null;
@@ -315,7 +321,18 @@ export class Game {
     this.hud.controls.onRemove = (id, key) => this.dropBind(id, key);
     this.hud.controls.onReset = () => this.resetBinds();
     this.hud.onMusic = (delta) => this.nudgeMusic(delta);
-    this.hud.onInsertCoin = () => this.addCredit();
+    this.hud.onInsertCoin = () => this.openPayPortal();
+    this.hud.onPickPack = (sku) => this.buyPack(sku);
+    this.hud.onPickDest = (kind) => this.pickPayDest(kind);
+    this.hud.onPayEmail = (email) => this.requestPayAuth(email);
+    this.hud.onPayCancel = () => this.closePayPortal();
+    window.addEventListener("focus", () => {
+      if (this.payOpen) {
+        this.syncAccount();
+        this.claimPaid();
+      }
+    });
+    this.bootPayReturn();
     window.addEventListener("storage", (event) => {
       if (event.key === SAVE_KEY) this.pullCabinetMode();
     });
@@ -1247,10 +1264,12 @@ export class Game {
 
   pullCabinetMode() {
     const next = this.storage.load();
-    this.credits = clampCredits(next.credits);
     this.freePlay = Boolean(next.settings?.freePlay);
-    this.save.credits = this.credits;
     this.save.settings.freePlay = this.freePlay;
+    if (!this.account) {
+      this.credits = clampCredits(next.credits);
+      this.save.credits = this.credits;
+    }
     this.paintCredits();
     this.syncContinueClock();
   }
@@ -1259,8 +1278,219 @@ export class Game {
     this.setFreePlay(!this.freePlay);
   }
 
+  ensurePayId() {
+    const id = normalizePayId(this.save.payId) || makePayId();
+    if (!id) return "";
+    if (this.save.payId !== id) {
+      this.save.payId = id;
+      this.storage.save(this.save);
+    }
+    return this.save.payId;
+  }
+
+  openPayPortal() {
+    if (this.freePlay) return;
+    this.audio.unlock();
+    this.stopAttract();
+    this.attractPage = "title";
+    this.attractTimer = ATTRACT_HOLD;
+    if (this.mode === TITLE || this.mode === GAMEOVER) this.hud.showTitle();
+    this.payOpen = true;
+    this.holdContinueClock();
+    if (this.account) this.hud.showPayPortal({ step: "packs", email: this.account.email });
+    else this.hud.showPayPortal({ step: "dest" });
+  }
+
+  closePayPortal() {
+    this.payOpen = false;
+    this.paySession = "";
+    if (this.payTimer) {
+      window.clearInterval(this.payTimer);
+      this.payTimer = 0;
+    }
+    this.hud.hidePayPortal();
+  }
+
+  pickPayDest(kind) {
+    if (kind === "guest") this.hud.showPayPortal({ step: "packs" });
+    else this.hud.showPayPortal({ step: "email" });
+  }
+
+  async requestPayAuth(raw) {
+    const email = String(raw || "").trim();
+    if (!email.includes("@")) {
+      this.sfx("off");
+      this.hud.showPayPortal({ step: "email", error: "ENTER A VALID EMAIL" });
+      return;
+    }
+    this.hud.showPayPortal({ step: "mail", email });
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        this.sfx("off");
+        const err = res.status === 503 ? "MAIL OFFLINE" : "SIGN IN FAILED";
+        this.hud.showPayPortal({ step: "email", error: err, email });
+        return;
+      }
+      if (this.payTimer) window.clearInterval(this.payTimer);
+      this.payTimer = window.setInterval(() => this.syncAccount({ afterMail: true }), 2500);
+    } catch {
+      this.sfx("off");
+      this.hud.showPayPortal({ step: "email", error: "SIGN IN FAILED", email });
+    }
+  }
+
+  applyAccount(acct, { chime = false } = {}) {
+    if (!acct?.email) {
+      this.account = null;
+      return;
+    }
+    const before = this.credits;
+    const next = clampCredits(acct.credits);
+    this.account = { email: acct.email, credits: next };
+    this.credits = next;
+    this.save.credits = next;
+    this.storage.save(this.save);
+    this.paintCredits();
+    this.syncContinueClock();
+    if (chime && next > before) {
+      this.audio.unlock();
+      this.audio.play("up");
+      this.holdContinueClock();
+    }
+  }
+
+  async syncAccount(options = {}) {
+    try {
+      const res = await fetch("/api/auth");
+      const data = await res.json().catch(() => ({}));
+      if (data.guest || !data.email) {
+        if (!this.account) return;
+        this.account = null;
+        this.credits = clampCredits(this.save.credits);
+        this.paintCredits();
+        return;
+      }
+      this.applyAccount(data, { chime: Boolean(options.afterMail) });
+      if (options.afterMail && this.payOpen) this.hud.showPayPortal({ step: "packs", email: data.email });
+    } catch {
+      /* stay guest */
+    }
+  }
+
+  async claimAuth(token) {
+    const query = new URLSearchParams({ token });
+    const payId = this.ensurePayId();
+    if (payId) query.set("payId", payId);
+    query.set("credits", String(this.credits || 0));
+    const res = await fetch(`/api/auth?${query}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.email) return false;
+    this.applyAccount(data, { chime: true });
+    return true;
+  }
+
+  async bootPayReturn() {
+    const params = new URLSearchParams(window.location.search);
+    const auth = params.get("auth");
+    const paid = params.get("paid");
+    try {
+      if (auth) await this.claimAuth(auth);
+      else await this.syncAccount();
+      if (paid) {
+        this.paySession = paid;
+        this.payOpen = true;
+        await this.claimPaid();
+      } else if (auth && this.account) {
+        this.openPayPortal();
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      if (auth || paid) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete("auth");
+        url.searchParams.delete("paid");
+        window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      }
+    }
+  }
+
+  async buyPack(sku) {
+    if (this.freePlay) return;
+    const payId = this.ensurePayId();
+    if (!payId) {
+      this.hud.showPayPortal({ step: "packs", error: "PAY ID MISSING", email: this.account?.email });
+      return;
+    }
+    this.hud.showPayPortal({ waiting: true, email: this.account?.email });
+    this.holdContinueClock();
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sku, payId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.url) {
+        this.sfx("off");
+        this.hud.showPayPortal({
+          step: "packs",
+          error: res.status === 503 ? "PAY OFFLINE" : "CHECKOUT FAILED",
+          email: this.account?.email,
+        });
+        return;
+      }
+      this.payOpen = true;
+      this.paySession = String(data.id || "");
+      const tab = window.open(data.url, "_blank", "noopener");
+      if (!tab) window.location.assign(data.url);
+      if (this.payTimer) window.clearInterval(this.payTimer);
+      this.payTimer = window.setInterval(() => this.claimPaid(), 2000);
+      this.claimPaid();
+    } catch {
+      this.sfx("off");
+      this.hud.showPayPortal({ step: "packs", error: "CHECKOUT FAILED", email: this.account?.email });
+    }
+  }
+
+  async claimPaid() {
+    if (this.payClaiming) return;
+    this.payClaiming = true;
+    const before = this.credits;
+    try {
+      const query = new URLSearchParams();
+      const payId = this.ensurePayId();
+      if (payId) query.set("payId", payId);
+      if (this.paySession) query.set("session", this.paySession);
+      const res = await fetch(`/api/pay?${query}`);
+      const data = await res.json().catch(() => ({}));
+      if (data.account?.email) this.applyAccount(data.account, { chime: true });
+      else {
+        const n = Math.max(0, Math.floor(Number(data.credits) || 0));
+        if (n > 0) this.addCredits(n);
+      }
+      if (this.payOpen && this.credits > before) this.closePayPortal();
+    } catch {
+      /* keep waiting */
+    } finally {
+      this.payClaiming = false;
+    }
+  }
+
   addCredit() {
-    this.credits = clampCredits((this.credits || 0) + 1);
+    this.addCredits(1);
+  }
+
+  addCredits(n) {
+    const add = Math.max(0, Math.floor(Number(n) || 0));
+    if (!add) return;
+    this.credits = clampCredits((this.credits || 0) + add);
+    if (this.account) this.account.credits = this.credits;
     this.audio.unlock();
     this.audio.play("up");
     this.paintCredits();
@@ -1297,8 +1527,25 @@ export class Game {
     if (this.freePlay) return true;
     if (this.credits < 1) return false;
     this.credits -= 1;
+    if (this.account) this.account.credits = this.credits;
     this.paintCredits();
     this.storeCredits();
+    if (this.account) {
+      const undo = () => {
+        this.credits = clampCredits(this.credits + 1);
+        if (this.account) this.account.credits = this.credits;
+        this.paintCredits();
+        this.storeCredits();
+      };
+      fetch("/api/wallet", { method: "POST" }).then(async (res) => {
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.email) this.applyAccount(data);
+          return;
+        }
+        undo();
+      }).catch(undo);
+    }
     return true;
   }
 
@@ -1501,7 +1748,7 @@ export class Game {
   }
 
   offerStart() {
-    if (this.titleHold > 0) return;
+    if (this.titleHold > 0 || this.payOpen) return;
     if (!this.canPlay()) {
       this.sfx("off");
       this.paintCredits();
@@ -5024,7 +5271,7 @@ export class Game {
     if (this.titleHold > 0) this.titleHold = Math.max(0, this.titleHold - t);
     if (this.input.fullscreenPressed) this.toggleFullscreen();
     this.hud.setPad(this.input.padConnected);
-    if (this.mode === TITLE || this.mode === GAMEOVER) this.tickAttract(t, space);
+    if ((this.mode === TITLE || this.mode === GAMEOVER) && !this.payOpen) this.tickAttract(t, space);
     if (this.mode === INITIALS) this.tickInitials();
     if (this.mode === WAVEPICK) this.tickWavePick();
     if (this.mode === STARTPICK) this.tickStartPick();
@@ -5104,13 +5351,16 @@ export class Game {
     } else if (this.mode === CONTROLS && this.input.startKeyPressed && !this.input.capture) {
       this.closeControls();
       this.offerStart();
-    } else if (this.mode === CONTINUE && (this.input.continueClick || this.input.startKeyPressed)) {
+    } else if (this.mode === CONTINUE && !this.payOpen && (this.input.continueClick || this.input.startKeyPressed)) {
       this.acceptContinue();
-    } else if (this.mode === CONTINUE && this.input.selectPressed) {
+    } else if (this.mode === CONTINUE && !this.payOpen && this.input.selectPressed) {
       this.endRun("dead");
+    } else if (this.payOpen && this.input.quitPressed) {
+      this.closePayPortal();
     } else if (
       !this.pickingDevice &&
       !this.attractThenTitle &&
+      !this.payOpen &&
       (this.mode === TITLE || this.mode === GAMEOVER) &&
       this.titleHold <= 0 &&
       this.input.startPressed
