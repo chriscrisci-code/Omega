@@ -54,7 +54,7 @@ export default async function handler(req, res) {
         ...(account ? { accountId: account.id } : {}),
       },
       custom_text: {
-        submit: { message: "Arcade credits are added after payment. All sales final. No refunds." },
+        submit: { message: "ALL CREDIT PURCHASES ARE FINAL." },
       },
     });
     if (!session.url) return res.status(500).json({ error: "session" });

@@ -397,7 +397,7 @@ export class Hud {
     } else if (step === "wait") {
       this.paint(this.payTitle, "INSERT", 22, CYAN, HOT, "center");
       this.paint(this.payTag, "WAITING FOR PAYMENT", 12, MAGENTA, PINK, "center");
-      this.paint(this.payNote, "ALL SALES FINAL  NO REFUNDS", 8, DIM, CYAN, "center");
+      this.paint(this.payNote, "ALL CREDIT PURCHASES ARE FINAL.", 8, DIM, CYAN, "center");
     } else {
       this.paint(this.payTitle, "INSERT", 22, CYAN, HOT, "center");
       this.paint(this.payTag, error || (email ? `SIGNED IN  ${email}` : "CHOOSE A PACK"), 10, error ? MAGENTA : CYAN, error ? PINK : HOT, "center");
@@ -416,7 +416,7 @@ export class Hud {
         });
         this.payRow.appendChild(btn);
       }
-      this.paint(this.payNote, "ALL SALES FINAL  NO REFUNDS", 8, DIM, CYAN, "center");
+      this.paint(this.payNote, "ALL CREDIT PURCHASES ARE FINAL.", 8, DIM, CYAN, "center");
     }
     this.paint(this.payCancel, "ESC CLOSE", 10, DIM, CYAN, "center");
   }
