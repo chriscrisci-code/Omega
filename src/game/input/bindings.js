@@ -51,7 +51,9 @@ const GESTURE_NAMES = {
   stickMove: "DIR PAD",
   stickTurn: "RIGHT STICK",
   doubleTap: "DOUBLE TAP",
+  tap: "TAP",
   twoFinger: "TWO FINGER",
+  twoFingerHold: "TWO FINGER HOLD",
 };
 
 function key(c) {
@@ -150,7 +152,7 @@ export const DEFAULTS = {
     turnR: [gesture("stickTurn")],
     aim: [aim("heading")],
     fire: [gesture("stickFire"), key("Space")],
-    shield: [gesture("doubleTap"), key("ShiftLeft")],
+    shield: [gesture("tap"), key("ShiftLeft")],
     warp: [gesture("flickFwd")],
     emp: [gesture("flickBack")],
     hole: [key("KeyB")],
@@ -159,7 +161,7 @@ export const DEFAULTS = {
     lock: [key("KeyL")],
     home: [key("KeyH")],
     pause: [key("KeyP")],
-    save: [key("KeyV")],
+    save: [gesture("twoFingerHold"), key("KeyV")],
     fullscreen: [key("KeyF")],
     quit: [key("Escape")],
   },
@@ -227,6 +229,22 @@ export function normalizeBinds(profile, data) {
     });
   }
   if (!next.lock.length) next.lock = cloneBinds(id).lock;
+  if (id === "phone") {
+    for (const row of ACTIONS) {
+      const seen = new Set();
+      next[row.id] = next[row.id]
+        .map((bind) => (bind.t === "gesture" && bind.g === "doubleTap" ? { t: "gesture", g: "tap" } : bind))
+        .filter((bind) => {
+          const key = bindId(bind);
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    }
+    if (!next.save.some((bind) => bind.t === "gesture" && bind.g === "twoFingerHold")) {
+      next.save = [{ t: "gesture", g: "twoFingerHold" }, ...next.save];
+    }
+  }
   return next;
 }
 

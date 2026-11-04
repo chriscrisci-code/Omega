@@ -35,6 +35,7 @@ export class Input {
     this._missileTicks = 0;
     this._lockTick = false;
     this._shieldTick = false;
+    this._saveTick = false;
     this._shipsClick = false;
     this._controlsClick = false;
     this._continueClick = false;
@@ -194,6 +195,7 @@ export class Input {
     else if (id === "emp") this._empTicks += 1;
     else if (id === "missile") this._missileTicks += 1;
     else if (id === "shield") this._shieldTick = true;
+    else if (id === "save") this._saveTick = true;
     else if (id === "fire") this.touchFire = true;
     else if (id === "home") this.pressed.add("__home__");
     else if (id === "map") this.keys.add("__map__");
@@ -436,7 +438,7 @@ export class Input {
   }
 
   get savePressed() {
-    return this.keysPressed("save") || this.anyPressed(["KeyV"]);
+    return this._saveTick || this.keysPressed("save") || this.anyPressed(["KeyV"]);
   }
 
   get slotDigit() {
@@ -534,6 +536,7 @@ export class Input {
     this._missileTicks = 0;
     this._lockTick = false;
     this._shieldTick = false;
+    this._saveTick = false;
     this._shipsClick = false;
     this._controlsClick = false;
     this._continueClick = false;
