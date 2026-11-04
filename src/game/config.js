@@ -461,7 +461,7 @@ export const bloom = {
   resolution: 1,
 };
 
-export const extraLifeEvery = 10000;
+export const extraLifeEvery = 25000;
 
 /** Ship stats and specials live in ships/kits.js. */
 
@@ -540,7 +540,7 @@ export function applyDifficulty(id) {
     rocks.startCount = 6;
     rocks.fieldCount = 44;
     rocks.hits = { 3: 5, 2: 4, 1: 2 };
-    return { id: key, extraLifeEvery: 10000 };
+    return { id: key, extraLifeEvery };
   }
 
   if (key === "hard") {
@@ -573,8 +573,8 @@ export function applyDifficulty(id) {
     rocks.fieldCount = 52;
     rocks.maxLarge = 10;
     rocks.hits = { 3: 6, 2: 4, 1: 3 };
-    return { id: key, extraLifeEvery: 10000 };
+    return { id: key, extraLifeEvery };
   }
 
-  return { id: "easy", extraLifeEvery: 10000 };
+  return { id: "easy", extraLifeEvery };
 }
