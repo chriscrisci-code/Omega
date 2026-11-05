@@ -30,7 +30,7 @@ import { ATTRACT_FLASH, ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCEN
 import { applyScoreToBoards, fetchGlobalBoards, submitGlobalScore } from "./storage/boards.js";
 import { ALPHA, SAVE_KEY, SAVE_SLOT_COUNT, SCORE_BOARDS, clampCredits, makePayId, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizePayId, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
-import { DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, unlockedShipIds } from "./ships/catalog.js";
+import { ACRP33_ID, DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, shipUnlocked, unlockedShipIds } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
 
 const TITLE = "title";
@@ -139,6 +139,8 @@ export class Game {
     this.vectors.addChildAt(this.station.view, 0);
     this.craneWait = 0;
     this.yardWarn = 0;
+    this.battleWarn = 0;
+    this.battleshipAttackWave = 0;
     for (const base of this.bases) this.vectors.addChild(base.view);
     this.pendingBases = [];
     this.baseUnlockIn = castle.arriveEvery;
@@ -577,6 +579,8 @@ export class Game {
     this.syncStation();
     this.station.setBuild(this.assaultIndex);
     this.battleship.setBuild(this.assaultIndex);
+    this.armBattleshipAttack();
+    this.maybeLaunchBattleship(silent);
     if (this.assaultIndex === 9) this.yardWarn = 6.5;
     if (this.assaultIndex >= 7 && this.assaultIndex < 9) this.clearCranes();
     if (this.assaultIndex === 8) this.cullRole("hunter");
@@ -979,8 +983,13 @@ export class Game {
       } else {
         job.t += t * rate;
         if (job.t >= craneCfg.dockTime) {
-          if (job.yard === this.battleship) job.yard.seat(piece);
-          else job.yard.seatArc(piece);
+          if (job.yard === this.battleship) {
+            job.yard.seat(piece);
+            if (job.yard.allSeated()) {
+              job.yard.complete();
+              this.armBattleshipAttack();
+            }
+          } else job.yard.seatArc(piece);
           enemy.job = null;
           this.fx.burst(slot.x, slot.y, this.station.color, 10, 90);
         }
@@ -1193,9 +1202,56 @@ export class Game {
     this.sfx("enemy");
   }
 
+  armBattleshipAttack() {
+    if (this.attractOnDemo || this.battleshipAttackWave || this.battleship?.attacking || this.battleship?.wrecked) return;
+    if (!this.battleship?.built || !this.battleship.alive) return;
+    if (!shipUnlocked(ACRP33_ID, this.xp)) return;
+    this.battleshipAttackWave = this.assaultIndex + 1;
+  }
+
+  maybeLaunchBattleship(silent = false) {
+    if (this.attractOnDemo || this.battleship?.wrecked || this.battleship?.attacking) return;
+    if (!this.battleshipAttackWave || this.assaultIndex < this.battleshipAttackWave) return;
+    if (!this.battleship?.built || !this.battleship.alive) return;
+    if (!this.battleship.beginAttack()) return;
+    this.battleWarn = 6.5;
+    if (!silent) this.sfx("warn");
+  }
+
+  fireBattleshipGuns() {
+    const ship = this.battleship;
+    if (!ship?.readyToFire() || !this.hub?.alive) return;
+    const bullet = this.hostileShots.find((shot) => !shot.alive);
+    if (!bullet) return;
+    const gun = ship.nextGun();
+    const dx = wrapDelta(this.hub.x - gun.x, worldConfig.width);
+    const dy = wrapDelta(this.hub.y - gun.y, worldConfig.height);
+    bullet.fire(gun.x, gun.y, Math.atan2(dy, dx), {
+      hostile: true,
+      color: ship.color,
+      hot: ship.hotColor,
+      speed: battleshipCfg.gunSpeed,
+      life: battleshipCfg.gunLife,
+    });
+    ship.gunCool = battleshipCfg.gunCool;
+    this.sfx("enemy");
+  }
+
+  tickBattleshipAttack(t, space) {
+    const ship = this.battleship;
+    if (!ship?.attacking || !ship.alive) return;
+    if (this.attractOnDemo) return;
+    ship.tickAttack(t, this.hub, space);
+    if (this.mode !== PLAYING) return;
+    if (this.inTunnel()) return;
+    this.fireBattleshipGuns();
+  }
+
   stationTargets() {
     const parts = this.station?.awake ? [...this.station.parts()] : [];
-    if (this.station?.awake && this.battleship?.alive) parts.push(...this.battleship.hitParts());
+    if (this.battleship?.alive && (this.station?.awake || this.battleship.attacking)) {
+      parts.push(...this.battleship.hitParts());
+    }
     return parts;
   }
 
@@ -1685,6 +1741,8 @@ export class Game {
     this.hubThreatClose = false;
     this.hubAlertOn = false;
     this.hubWarnPulse = 0;
+    this.battleWarn = 0;
+    this.battleshipAttackWave = 0;
     this.starBeepWait = 0;
     this.selected = null;
     this.railPrey = null;
@@ -2348,6 +2406,7 @@ export class Game {
       this.hud.setMode(id);
       this.sfx("up");
     }
+    this.armBattleshipAttack();
   }
 
   resetXp() {
@@ -5020,9 +5079,18 @@ export class Game {
       count += 1;
       if (dist < nearest) nearest = dist;
     }
+    const battleshipStrike = this.battleship?.attacking && this.battleship.alive;
+    if (battleshipStrike) {
+      incoming += 1;
+      const dist = Math.hypot(
+        wrapDelta(this.battleship.x - this.hub.x, space.width),
+        wrapDelta(this.battleship.y - this.hub.y, space.height),
+      );
+      if (dist < nearest) nearest = dist;
+    }
     const shown = incoming || count;
     this.hubThreat = shown;
-    this.hubThreatClose = shown > 0 && nearest < raid.warn * 0.45;
+    this.hubThreatClose = shown > 0 && (Boolean(battleshipStrike && this.battleship.holding) || nearest < raid.warn * 0.45);
     if (shown && !this.hubAlertOn) {
       this.sfx("warn");
       this.hubWarnPulse = 1.6;
@@ -5045,7 +5113,11 @@ export class Game {
             hull: this.hub.coreHp,
             shield: this.hub.shieldHp(),
             close: this.hubThreatClose,
-            title: incoming ? "INCOMING ATTACK DETECTED" : undefined,
+            title: battleshipStrike
+              ? "BATTLESHIP IS ATTACKING THE HUB"
+              : incoming
+                ? "INCOMING ATTACK DETECTED"
+                : undefined,
           }
         : null,
     );
@@ -5196,6 +5268,13 @@ export class Game {
         }
       }
     }
+    if (this.battleship?.attacking && this.battleship.alive) {
+      this.battleship.view.visible = !mapping && !this.tunnel;
+      if (!mapping && !this.tunnel) {
+        this.placeView({ view: this.battleship.view, x: this.battleship.ox, y: this.battleship.oy }, space.width, space.height);
+        this.battleship.view.rotation = this.battleship.rotation;
+      }
+    }
     for (const enemy of this.enemies) {
       enemy.view.scale.set(foeBoost);
       this.placeView(enemy, space.width, space.height);
@@ -5241,7 +5320,7 @@ export class Game {
       ...this.enemies.filter((enemy) => enemy.alive),
     ];
     if (this.station.awake) marks.push(this.station);
-    if (this.station.awake && this.battleship?.alive) marks.push(this.battleship);
+    if (this.battleship?.alive && (this.station.awake || this.battleship.attacking)) marks.push(this.battleship);
     if (this.tunnel) {
       marks.push({
         x: this.tunnel.core.x,
@@ -5529,14 +5608,17 @@ export class Game {
               : `WAVE  ${this.assaultIndex}`;
       if (this.yardWarn > 0) this.yardWarn = Math.max(0, this.yardWarn - t);
       if (this.strikeWarn > 0) this.strikeWarn = Math.max(0, this.strikeWarn - t);
+      if (this.battleWarn > 0) this.battleWarn = Math.max(0, this.battleWarn - t);
       this.hud.setMode(
         this.saveFlash > 0
           ? "SAVED"
-          : this.strikeWarn > 0
-            ? "INCOMING ATTACK DETECTED"
-            : this.yardWarn > 0
-              ? "BATTLESHIP BEING BUILT"
-              : modeLabel,
+          : this.battleWarn > 0
+            ? "BATTLESHIP IS ATTACKING THE HUB"
+            : this.strikeWarn > 0
+              ? "INCOMING ATTACK DETECTED"
+              : this.yardWarn > 0
+                ? "BATTLESHIP BEING BUILT"
+                : modeLabel,
       );
     } else if (this.mode === DYING) {
       this.leaveHubSeat();
@@ -5709,6 +5791,7 @@ export class Game {
         if (!enemy.warping && enemy.wantsShot(prey, space)) this.fireHostile(enemy);
       }
       this.tickStation(t, space);
+      this.tickBattleshipAttack(t, space);
       this.battleship.tickLoose(t, space);
       this.tickDestroyerLasers(t, space);
       if (this.hub.alive && this.hub.armed) {

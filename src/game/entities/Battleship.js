@@ -1,6 +1,6 @@
 import { Container, Graphics } from "pixi.js";
 import { battleship as cfg, colors, station as stationCfg } from "../config.js";
-import { wrap } from "../math.js";
+import { turnToward, wrap, wrapCoord, wrapDelta } from "../math.js";
 import { strokeGlow, strokeLine } from "../render/textures.js";
 import { kitFor, kitWeapon } from "../ships/kits.js";
 
@@ -186,10 +186,17 @@ export class Battleship {
     this.hotColor = colors.magentaHot;
     this.alive = false;
     this.building = false;
+    this.built = false;
+    this.attacking = false;
+    this.holding = false;
     this.wrecked = false;
     this.x = 0;
     this.y = 0;
+    this.ox = 0;
+    this.oy = 0;
     this.rotation = 0;
+    this.gunCool = 0;
+    this.gunSign = 0;
     this.radius = 140;
     this.maxHp = (cfg.acrpShots || 10) * acrpShotHits();
     this.hp = this.maxHp;
@@ -263,13 +270,14 @@ export class Battleship {
 
   sync() {
     if (!this.station) return;
-    const at = this.station.localToWorld(0, CY);
+    if (!this.attacking) this.rotation = this.station.rotation;
+    const at = this.localToWorld(0, CY);
     this.x = at.x;
     this.y = at.y;
-    this.rotation = this.station.rotation;
+    if (this.attacking) this.view.rotation = this.rotation;
     const live = this.alive && this.hp > 0;
     for (const hit of this.hits) {
-      const pos = this.station.localToWorld(hit.lx, hit.ly);
+      const pos = this.localToWorld(hit.lx, hit.ly);
       hit.x = pos.x;
       hit.y = pos.y;
       hit.alive = live;
@@ -297,7 +305,85 @@ export class Battleship {
   }
 
   localToWorld(lx, ly) {
+    if (this.attacking) {
+      const c = Math.cos(this.rotation);
+      const s = Math.sin(this.rotation);
+      return {
+        x: this.ox + lx * c - ly * s,
+        y: this.oy + lx * s + ly * c,
+      };
+    }
     return this.station.localToWorld(lx, ly);
+  }
+
+  dockToStation() {
+    this.attacking = false;
+    this.holding = false;
+    this.station?.combat?.addChild(this.view);
+    this.view.position.set(0, 0);
+    this.view.rotation = 0;
+  }
+
+  allSeated() {
+    return this.plates.every((plate) => plate.installed);
+  }
+
+  gunWorld() {
+    const side = this.gunSign >= 0 ? 1 : -1;
+    return this.localToWorld(188, CY + 68 * side);
+  }
+
+  nextGun() {
+    const at = this.gunWorld();
+    this.gunSign = this.gunSign >= 0 ? -1 : 1;
+    return at;
+  }
+
+  readyToFire() {
+    return this.attacking && this.holding && this.alive && !this.wrecked && this.gunCool <= 0;
+  }
+
+  beginAttack() {
+    if (!this.alive || this.wrecked || this.attacking || !this.worldLayer) return false;
+    this.complete();
+    this.ox = this.station.x;
+    this.oy = this.station.y;
+    this.rotation = this.station.rotation;
+    const parent = this.station.view;
+    const i = parent && this.worldLayer.children.includes(parent)
+      ? this.worldLayer.getChildIndex(parent) + 1
+      : 1;
+    this.worldLayer.addChildAt(this.view, i);
+    this.view.visible = true;
+    this.attacking = true;
+    this.holding = false;
+    this.gunCool = 0.4;
+    this.gunSign = 0;
+    this.sync();
+    return true;
+  }
+
+  tickAttack(dt, hub, space) {
+    if (!this.attacking || !this.alive) return;
+    this.gunCool = Math.max(0, this.gunCool - dt);
+    if (!hub) return;
+    const dx = wrapDelta(hub.x - this.x, space.width);
+    const dy = wrapDelta(hub.y - this.y, space.height);
+    const dist = Math.hypot(dx, dy) || 1;
+    const desired = Math.atan2(dy, dx);
+    this.rotation = turnToward(this.rotation, desired, cfg.turn * dt);
+    const standoff = cfg.approach || 1500;
+    if (dist > standoff + 6) {
+      this.holding = false;
+      const move = Math.min(cfg.speed * dt, dist - standoff);
+      this.ox += (dx / dist) * move;
+      this.oy += (dy / dist) * move;
+      this.ox = wrapCoord(this.ox, space.width);
+      this.oy = wrapCoord(this.oy, space.height);
+    } else {
+      this.holding = true;
+    }
+    this.sync();
   }
 
   slotWorld(plate) {
@@ -333,7 +419,9 @@ export class Battleship {
   }
 
   hide() {
+    this.dockToStation();
     this.building = false;
+    this.built = false;
     this.alive = false;
     this.hp = 0;
     for (const hit of this.hits) hit.alive = false;
@@ -349,6 +437,8 @@ export class Battleship {
   }
 
   startYard() {
+    this.dockToStation();
+    this.built = false;
     this.building = true;
     this.resetHull();
     this.view.visible = true;
@@ -366,6 +456,7 @@ export class Battleship {
 
   complete() {
     this.building = false;
+    this.built = true;
     this.resetHull();
     this.view.visible = true;
     this.paintKeel(true);
@@ -373,8 +464,11 @@ export class Battleship {
   }
 
   setBuild(wave, force = false) {
+    if (force) this.dockToStation();
     if (wave < cfg.fromWave) this.hide();
     else if (this.wrecked && !force) return;
+    else if (this.attacking && !force) return;
+    else if (this.built && !this.building && !force) return;
     else if (force || !this.building) this.startYard();
   }
 

@@ -404,7 +404,8 @@ export const station = {
   shift: [70, 95],
 };
 
-/** Wave 9 scaffold on the station. ~8× destroyer length. 10 ACRP rail shots to kill. */
+/** Wave 9 scaffold on the station. ~8× destroyer length. 10 ACRP rail shots to kill.
+ *  Once built and the player has ACRP, the next wave undocks and crawls to the Hub. */
 export const battleship = {
   fromWave: 9,
   plates: 6,
@@ -413,6 +414,12 @@ export const battleship = {
   length: 1080,
   beam: 172,
   acrpShots: 10,
+  approach: 1500,
+  speed: 32,
+  turn: 0.28,
+  gunCool: 1.45,
+  gunSpeed: 480,
+  gunLife: 3.8,
 };
 
 export const ore = {
