@@ -309,7 +309,7 @@ export class Game {
       this.acceptContinue();
     };
     this.hud.onDecline = () => this.endRun("dead");
-    this.hud.onPickDevice = (id) => this.setControlProfile(id === "phone" ? "phone" : "mouse");
+    this.hud.onPickDevice = () => this.dismissPhoneSoon();
     this.hud.onPickWave = (n) => this.startRun(n);
     this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
     this.hud.bay.onSeat = (id) => this.enterHubSeat(id);
@@ -1919,24 +1919,25 @@ export class Game {
   }
 
   offerDevicePick() {
-    const saved = this.save.settings.controls;
-    if (saved === "desktop" || saved === "phone") {
-      this.applyControls(saved, false);
-      return;
-    }
-    if (maybePhone()) {
-      this.pickingDevice = true;
-      this.hud.showDevicePick();
-      return;
-    }
     this.applyControls("desktop", false);
+    if (this.save.settings.controls === "phone" || maybePhone()) {
+      this.pickingDevice = true;
+      this.hud.showPhoneSoon();
+    }
+  }
+
+  dismissPhoneSoon() {
+    this.pickingDevice = false;
+    this.hud.hideDevicePick();
+    this.applyControls("desktop", true);
   }
 
   applyControls(id, persist = true) {
-    const layout = id === "phone" ? "phone" : "desktop";
+    const layout = "desktop";
+    if (this.input.profile === "phone") this.input.setBinds("mouse");
     this.pickingDevice = false;
     this.input.setLayout(layout);
-    this.touch.setActive(layout === "phone");
+    this.touch.setActive(false);
     this.camZoom = this.playZoom();
     this.world.scale.set(this.camZoom);
     this.hud.setLayout(layout);
@@ -1952,7 +1953,7 @@ export class Game {
   persistBinds() {
     this.save.settings.profile = this.input.profile;
     this.save.settings.binds = this.input.binds;
-    this.save.settings.controls = this.input.profile === "phone" ? "phone" : "desktop";
+    this.save.settings.controls = "desktop";
     this.storage.save(this.save);
   }
 
@@ -1965,8 +1966,13 @@ export class Game {
   }
 
   setControlProfile(id) {
+    if (id === "phone") {
+      this.pickingDevice = true;
+      this.hud.showPhoneSoon();
+      return;
+    }
     this.input.setBinds(id);
-    this.applyControls(id === "phone" ? "phone" : "desktop", false);
+    this.applyControls("desktop", false);
     this.persistBinds();
     this.refreshControls();
     this.hud.setLayout(this.input.layout);
@@ -4207,6 +4213,7 @@ export class Game {
           longLife: 3,
           longChance: 0.4,
           chips: via === "missile" ? 5 : enemy.shieldHp > 0 ? 2 : 4,
+          kickRamp: true,
         });
       }
       if (enemy.shieldHp > 0) {
@@ -5388,6 +5395,8 @@ export class Game {
       this.endRun("dead");
     } else if (this.payOpen && this.input.quitPressed) {
       this.closePayPortal();
+    } else if (this.pickingDevice && (this.input.startPressed || this.input.quitPressed)) {
+      this.dismissPhoneSoon();
     } else if (
       !this.pickingDevice &&
       !this.attractThenTitle &&

@@ -217,6 +217,13 @@ export function wreckBurst(body, look, count = 8) {
   return shards;
 }
 
+function chipKickScale(linger, ramp) {
+  const base = linger ? rand(0.35, 0.7) : rand(1.2, 1.8);
+  if (!ramp) return base;
+  const extra = Math.pow(Math.random(), 4.5);
+  return base * (1 + extra * (linger ? 1.2 : 2.4));
+}
+
 export function chipBurst(body, look, count = 5) {
   const shards = [];
   for (let i = 0; i < count; i += 1) {
@@ -238,7 +245,7 @@ export function chipBurst(body, look, count = 5) {
           closed: false,
           life: linger ? look.longLife + rand(-0.2, 0.4) : undefined,
           lifeScale: rand(0.28, 0.5),
-          kickScale: linger ? rand(0.35, 0.7) : rand(1.2, 1.8),
+          kickScale: chipKickScale(linger, look.kickRamp),
           spinScale: linger ? rand(0.35, 0.9) : rand(1.6, 2.4),
           width: linger ? rand(1.15, 1.55) : rand(1, 1.35),
         },

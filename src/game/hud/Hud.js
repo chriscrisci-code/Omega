@@ -82,6 +82,7 @@ export class Hud {
     this.continueNo = document.querySelector("#continue-no");
     this.devicePick = document.querySelector("#device-pick");
     this.deviceTitle = document.querySelector("#device-title");
+    this.deviceNote = document.querySelector("#device-note");
     this.pickDesktop = document.querySelector("#pick-desktop");
     this.pickPhone = document.querySelector("#pick-phone");
     this.payPortal = document.querySelector("#pay-portal");
@@ -131,8 +132,8 @@ export class Hud {
     this.paint(this.padStatus, "GAMEPAD CONNECTED", 10, DIM, CYAN, "right");
     this.paintHelp();
     this.paint(this.deviceTitle, "CONTROLS", 16, CYAN, HOT, "center");
-    this.pickDesktop && (this.pickDesktop.innerHTML = vectorTextSvg("DESKTOP", 14, CYAN, HOT, "center"));
-    this.pickPhone && (this.pickPhone.innerHTML = vectorTextSvg("PHONE", 14, CYAN, HOT, "center"));
+    this.pickDesktop && (this.pickDesktop.innerHTML = vectorTextSvg("OK", 14, CYAN, HOT, "center"));
+    this.pickPhone?.classList.add("is-hidden");
     this.pickDesktop?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -353,6 +354,14 @@ export class Hud {
   }
 
   showDevicePick() {
+    this.showPhoneSoon();
+  }
+
+  showPhoneSoon() {
+    this.paint(this.deviceTitle, "PHONE VERSION", 16, CYAN, HOT, "center");
+    this.paint(this.deviceNote, "COMING SOON!", 14, MAGENTA, PINK, "center");
+    this.pickDesktop && (this.pickDesktop.innerHTML = vectorTextSvg("OK", 14, CYAN, HOT, "center"));
+    this.pickPhone?.classList.add("is-hidden");
     this.devicePick?.classList.remove("is-hidden");
   }
 
