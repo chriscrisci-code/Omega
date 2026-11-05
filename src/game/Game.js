@@ -2110,6 +2110,7 @@ export class Game {
     this.hubDownLatch = false;
     this.hud.hideHubDown();
     this.initials = null;
+    this.input.typeMode = false;
     this.stopAttract();
     this.hud.hideContinue();
     this.hud.hideDock();
@@ -5012,6 +5013,7 @@ export class Game {
 
   beginInitials(reason = "final") {
     this.mode = INITIALS;
+    this.input.typeMode = true;
     this.silenceLasers();
     this.initials = { letters: ["A", "A", "A"], i: 0 };
     const rank = this.rankEntry();
@@ -5025,6 +5027,19 @@ export class Game {
     const slot = this.initials.i;
     const at = Math.max(0, ALPHA.indexOf(this.initials.letters[slot]));
     this.initials.letters[slot] = ALPHA[(at + dir + ALPHA.length) % ALPHA.length];
+    this.hud.paintInitials(this.initials);
+  }
+
+  typeInitial(ch) {
+    if (!this.initials || !ALPHA.includes(ch)) return;
+    this.initials.letters[this.initials.i] = ch;
+    if (this.initials.i < 2) this.initials.i += 1;
+    this.hud.paintInitials(this.initials);
+  }
+
+  backInitial() {
+    if (!this.initials) return;
+    if (this.initials.i > 0) this.initials.i -= 1;
     this.hud.paintInitials(this.initials);
   }
 
@@ -5048,6 +5063,11 @@ export class Game {
   }
 
   tickInitials() {
+    for (const ch of this.input.takeTyped()) {
+      if (ch === "\b") this.backInitial();
+      else this.typeInitial(ch);
+    }
+    if (!this.initials) return;
     if (this.input.letterLeft) this.nudgeInitial(-1);
     if (this.input.letterRight) this.nudgeInitial(1);
     if (this.input.startPressed || this.input.firePressed || this.input.selectPressed) this.lockInitial();
@@ -5384,6 +5404,7 @@ export class Game {
     const space = this.space();
 
     this.touch.tick();
+    this.input.typeMode = this.mode === INITIALS;
     this.input.fineWheel = this.mode === INITIALS || this.mode === WAVEPICK || this.mode === STARTPICK || this.savePick;
     if (this.titleHold > 0) this.titleHold = Math.max(0, this.titleHold - t);
     if (this.input.fullscreenPressed) this.toggleFullscreen();

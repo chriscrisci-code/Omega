@@ -630,7 +630,7 @@ export class Hud {
       this.paint(this.tag, `${label}  ${score}`, 14, MAGENTA, PINK, "center");
     }
     this.paintInitials(entry);
-    this.paint(this.credit, "WHEEL OR ARROWS   CLICK NEXT", 8, DIM, CYAN, "center");
+    this.paint(this.credit, "TYPE OR ARROWS   ENTER NEXT", 8, DIM, CYAN, "center");
     this.cta.innerHTML = "";
     this.shipsPage?.classList.add("is-hidden");
     this.hideContinue();

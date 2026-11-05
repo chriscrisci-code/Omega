@@ -52,6 +52,8 @@ export class Input {
     this.fineWheel = false;
     this.capture = "";
     this.onCapture = null;
+    this.typeMode = false;
+    this.typed = [];
     this.tapAt = 0;
     this.tapX = 0;
     this.tapY = 0;
@@ -63,6 +65,7 @@ export class Input {
         this.finishCapture({ t: "key", c: event.code });
         return;
       }
+      if (this.noteTyped(event)) return;
       if (!this.keys.has(event.code)) this.pressed.add(event.code);
       this.keys.add(event.code);
     };
@@ -161,6 +164,28 @@ export class Input {
     window.addEventListener("gamepaddisconnected", () => {
       this.padConnected = navigator.getGamepads?.().some(Boolean) ?? false;
     });
+  }
+
+  noteTyped(event) {
+    if (!this.typeMode || event.ctrlKey || event.metaKey || event.altKey) return false;
+    const letter = event.key.length === 1 ? event.key.toUpperCase() : "";
+    if (letter >= "A" && letter <= "Z") {
+      event.preventDefault();
+      if (!event.repeat) this.typed.push(letter);
+      return true;
+    }
+    if (event.key === "Backspace") {
+      event.preventDefault();
+      if (!event.repeat) this.typed.push("\b");
+      return true;
+    }
+    return false;
+  }
+
+  takeTyped() {
+    const out = this.typed;
+    this.typed = [];
+    return out;
   }
 
   setBinds(profile, binds) {
