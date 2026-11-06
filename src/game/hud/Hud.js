@@ -83,6 +83,8 @@ export class Hud {
     this.devicePick = document.querySelector("#device-pick");
     this.deviceTitle = document.querySelector("#device-title");
     this.deviceNote = document.querySelector("#device-note");
+    this.devicePlay = document.querySelector("#device-play");
+    this.phoneDevice = false;
     this.pickDesktop = document.querySelector("#pick-desktop");
     this.pickPhone = document.querySelector("#pick-phone");
     this.payPortal = document.querySelector("#pay-portal");
@@ -219,7 +221,13 @@ export class Hud {
     if (this.shipsPage && !this.shipsPage.classList.contains("is-hidden")) return;
     if (this.controlsPage && !this.controlsPage.classList.contains("is-hidden")) return;
     const ready = this.canPlay();
-    const line = ready ? (this.layout === "phone" ? "TAP TO START" : "PRESS FIRE") : "INSERT COIN";
+    const line = ready
+      ? this.layout === "phone"
+        ? "TAP TO START"
+        : "PRESS FIRE"
+      : this.phoneDevice
+        ? "PLAY ON DESKTOP"
+        : "INSERT COIN";
     this.cta.innerHTML = vectorTitleSvg(line, 20, CYAN, HOT);
   }
 
@@ -357,9 +365,19 @@ export class Hud {
     this.showPhoneSoon();
   }
 
+  setPhoneDevice(on) {
+    this.phoneDevice = Boolean(on);
+    document.body.classList.toggle("is-phone-device", this.phoneDevice);
+    this.insertCoin?.classList.toggle("is-hidden", this.phoneDevice);
+    this.refreshStartPrompt();
+  }
+
   showPhoneSoon() {
     this.paint(this.deviceTitle, "PHONE VERSION", 16, CYAN, HOT, "center");
     this.paint(this.deviceNote, "COMING SOON!", 14, MAGENTA, PINK, "center");
+    if (this.devicePlay) {
+      this.devicePlay.innerHTML = `${vectorTextSvg("PLAY THE DESKTOP VERSION AT", 8, DIM, CYAN, "center")}<a class="device-url" href="https://www.2dsg.space">${vectorTextSvg("WWW.2DSG.SPACE", 11, CYAN, HOT, "center")}</a>`;
+    }
     this.pickDesktop && (this.pickDesktop.innerHTML = vectorTextSvg("OK", 14, CYAN, HOT, "center"));
     this.pickPhone?.classList.add("is-hidden");
     this.devicePick?.classList.remove("is-hidden");
@@ -743,7 +761,7 @@ export class Hud {
     this.continueRow?.classList.toggle("is-wait", !ready);
     document.body.classList.add("is-continue");
     if (!ready) {
-      this.paint(this.continueTitle, "ADD CREDIT", 16, CYAN, HOT, "center");
+      this.paint(this.continueTitle, this.phoneDevice ? "PLAY ON DESKTOP" : "ADD CREDIT", 16, CYAN, HOT, "center");
       this.paint(this.continueBtn, String(Math.max(0, Math.ceil(Number(seconds) || 0))), 22, CYAN, HOT, "center");
       if (this.continueNo) this.paint(this.continueNo, "NO", 18, MAGENTA, PINK, "center");
       return;

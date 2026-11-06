@@ -325,6 +325,7 @@ export class Game {
     this.hud.controls.onRemove = (id, key) => this.dropBind(id, key);
     this.hud.controls.onReset = () => this.resetBinds();
     this.hud.onMusic = (delta) => this.nudgeMusic(delta);
+    this.hud.setPhoneDevice(maybePhone());
     this.hud.onInsertCoin = () => this.openPayPortal();
     this.hud.onPickPack = (sku) => this.buyPack(sku);
     this.hud.onPickDest = (kind) => this.pickPayDest(kind);
@@ -1376,7 +1377,7 @@ export class Game {
   }
 
   openPayPortal() {
-    if (this.freePlay) return;
+    if (this.freePlay || maybePhone()) return;
     this.audio.unlock();
     this.stopAttract();
     this.attractPage = "title";
@@ -1508,7 +1509,7 @@ export class Game {
   }
 
   async buyPack(sku) {
-    if (this.freePlay) return;
+    if (this.freePlay || maybePhone()) return;
     const payId = this.ensurePayId();
     if (!payId) {
       this.hud.showPayPortal({ step: "packs", error: "PAY ID MISSING", email: this.account?.email });

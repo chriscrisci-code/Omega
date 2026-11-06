@@ -1564,6 +1564,33 @@ body.is-phone .ships-link {
   min-height: 22px;
 }
 
+.device-play {
+  margin: 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.device-play .vector-text {
+  width: min(360px, 78vw);
+  height: auto;
+}
+
+.device-url {
+  display: block;
+  text-decoration: none;
+}
+
+.device-url:hover .vector-text,
+.device-url:focus .vector-text {
+  filter: brightness(1.15);
+}
+
+body.is-phone-device #insert-coin {
+  display: none;
+}
+
 .device-row {
   display: flex;
   gap: 12px;
