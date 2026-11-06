@@ -1,5 +1,9 @@
 /** Web Audio SFX, plus the looping Sunlight bed. */
 
+import { SFX, SFX_GROUPS, BULLET_SOUNDS, bedFor, patchFor } from "./patches.js";
+
+export { SFX, SFX_GROUPS, BULLET_SOUNDS };
+
 const SUNLIGHT = new URL("../../../music/Sunlight v4.mp3", import.meta.url).href;
 
 export class GameAudio {
@@ -285,7 +289,15 @@ export class GameAudio {
 
   incomingBeep({ at, dur = 0.5 } = {}) {
     if (!this.ctx || this.ctx.state !== "running") return;
-    this.tone({ type: "square", freq: 250, dur, peak: 0.055, attack: 0.012, at: at ?? this.now() });
+    const voice = patchFor("star")?.voices?.[0] || {};
+    this.tone({
+      type: voice.type || "square",
+      freq: voice.freq || 250,
+      dur: dur ?? voice.dur ?? 0.5,
+      peak: voice.peak ?? 0.055,
+      attack: voice.attack ?? 0.012,
+      at: at ?? this.now(),
+    });
   }
 
   ensureLaser() {
@@ -313,19 +325,22 @@ export class GameAudio {
     buzzFilter.connect(buzzGain);
     buzzGain.connect(this.master);
     buzz.start();
-    this.laserBed = { hiss, buzzGain };
+    this.laserBed = { hiss, hissFilter, buzz, buzzGain };
   }
 
   tickLaser(on = 0) {
     if (!this.ctx || this.ctx.state !== "running") return;
     const amt = on ? 1 : 0;
-    if (amt === this._laserOn && (amt === 0 || this.laserBed)) return;
+    if (amt === this._laserOn && amt === 0) return;
     this._laserOn = amt;
     if (amt === 0 && !this.laserBed) return;
     this.ensureLaser();
+    const bed = bedFor("laser");
     const t = this.now();
-    this.laserBed.hiss.gain.setTargetAtTime(amt * 0.11, t, 0.04);
-    this.laserBed.buzzGain.gain.setTargetAtTime(amt * 0.07, t, 0.04);
+    this.laserBed.hiss.gain.setTargetAtTime(amt * bed.hissPeak, t, 0.04);
+    this.laserBed.buzzGain.gain.setTargetAtTime(amt * bed.buzzPeak, t, 0.04);
+    this.laserBed.hissFilter.frequency.setTargetAtTime(bed.hissFreq, t, 0.08);
+    this.laserBed.buzz.frequency.setTargetAtTime(bed.buzzFreq, t, 0.08);
   }
 
   ensureRail() {
@@ -375,11 +390,12 @@ export class GameAudio {
     this.ensureRail();
     const t = this.now();
     const bed = this.railBed;
-    bed.hiss.gain.setTargetAtTime(on ? (ready ? 0.075 : 0.03 + charge * 0.08) : 0, t, on ? 0.06 : 0.035);
-    bed.hissFilter.frequency.setTargetAtTime(ready ? 3400 : 820 + charge * 2300, t, 0.08);
-    bed.coilGain.gain.setTargetAtTime(ready ? 0.016 : charge * 0.058, t, 0.055);
-    bed.coil.frequency.setTargetAtTime(ready ? 760 : 170 + charge * 780, t, 0.075);
-    bed.holdGain.gain.setTargetAtTime(ready ? 0.075 : 0, t, ready ? 0.045 : 0.07);
+    const knobs = bedFor("rail");
+    bed.hiss.gain.setTargetAtTime(on ? (ready ? knobs.hissReady : knobs.hissIdle + charge * knobs.hissCharge) : 0, t, on ? 0.06 : 0.035);
+    bed.hissFilter.frequency.setTargetAtTime(ready ? knobs.hissFreqReady : knobs.hissFreqIdle + charge * knobs.hissFreqSpan, t, 0.08);
+    bed.coilGain.gain.setTargetAtTime(ready ? knobs.coilReady : charge * knobs.coilIdle, t, 0.055);
+    bed.coil.frequency.setTargetAtTime(ready ? knobs.coilFreqReady : knobs.coilFreqIdle + charge * knobs.coilFreqSpan, t, 0.075);
+    bed.holdGain.gain.setTargetAtTime(ready ? knobs.holdPeak : 0, t, ready ? 0.045 : 0.07);
     const phase = !on ? "off" : ready ? "hold" : "charge";
     if (phase === "charge" && this._railPhase === "off") {
       this.whoosh({ from: 240, to: 780, dur: 0.16, peak: 0.1, q: 0.7 });
@@ -408,16 +424,17 @@ export class GameAudio {
     const shieldAmt = Math.min(1, Math.max(0, shield));
     const warpOn = Math.min(1, Math.max(0, warpAmt));
     const u = Math.min(1, Math.max(0, warpU));
-    this.engines.main.gain.gain.setTargetAtTime(mainAmt * 0.065, t, 0.07);
-    this.engines.main.filter.frequency.setTargetAtTime(340 + mainAmt * 380, t, 0.08);
-    this.engines.man.gain.gain.setTargetAtTime(manAmt * 0.02, t, 0.05);
-    this.engines.man.filter.frequency.setTargetAtTime(1100 + manAmt * 700, t, 0.06);
-    this.engines.rumbleGain.gain.setTargetAtTime(mainAmt * 0.027, t, 0.09);
-    this.engines.shield.gain.gain.setTargetAtTime(shieldAmt * 0.09, t, 0.08);
-    this.engines.shield.filter.frequency.setTargetAtTime(820 + shieldAmt * 420, t, 0.12);
-    this.engines.humGain.gain.setTargetAtTime(shieldAmt * 0.045, t, 0.1);
-    this.engines.warp.gain.gain.setTargetAtTime(warpOn * 0.2, t, warpOn ? 0.05 : 0.12);
-    this.engines.warp.filter.frequency.setTargetAtTime(380 + u * 1500, t, 0.08);
+    const knobs = bedFor("engine");
+    this.engines.main.gain.gain.setTargetAtTime(mainAmt * knobs.mainGain, t, 0.07);
+    this.engines.main.filter.frequency.setTargetAtTime(knobs.mainCutoff + mainAmt * knobs.mainSpan, t, 0.08);
+    this.engines.man.gain.gain.setTargetAtTime(manAmt * knobs.manGain, t, 0.05);
+    this.engines.man.filter.frequency.setTargetAtTime(knobs.manCutoff + manAmt * knobs.manSpan, t, 0.06);
+    this.engines.rumbleGain.gain.setTargetAtTime(mainAmt * knobs.rumbleGain, t, 0.09);
+    this.engines.shield.gain.gain.setTargetAtTime(shieldAmt * knobs.shieldGain, t, 0.08);
+    this.engines.shield.filter.frequency.setTargetAtTime(knobs.shieldCutoff + shieldAmt * knobs.shieldSpan, t, 0.12);
+    this.engines.humGain.gain.setTargetAtTime(shieldAmt * knobs.humGain, t, 0.1);
+    this.engines.warp.gain.gain.setTargetAtTime(warpOn * knobs.warpGain, t, warpOn ? 0.05 : 0.12);
+    this.engines.warp.filter.frequency.setTargetAtTime(knobs.warpCutoff + u * knobs.warpSpan, t, 0.08);
   }
 
   ensureMusic() {
@@ -486,382 +503,3 @@ export class GameAudio {
     this.playElement();
   }
 }
-
-export const SFX = {
-  rail: {
-    name: "RAIL",
-    fire: (audio) => {
-      const t = audio.now();
-      audio.whoosh({ from: 3400, to: 240, dur: 0.28, peak: 0.3, q: 0.55, at: t });
-      audio.tone({ type: "sine", freq: 1860, glide: 180, dur: 0.22, peak: 0.1, attack: 0.001, at: t });
-      audio.gun({
-        dur: 0.7,
-        attack: 0.001,
-        noisePeak: 0.34,
-        cutoff: 2600,
-        endCutoff: 70,
-        q: 0.46,
-        thump: 34,
-        thumpPeak: 0.42,
-        thumpDur: 0.72,
-        at: t,
-      });
-      audio.whoosh({ from: 1600, to: 60, dur: 1.7, peak: 0.2, q: 0.36, at: t + 0.04 });
-      audio.tone({ type: "sine", freq: 78, glide: 26, dur: 1.45, peak: 0.16, attack: 0.01, at: t });
-      audio.tone({ type: "triangle", freq: 210, glide: 48, dur: 1.85, peak: 0.09, attack: 0.016, at: t + 0.05 });
-      audio.tone({ type: "sine", freq: 420, glide: 70, dur: 1.15, peak: 0.05, attack: 0.02, at: t + 0.08 });
-    },
-  },
-  thud: {
-    name: "THUD",
-    fire: (audio) =>
-      audio.gun({
-        dur: 0.2,
-        noisePeak: 0.28,
-        cutoff: 700,
-        endCutoff: 140,
-        q: 0.7,
-        thump: 55,
-        thumpPeak: 0.32,
-        thumpDur: 0.16,
-        flange: true,
-      }),
-  },
-  turret: {
-    name: "TURRET",
-    fire: (audio) =>
-      audio.gun({
-        dur: 0.2,
-        noisePeak: 0.26,
-        cutoff: 700 * Math.SQRT2,
-        endCutoff: 140 * Math.SQRT2,
-        q: 0.7,
-        thump: 55 * Math.SQRT2,
-        thumpPeak: 0.28,
-        thumpDur: 0.16,
-        rate: Math.SQRT2,
-        flange: "hot",
-      }),
-  },
-  enemy: {
-    name: "ENEMY",
-    fire: (audio) =>
-      audio.gun({
-        dur: 0.08,
-        attack: 0.001,
-        noisePeak: 0.22,
-        cutoff: 2100,
-        endCutoff: 420,
-        q: 1.1,
-        type: "bandpass",
-        thump: 140,
-        thumpPeak: 0.08,
-        thumpDur: 0.04,
-      }),
-  },
-  missile: {
-    name: "MSL",
-    fire: (audio) => {
-      audio.whoosh({ from: 640, to: 260, dur: 1.05, peak: 0.18, q: 0.58 });
-      audio.gun({
-        dur: 0.08,
-        noisePeak: 0.12,
-        cutoff: 480,
-        endCutoff: 140,
-        thump: 70,
-        thumpPeak: 0.1,
-        thumpDur: 0.06,
-      });
-    },
-  },
-  star: {
-    name: "STAR",
-    fire: (audio) => {
-      audio.incomingBeep();
-    },
-  },
-  boom: {
-    name: "BOOM",
-    fire: (audio) =>
-      audio.gun({
-        dur: 0.28,
-        attack: 0.002,
-        noisePeak: 0.4,
-        cutoff: 900,
-        endCutoff: 90,
-        q: 0.5,
-        thump: 48,
-        thumpPeak: 0.28,
-        thumpDur: 0.22,
-      }),
-  },
-  warp: {
-    name: "WARP",
-    fire: (audio) => {
-      audio.whoosh({ from: 280, to: 1600, dur: 1, peak: 0.22, q: 0.55 });
-      audio.tone({ type: "sine", freq: 80, glide: 260, dur: 1, peak: 0.1, attack: 0.04 });
-    },
-  },
-  laser: {
-    name: "LASER",
-    fire: (audio) => {
-      audio.tone({ type: "sine", freq: 1880, dur: 0.08, peak: 0.12, attack: 0.004 });
-    },
-  },
-  emp: {
-    name: "EMP",
-    fire: (audio) => {
-      audio.whoosh({ from: 400, to: 90, dur: 0.55, peak: 0.24, q: 0.45 });
-      audio.tone({ type: "triangle", freq: 180, glide: 55, dur: 0.6, peak: 0.1, attack: 0.03 });
-      audio.gun({
-        dur: 0.18,
-        noisePeak: 0.16,
-        cutoff: 1800,
-        endCutoff: 300,
-        q: 1.2,
-        type: "bandpass",
-        thumpPeak: 0,
-      });
-    },
-  },
-  hole: {
-    name: "HOLE",
-    fire: (audio) => {
-      audio.whoosh({ from: 220, to: 40, dur: 0.9, peak: 0.26, q: 0.4 });
-      audio.tone({ type: "sine", freq: 70, glide: 28, dur: 1.1, peak: 0.14, attack: 0.05 });
-      audio.gun({
-        dur: 0.28,
-        noisePeak: 0.14,
-        cutoff: 900,
-        endCutoff: 80,
-        q: 0.7,
-        type: "lowpass",
-        thump: 36,
-        thumpPeak: 0.2,
-        thumpDur: 0.28,
-      });
-    },
-  },
-  main: {
-    name: "MAIN",
-    fire: (audio) => audio.enginePreview("main"),
-  },
-  side: {
-    name: "SIDE",
-    fire: (audio) => audio.enginePreview("side"),
-  },
-  hit: {
-    name: "HIT",
-    fire: (audio) =>
-      audio.gun({
-        dur: 0.05,
-        attack: 0.0008,
-        noisePeak: 0.22,
-        cutoff: 1600,
-        endCutoff: 400,
-        q: 1.2,
-        type: "bandpass",
-        thump: 180,
-        thumpPeak: 0.06,
-        thumpDur: 0.03,
-      }),
-  },
-  rock: {
-    name: "ROCK",
-    fire: (audio) =>
-      audio.gun({
-        dur: 0.26,
-        attack: 0.002,
-        noisePeak: 0.38,
-        cutoff: 780,
-        endCutoff: 110,
-        q: 0.55,
-        thump: 42,
-        thumpPeak: 0.24,
-        thumpDur: 0.2,
-      }),
-  },
-  die: {
-    name: "DIE",
-    fire: (audio) => {
-      audio.gun({
-        dur: 0.4,
-        attack: 0.003,
-        noisePeak: 0.36,
-        cutoff: 600,
-        endCutoff: 70,
-        q: 0.4,
-        thump: 38,
-        thumpPeak: 0.3,
-        thumpDur: 0.32,
-      });
-      audio.tone({ type: "sine", freq: 160, glide: 40, dur: 0.45, peak: 0.12, attack: 0.01 });
-    },
-  },
-  spawn: {
-    name: "SPAWN",
-    fire: (audio) => {
-      audio.chime({ freq: 980, dur: 0.12, peak: 0.07 });
-      audio.gun({
-        dur: 0.08,
-        noisePeak: 0.1,
-        cutoff: 2400,
-        endCutoff: 800,
-        q: 0.8,
-        type: "bandpass",
-        thumpPeak: 0,
-      });
-    },
-  },
-  ore: {
-    name: "ORE",
-    fire: (audio) => audio.chime({ freq: 1240, dur: 0.14, peak: 0.11 }),
-  },
-  dump: {
-    name: "DUMP",
-    fire: (audio) => {
-      audio.chime({ freq: 660, dur: 0.18, peak: 0.09 });
-      audio.tone({ type: "sine", freq: 110, glide: 70, dur: 0.16, peak: 0.08 });
-    },
-  },
-  up: {
-    name: "UP",
-    fire: (audio) => {
-      audio.chime({ freq: 740, dur: 0.2, peak: 0.1 });
-      audio.chime({ freq: 980, dur: 0.22, peak: 0.08 });
-      audio.tone({ type: "sine", freq: 220, glide: 440, dur: 0.28, peak: 0.08, attack: 0.01 });
-    },
-  },
-  dock: {
-    name: "DOCK",
-    fire: (audio) => {
-      audio.gun({
-        dur: 0.12,
-        noisePeak: 0.16,
-        cutoff: 500,
-        endCutoff: 120,
-        q: 0.7,
-        thump: 90,
-        thumpPeak: 0.22,
-        thumpDur: 0.1,
-      });
-      audio.tone({ type: "triangle", freq: 180, glide: 90, dur: 0.14, peak: 0.08 });
-    },
-  },
-  launch: {
-    name: "LAUNCH",
-    fire: (audio) => {
-      audio.whoosh({ from: 200, to: 900, dur: 0.22, peak: 0.14, q: 0.55 });
-      audio.gun({
-        dur: 0.1,
-        noisePeak: 0.12,
-        cutoff: 700,
-        endCutoff: 220,
-        thump: 70,
-        thumpPeak: 0.1,
-        thumpDur: 0.08,
-      });
-    },
-  },
-  warn: {
-    name: "WARN",
-    fire: (audio) => {
-      audio.tone({ type: "triangle", freq: 390, dur: 0.16, peak: 0.12, attack: 0.006 });
-      audio.tone({ type: "triangle", freq: 270, dur: 0.2, peak: 0.1, attack: 0.006, at: audio.now() + 0.16 });
-      audio.whoosh({ from: 900, to: 300, dur: 0.28, peak: 0.1, q: 0.9 });
-    },
-  },
-  hub: {
-    name: "HUB",
-    fire: (audio) =>
-      audio.gun({
-        dur: 0.14,
-        noisePeak: 0.24,
-        cutoff: 1100,
-        endCutoff: 180,
-        q: 0.9,
-        thump: 64,
-        thumpPeak: 0.18,
-        thumpDur: 0.1,
-      }),
-  },
-  on: {
-    name: "ON",
-    fire: (audio) => {
-      audio.whoosh({ from: 280, to: 900, dur: 0.16, peak: 0.12, q: 0.7 });
-      audio.tone({ type: "sine", freq: 240, glide: 420, dur: 0.14, peak: 0.08 });
-    },
-  },
-  off: {
-    name: "OFF",
-    fire: (audio) => {
-      audio.whoosh({ from: 800, to: 220, dur: 0.14, peak: 0.1, q: 0.7 });
-      audio.tone({ type: "sine", freq: 360, glide: 140, dur: 0.12, peak: 0.07 });
-    },
-  },
-  block: {
-    name: "BLOCK",
-    fire: (audio) =>
-      audio.gun({
-        dur: 0.07,
-        attack: 0.0008,
-        noisePeak: 0.18,
-        cutoff: 2400,
-        endCutoff: 700,
-        q: 1.6,
-        type: "bandpass",
-        thump: 220,
-        thumpPeak: 0.08,
-        thumpDur: 0.04,
-      }),
-  },
-  pop: {
-    name: "POP",
-    fire: (audio) => {
-      audio.gun({
-        dur: 0.16,
-        noisePeak: 0.26,
-        cutoff: 1400,
-        endCutoff: 180,
-        q: 0.8,
-        thump: 90,
-        thumpPeak: 0.16,
-        thumpDur: 0.1,
-      });
-      audio.tone({ type: "sine", freq: 300, glide: 80, dur: 0.18, peak: 0.08 });
-    },
-  },
-  castle: {
-    name: "CASTLE",
-    fire: (audio) => {
-      audio.whoosh({ from: 180, to: 520, dur: 0.35, peak: 0.16, q: 0.5 });
-      audio.tone({ type: "triangle", freq: 140, glide: 280, dur: 0.32, peak: 0.09, attack: 0.02 });
-    },
-  },
-  life: {
-    name: "LIFE",
-    fire: (audio) => {
-      audio.chime({ freq: 880, dur: 0.18, peak: 0.1 });
-      audio.chime({ freq: 1320, dur: 0.22, peak: 0.08 });
-    },
-  },
-  stab: {
-    name: "STAB",
-    fire: (audio) => audio.stab(),
-  },
-};
-
-export const SFX_GROUPS = [
-  { name: "GUNS", ids: ["thud", "rail", "turret", "enemy"] },
-  { name: "SPECIAL", ids: ["missile", "star", "warp", "emp", "hole", "laser"] },
-  { name: "THRUST", ids: ["main", "side"] },
-  { name: "HITS", ids: ["hit", "rock", "boom", "die", "hub"] },
-  { name: "ORE", ids: ["spawn", "ore", "dump", "up"] },
-  { name: "STATION", ids: ["dock", "launch", "warn", "castle"] },
-  { name: "SHIELD", ids: ["on", "off", "block", "pop"] },
-  { name: "SHIP", ids: ["life", "stab"] },
-];
-
-export const BULLET_SOUNDS = [
-  { id: "thud", name: "THUD", fire: SFX.thud.fire },
-];
