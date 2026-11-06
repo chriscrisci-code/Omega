@@ -1340,6 +1340,7 @@ export class Game {
       this.credits = clampCredits(next.credits);
       this.save.credits = this.credits;
     }
+    if (next.settings?.music != null) this.applyMusicVol(next.settings.music);
     this.refreshFreePlay();
   }
 

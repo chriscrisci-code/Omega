@@ -62,13 +62,36 @@ let bedRaf = 0;
 let railCharge = 0.45;
 let railReady = false;
 
+function clampMusic(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0.2;
+  return Math.max(0, Math.min(1, Math.round(n * 10) / 10));
+}
+
+function musicVol() {
+  return clampMusic(state().data.settings?.music);
+}
+
 function paintCabinet() {
   const { freePlay, credits } = state();
   const on = freePlay || happyHour;
+  const vol = musicVol();
   document.getElementById("now").textContent = on ? "MODE  FREE PLAY" : "MODE  COIN";
   document.getElementById("coin").classList.toggle("is-on", !freePlay && !happyHour);
   document.getElementById("free").classList.toggle("is-on", freePlay || happyHour);
   document.getElementById("credits").textContent = String(credits);
+  const slider = document.getElementById("music");
+  const out = document.getElementById("music-out");
+  if (slider && slider.value !== String(vol)) slider.value = String(vol);
+  if (out) out.textContent = `${Math.round(vol * 100)}%`;
+}
+
+function setMusic(vol) {
+  const data = load();
+  const value = clampMusic(vol);
+  data.settings = { ...(data.settings || {}), music: value };
+  save(data);
+  paintCabinet();
 }
 
 async function syncHappyHour() {
@@ -404,6 +427,7 @@ window.addEventListener("storage", (event) => {
 document.getElementById("coin").addEventListener("click", () => setFreePlay(false));
 document.getElementById("free").addEventListener("click", () => setFreePlay(true));
 document.getElementById("insert").addEventListener("click", addCredit);
+document.getElementById("music").addEventListener("input", (event) => setMusic(event.target.value));
 document.getElementById("tab-cabinet").addEventListener("click", () => showTab("cabinet"));
 document.getElementById("tab-sfx").addEventListener("click", () => showTab("sfx"));
 window.addEventListener("pagehide", stopBeds);
