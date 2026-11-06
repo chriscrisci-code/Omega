@@ -170,11 +170,17 @@ export const DEFAULTS = {
 export function guessProfile(controls, padConnected) {
   if (controls === "phone") return "phone";
   if (padConnected) return "gamepad";
-  const touch = (navigator.maxTouchPoints || 0) > 0;
-  const fine = window.matchMedia?.("(pointer: fine)")?.matches ?? true;
   const mobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
   if (mobile) return "phone";
-  if (touch && fine) return "laptop";
+  return "mouse";
+}
+
+/** Windows touchpads report touch points, so laptop must be opt-in. */
+export function preferDesktopMouse(profile) {
+  if (profile !== "laptop") return profile;
+  const coarse = window.matchMedia?.("(pointer: coarse)")?.matches;
+  const mobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "");
+  if (mobile || coarse) return profile;
   return "mouse";
 }
 

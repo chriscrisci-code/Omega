@@ -101,6 +101,10 @@ export class Input {
       this.fireCorner(event.clientX, event.clientY);
       this.noteTap(event);
     };
+    this.onMouseDown = (event) => {
+      if (typeof PointerEvent !== "undefined") return;
+      this.onPointerDown(event);
+    };
     this.onAuxClick = (event) => {
       if (event.button !== 1) return;
       event.preventDefault();
@@ -149,7 +153,7 @@ export class Input {
     window.addEventListener("pointermove", this.onPointerMove);
     window.addEventListener("pointerdown", this.onPointerDown, true);
     window.addEventListener("auxclick", this.onAuxClick, true);
-    window.addEventListener("mousedown", this.onPointerDown, true);
+    window.addEventListener("mousedown", this.onMouseDown, true);
     window.addEventListener("pointerup", this.onPointerUp);
     window.addEventListener("contextmenu", this.onContextMenu);
     window.addEventListener("wheel", this.onWheel, { passive: false });

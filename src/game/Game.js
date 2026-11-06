@@ -2133,9 +2133,11 @@ export class Game {
   }
 
   resetBinds() {
-    this.input.setBinds(this.input.profile);
+    const id = this.input.profile === "gamepad" ? "gamepad" : "mouse";
+    this.input.setBinds(id);
     this.persistBinds();
     this.refreshControls();
+    this.hud.setProfile(this.input.profile);
   }
 
   openControls() {

@@ -1,5 +1,5 @@
 import { missiles, shipLevels, xp } from "../config.js";
-import { guessProfile, normalizeBinds } from "../input/bindings.js";
+import { guessProfile, normalizeBinds, preferDesktopMouse } from "../input/bindings.js";
 import { DEFAULT_SHIP_ID, PLAYABLE_SHIP_IDS, resolveShipId } from "../ships/catalog.js";
 import {
   DEFAULT_ACES,
@@ -213,11 +213,12 @@ function migrateCheckpoint(data) {
 
 function withControls(settings, src) {
   const controls = settings.controls;
-  const profile = ["mouse", "gamepad", "laptop", "phone"].includes(src?.profile)
+  const saved = ["mouse", "gamepad", "laptop", "phone"].includes(src?.profile)
     ? src.profile
     : guessProfile(controls, false);
+  const profile = preferDesktopMouse(saved);
   settings.profile = profile;
-  settings.binds = normalizeBinds(profile, src?.binds);
+  settings.binds = normalizeBinds(profile, profile !== saved ? null : src?.binds);
   return settings;
 }
 
