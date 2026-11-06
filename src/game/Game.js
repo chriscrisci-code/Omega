@@ -89,6 +89,7 @@ export class Game {
     this.touch = new TouchControls(this.input);
     this.hud = new Hud();
     this.pickingDevice = false;
+    this.remindBusy = false;
     this.audio = new GameAudio();
     const holdMusic = () => {
       this.audio.tickMusic(this.musicOutLevel());
@@ -312,6 +313,7 @@ export class Game {
     };
     this.hud.onDecline = () => this.endRun("dead");
     this.hud.onPickDevice = () => this.dismissPhoneSoon();
+    this.hud.onRemindEmail = (email) => this.sendRemind(email);
     this.hud.onPickWave = (n) => this.startRun(n);
     this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
     this.hud.bay.onSeat = (id) => this.enterHubSeat(id);
@@ -326,6 +328,7 @@ export class Game {
     this.hud.controls.onReset = () => this.resetBinds();
     this.hud.onMusic = (delta) => this.nudgeMusic(delta);
     this.hud.setPhoneDevice(maybePhone());
+    this.noteVisit();
     this.hud.onInsertCoin = () => this.openPayPortal();
     this.hud.onPickPack = (sku) => this.buyPack(sku);
     this.hud.onPickDest = (kind) => this.pickPayDest(kind);
@@ -1990,6 +1993,69 @@ export class Game {
     this.pickingDevice = false;
     this.hud.hideDevicePick();
     this.applyControls("desktop", true);
+  }
+
+  visitorId() {
+    try {
+      let id = localStorage.getItem("2dsg-vid");
+      if (!id) {
+        id = crypto.randomUUID?.() || `v${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+        localStorage.setItem("2dsg-vid", id);
+      }
+      return id;
+    } catch {
+      return "";
+    }
+  }
+
+  noteVisit() {
+    const id = this.visitorId();
+    if (!id) return;
+    const day = new Date().toISOString().slice(0, 10);
+    try {
+      if (localStorage.getItem("2dsg-visit-day") === day) return;
+    } catch {
+      /* ignore */
+    }
+    fetch("/api/visits", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, phone: maybePhone() }),
+      keepalive: true,
+    })
+      .then((res) => {
+        if (!res.ok) return;
+        try {
+          localStorage.setItem("2dsg-visit-day", day);
+        } catch {
+          /* ignore */
+        }
+      })
+      .catch(() => {});
+  }
+
+  async sendRemind(raw) {
+    if (this.remindBusy) return;
+    const email = String(raw || "").trim();
+    if (!email.includes("@")) {
+      this.hud.showRemindForm("NEED AN EMAIL");
+      return;
+    }
+    this.remindBusy = true;
+    this.hud.showRemindForm("SENDING");
+    try {
+      const res = await fetch("/api/remind", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (res.status === 429) this.hud.showRemindForm("TRY AGAIN LATER");
+      else if (!res.ok) this.hud.showRemindForm("MAIL FAILED");
+      else this.hud.showRemindSent();
+    } catch {
+      this.hud.showRemindForm("MAIL FAILED");
+    }
+    this.remindBusy = false;
   }
 
   applyControls(id, persist = true) {
@@ -5497,7 +5563,11 @@ export class Game {
       this.endRun("dead");
     } else if (this.payOpen && this.input.quitPressed) {
       this.closePayPortal();
-    } else if (this.pickingDevice && (this.input.startPressed || this.input.quitPressed)) {
+    } else if (
+      this.pickingDevice &&
+      (this.input.startPressed || this.input.quitPressed) &&
+      document.activeElement?.tagName !== "INPUT"
+    ) {
       this.dismissPhoneSoon();
     } else if (
       !this.pickingDevice &&

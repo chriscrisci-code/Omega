@@ -126,6 +126,18 @@
       }
       .credits { color: var(--dim); letter-spacing: 0.14em; }
       .credits strong { color: var(--cyan); font-weight: 400; }
+      .visits-head {
+        margin-top: 22px;
+        border-top: 1px solid var(--line);
+        padding-top: 20px;
+      }
+      .visits {
+        margin: 0 0 6px;
+        color: var(--dim);
+        letter-spacing: 0.12em;
+        font-size: 12px;
+      }
+      .visits strong { color: var(--cyan); font-weight: 400; }
       .note {
         margin: 22px 0 0;
         color: var(--dim);
@@ -247,7 +259,11 @@
           <p class="credits">CREDITS  <strong id="credits">0</strong></p>
           <button id="insert" type="button">INSERT</button>
         </div>
-        <p class="note">PUBLIC ON covers every player until midnight Eastern. PUBLIC OFF returns the site to the 3–4 PM Eastern hour. COIN / FREE PLAY still only change this browser. Keep this page off the cabinet floor.</p>
+        <p class="group visits-head">VISITORS</p>
+        <p class="visits" id="visits-today">TODAY  PHONE  <strong>0</strong>  DESKTOP  <strong>0</strong></p>
+        <p class="visits" id="visits-all">ALL  PHONE  <strong>0</strong>  DESKTOP  <strong>0</strong></p>
+        <p class="visits" id="visits-remind">REMIND  <strong>0</strong></p>
+        <p class="note">PUBLIC ON covers every player until midnight Eastern. PUBLIC OFF returns the site to the 3–4 PM Eastern hour. COIN / FREE PLAY still only change this browser. Phone and desktop visits are unique per browser per Eastern day. Keep this page off the cabinet floor.</p>
       </section>
       <section id="sfx" class="is-hidden">
         <div class="sfx-layout">

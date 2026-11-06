@@ -128,6 +128,30 @@ function setMusic(vol) {
   paintCabinet();
 }
 
+function paintVisits(data) {
+  const phoneToday = Number(data?.phone?.today) || 0;
+  const deskToday = Number(data?.desktop?.today) || 0;
+  const phoneAll = Number(data?.phone?.all) || 0;
+  const deskAll = Number(data?.desktop?.all) || 0;
+  const remindAll = Number(data?.remind?.all) || 0;
+  const today = document.getElementById("visits-today");
+  const all = document.getElementById("visits-all");
+  const remind = document.getElementById("visits-remind");
+  if (today) today.innerHTML = `TODAY  PHONE  <strong>${phoneToday}</strong>  DESKTOP  <strong>${deskToday}</strong>`;
+  if (all) all.innerHTML = `ALL  PHONE  <strong>${phoneAll}</strong>  DESKTOP  <strong>${deskAll}</strong>`;
+  if (remind) remind.innerHTML = `REMIND  <strong>${remindAll}</strong>`;
+}
+
+async function syncVisits() {
+  try {
+    const res = await fetch("/api/visits");
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) paintVisits(data);
+  } catch {
+    /* ignore */
+  }
+}
+
 async function syncHappyHour() {
   try {
     const res = await fetch("/api/freeplay");
@@ -513,4 +537,6 @@ window.addEventListener("pagehide", stopBeds);
 paintCabinet();
 paintLab();
 syncHappyHour();
+syncVisits();
 setInterval(syncHappyHour, 20000);
+setInterval(syncVisits, 20000);

@@ -1564,6 +1564,11 @@ body.is-phone .ships-link {
   min-height: 22px;
 }
 
+#device-title .vector-text {
+  width: 100%;
+  height: auto;
+}
+
 .device-play {
   margin: 12px 0 0;
   display: flex;
@@ -1572,9 +1577,36 @@ body.is-phone .ships-link {
   gap: 8px;
 }
 
+.device-play.is-hidden {
+  display: none;
+}
+
 .device-play .vector-text {
   width: min(360px, 78vw);
   height: auto;
+}
+
+.device-email {
+  display: block;
+  width: min(360px, 80vw);
+  margin: 16px auto 0;
+  padding: 10px 12px;
+  background: rgba(5, 8, 14, 0.9);
+  border: 1px solid rgba(102, 224, 255, 0.45);
+  color: #8ef6ff;
+  font: 14px "Share Tech Mono", ui-monospace, monospace;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.device-email.is-hidden {
+  display: none;
+}
+
+.device-email:focus {
+  outline: none;
+  border-color: #c8f8ff;
+  box-shadow: 0 0 12px rgba(142, 246, 255, 0.35);
 }
 
 .device-url {

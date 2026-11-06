@@ -84,7 +84,9 @@ export class Hud {
     this.deviceTitle = document.querySelector("#device-title");
     this.deviceNote = document.querySelector("#device-note");
     this.devicePlay = document.querySelector("#device-play");
+    this.deviceEmail = document.querySelector("#device-email");
     this.phoneDevice = false;
+    this.remindOpen = false;
     this.pickDesktop = document.querySelector("#pick-desktop");
     this.pickPhone = document.querySelector("#pick-phone");
     this.payPortal = document.querySelector("#pay-portal");
@@ -98,6 +100,7 @@ export class Hud {
     this.onContinue = null;
     this.onDecline = null;
     this.onPickDevice = null;
+    this.onRemindEmail = null;
     this.onPickPack = null;
     this.onPickDest = null;
     this.onPayEmail = null;
@@ -139,12 +142,19 @@ export class Hud {
     this.pickDesktop?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      this.onPickDevice?.("desktop");
+      if (this.remindOpen) this.showPhoneSoon();
+      else this.onPickDevice?.("desktop");
     });
     this.pickPhone?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      this.onPickDevice?.("phone");
+      if (this.remindOpen) this.onRemindEmail?.(this.deviceEmail?.value);
+      else this.showRemindForm();
+    });
+    this.deviceEmail?.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      this.onRemindEmail?.(this.deviceEmail.value);
     });
     this.shipsLink?.classList.add("is-hidden");
     this.paint(this.controlsLink, "C CONTROLS", 14, DIM, CYAN, "center");
@@ -373,17 +383,51 @@ export class Hud {
   }
 
   showPhoneSoon() {
-    this.paint(this.deviceTitle, "PHONE VERSION", 16, CYAN, HOT, "center");
-    this.paint(this.deviceNote, "COMING SOON!", 14, MAGENTA, PINK, "center");
+    this.remindOpen = false;
+    this.paint(this.deviceTitle, "PLAY 2DSG ON YOUR COMPUTER.", 12, CYAN, HOT, "center");
+    this.paint(this.deviceNote, "THE FULL GAME LIVES ON DESKTOP", 8, DIM, CYAN, "center");
     if (this.devicePlay) {
-      this.devicePlay.innerHTML = `${vectorTextSvg("PLAY THE DESKTOP VERSION AT", 8, DIM, CYAN, "center")}<a class="device-url" href="https://www.2dsg.space">${vectorTextSvg("WWW.2DSG.SPACE", 11, CYAN, HOT, "center")}</a>`;
+      this.devicePlay.classList.remove("is-hidden");
+      this.devicePlay.innerHTML = `<a class="device-url" href="https://www.2dsg.space">${vectorTextSvg("WWW.2DSG.SPACE", 11, CYAN, HOT, "center")}</a>`;
     }
+    this.deviceEmail?.classList.add("is-hidden");
+    if (this.deviceEmail) this.deviceEmail.value = "";
+    this.pickDesktop && (this.pickDesktop.innerHTML = vectorTextSvg("OK", 14, CYAN, HOT, "center"));
+    this.pickPhone && (this.pickPhone.innerHTML = vectorTextSvg("REMIND ME", 14, CYAN, HOT, "center"));
+    this.pickPhone?.classList.remove("is-hidden");
+    this.devicePick?.classList.remove("is-hidden");
+  }
+
+  showRemindForm(error = "") {
+    this.remindOpen = true;
+    this.paint(this.deviceTitle, "REMIND ME", 16, CYAN, HOT, "center");
+    this.paint(this.deviceNote, error || "EMAIL YOURSELF THE DESKTOP LINK", 8, error ? MAGENTA : DIM, error ? PINK : CYAN, "center");
+    this.devicePlay?.classList.add("is-hidden");
+    this.deviceEmail?.classList.remove("is-hidden");
+    this.pickDesktop && (this.pickDesktop.innerHTML = vectorTextSvg("BACK", 14, CYAN, HOT, "center"));
+    this.pickPhone && (this.pickPhone.innerHTML = vectorTextSvg("SEND", 14, CYAN, HOT, "center"));
+    this.pickPhone?.classList.remove("is-hidden");
+    this.devicePick?.classList.remove("is-hidden");
+    if (error !== "SENDING") queueMicrotask(() => this.deviceEmail?.focus());
+  }
+
+  showRemindSent() {
+    this.remindOpen = false;
+    this.paint(this.deviceTitle, "SENT", 16, CYAN, HOT, "center");
+    this.paint(this.deviceNote, "OPEN IT ON YOUR COMPUTER", 8, DIM, CYAN, "center");
+    if (this.devicePlay) {
+      this.devicePlay.classList.remove("is-hidden");
+      this.devicePlay.innerHTML = `<a class="device-url" href="https://www.2dsg.space">${vectorTextSvg("WWW.2DSG.SPACE", 11, CYAN, HOT, "center")}</a>`;
+    }
+    this.deviceEmail?.classList.add("is-hidden");
     this.pickDesktop && (this.pickDesktop.innerHTML = vectorTextSvg("OK", 14, CYAN, HOT, "center"));
     this.pickPhone?.classList.add("is-hidden");
     this.devicePick?.classList.remove("is-hidden");
   }
 
   hideDevicePick() {
+    this.remindOpen = false;
+    this.deviceEmail?.classList.add("is-hidden");
     this.devicePick?.classList.add("is-hidden");
   }
 

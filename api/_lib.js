@@ -31,6 +31,11 @@ export function noStore(res) {
   res.setHeader("cache-control", "no-store");
 }
 
+export function clientIp(req) {
+  const raw = req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "";
+  return String(raw).split(",")[0].trim() || "local";
+}
+
 const FREE_PLAY_ZONE = "America/New_York";
 const FREE_PLAY_START_MIN = 15 * 60;
 const FREE_PLAY_END_MIN = 16 * 60;
@@ -61,7 +66,7 @@ export function isEasternFreePlay(now = Date.now()) {
   return mins >= FREE_PLAY_START_MIN && mins < FREE_PLAY_END_MIN;
 }
 
-function easternYmd(now = Date.now()) {
+export function easternYmd(now = Date.now()) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone: FREE_PLAY_ZONE,
     year: "numeric",
