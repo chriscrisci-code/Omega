@@ -59,15 +59,37 @@
         margin-bottom: 22px;
       }
       .now {
-        margin: 0 0 22px;
+        margin: 0 0 6px;
         color: var(--cyan);
         letter-spacing: 0.16em;
+      }
+      .subline {
+        margin: 0 0 22px;
+        color: var(--dim);
+        letter-spacing: 0.14em;
+        font-size: 12px;
+      }
+      .group {
+        margin: 0 0 8px;
+        color: var(--dim);
+        letter-spacing: 0.18em;
+        font-size: 11px;
       }
       .row {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 12px;
         margin-bottom: 28px;
+      }
+      .row.tight { margin-bottom: 16px; }
+      .key-knob { margin: 0 0 8px; }
+      .key-knob input[type="password"] {
+        background: transparent;
+        border: 1px solid var(--line);
+        color: var(--cyan);
+        font: inherit;
+        letter-spacing: 0.12em;
+        padding: 8px 10px;
       }
       button {
         appearance: none;
@@ -199,10 +221,23 @@
       </div>
       <section id="cabinet">
         <p class="now" id="now">MODE  COIN</p>
-        <div class="row">
+        <p class="subline" id="public-now">PUBLIC  OFF</p>
+        <p class="group">THIS BROWSER</p>
+        <div class="row tight">
           <button id="coin" type="button">COIN</button>
           <button id="free" type="button">FREE PLAY</button>
         </div>
+        <p class="group">EVERYONE</p>
+        <div class="row tight">
+          <button id="public-on" type="button">PUBLIC ON</button>
+          <button id="public-off" type="button">PUBLIC OFF</button>
+        </div>
+        <label class="knob key-knob">
+          <span>KEY</span>
+          <input id="operator-key" type="password" autocomplete="off" spellcheck="false" />
+          <span></span>
+        </label>
+        <p class="note is-hidden" id="public-err"></p>
         <label class="knob music-knob">
           <span>MUSIC</span>
           <input id="music" type="range" min="0" max="1" step="0.1" />
@@ -212,7 +247,7 @@
           <p class="credits">CREDITS  <strong id="credits">0</strong></p>
           <button id="insert" type="button">INSERT</button>
         </div>
-        <p class="note">Public Free Play is 3–4 PM Eastern every day. These buttons override this browser only. Keep this page off the cabinet floor. Same browser, same machine as the game.</p>
+        <p class="note">PUBLIC ON covers every player until midnight Eastern. PUBLIC OFF returns the site to the 3–4 PM Eastern hour. COIN / FREE PLAY still only change this browser. Keep this page off the cabinet floor.</p>
       </section>
       <section id="sfx" class="is-hidden">
         <div class="sfx-layout">

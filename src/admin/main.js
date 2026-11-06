@@ -20,6 +20,7 @@ import {
 
 const KEY = "vector-game-save";
 const CHANNEL = "2dsg-cabinet";
+const OPERATOR_KEY = "2dsg-operator-key";
 const audio = new GameAudio();
 
 function clampCredits(value) {
@@ -54,6 +55,7 @@ function state() {
 }
 
 let happyHour = false;
+let publicOn = false;
 let channel = null;
 let selected = "thud";
 let selectedBed = "";
@@ -72,13 +74,45 @@ function musicVol() {
   return clampMusic(state().data.settings?.music);
 }
 
+function operatorKey() {
+  return String(document.getElementById("operator-key")?.value || "").trim();
+}
+
+function rememberKey(value) {
+  const key = String(value || "").trim();
+  if (key) sessionStorage.setItem(OPERATOR_KEY, key);
+  else sessionStorage.removeItem(OPERATOR_KEY);
+}
+
+function publicErr(text) {
+  const note = document.getElementById("public-err");
+  if (!note) return;
+  note.textContent = text || "";
+  note.classList.toggle("is-hidden", !text);
+}
+
+function applyPublic(data) {
+  publicOn = Boolean(data?.publicOn);
+  happyHour = Boolean(data?.hour) || (Boolean(data?.freePlay) && !publicOn);
+}
+
 function paintCabinet() {
   const { freePlay, credits } = state();
-  const on = freePlay || happyHour;
+  const on = freePlay || publicOn || happyHour;
   const vol = musicVol();
   document.getElementById("now").textContent = on ? "MODE  FREE PLAY" : "MODE  COIN";
-  document.getElementById("coin").classList.toggle("is-on", !freePlay && !happyHour);
-  document.getElementById("free").classList.toggle("is-on", freePlay || happyHour);
+  const publicLine = document.getElementById("public-now");
+  if (publicLine) {
+    publicLine.textContent = publicOn
+      ? "PUBLIC  UNTIL MIDNIGHT ET"
+      : happyHour
+        ? "PUBLIC  3-4 PM ET"
+        : "PUBLIC  OFF";
+  }
+  document.getElementById("coin").classList.toggle("is-on", !freePlay);
+  document.getElementById("free").classList.toggle("is-on", freePlay);
+  document.getElementById("public-on")?.classList.toggle("is-on", publicOn);
+  document.getElementById("public-off")?.classList.toggle("is-on", !publicOn);
   document.getElementById("credits").textContent = String(credits);
   const slider = document.getElementById("music");
   const out = document.getElementById("music-out");
@@ -98,9 +132,45 @@ async function syncHappyHour() {
   try {
     const res = await fetch("/api/freeplay");
     const data = await res.json().catch(() => ({}));
-    happyHour = Boolean(res.ok && data.freePlay);
+    if (res.ok) applyPublic(data);
+    else {
+      publicOn = false;
+      happyHour = false;
+    }
   } catch {
+    publicOn = false;
     happyHour = false;
+  }
+  paintCabinet();
+}
+
+async function setPublic(on) {
+  publicErr("");
+  try {
+    const res = await fetch("/api/freeplay", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-2dsg-operator": operatorKey(),
+      },
+      body: JSON.stringify({ on: Boolean(on) }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) {
+      publicErr("KEY REJECTED");
+      return;
+    }
+    if (res.status === 503) {
+      publicErr("NO OPERATOR SECRET ON SERVER");
+      return;
+    }
+    if (!res.ok) {
+      publicErr("PUBLIC SWITCH FAILED");
+      return;
+    }
+    applyPublic(data);
+  } catch {
+    publicErr("PUBLIC SWITCH FAILED");
   }
   paintCabinet();
 }
@@ -424,8 +494,16 @@ window.addEventListener("storage", (event) => {
   if (event.key === KEY) paintCabinet();
 });
 
+const keyInput = document.getElementById("operator-key");
+if (keyInput) {
+  keyInput.value = sessionStorage.getItem(OPERATOR_KEY) || "";
+  keyInput.addEventListener("input", () => rememberKey(keyInput.value));
+}
+
 document.getElementById("coin").addEventListener("click", () => setFreePlay(false));
 document.getElementById("free").addEventListener("click", () => setFreePlay(true));
+document.getElementById("public-on")?.addEventListener("click", () => setPublic(true));
+document.getElementById("public-off")?.addEventListener("click", () => setPublic(false));
 document.getElementById("insert").addEventListener("click", addCredit);
 document.getElementById("music").addEventListener("input", (event) => setMusic(event.target.value));
 document.getElementById("tab-cabinet").addEventListener("click", () => showTab("cabinet"));

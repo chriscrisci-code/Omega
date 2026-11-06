@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { Redis } from "@upstash/redis";
 
 export const PACKS = {
@@ -33,19 +34,96 @@ export function noStore(res) {
 const FREE_PLAY_ZONE = "America/New_York";
 const FREE_PLAY_START_MIN = 15 * 60;
 const FREE_PLAY_END_MIN = 16 * 60;
+export const FREE_PLAY_KEY = "freeplay:public";
 
-export function isEasternFreePlay(now = Date.now()) {
+function easternParts(now = Date.now(), extra = {}) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: FREE_PLAY_ZONE,
     hour: "numeric",
     minute: "numeric",
     hourCycle: "h23",
+    ...extra,
   }).formatToParts(new Date(now));
-  const hour = Number(parts.find((part) => part.type === "hour")?.value);
-  const minute = Number(parts.find((part) => part.type === "minute")?.value);
+  const get = (type) => Number(parts.find((part) => part.type === type)?.value);
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: get("hour"),
+    minute: get("minute"),
+  };
+}
+
+export function isEasternFreePlay(now = Date.now()) {
+  const { hour, minute } = easternParts(now);
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) return false;
   const mins = hour * 60 + minute;
   return mins >= FREE_PLAY_START_MIN && mins < FREE_PLAY_END_MIN;
+}
+
+function easternYmd(now = Date.now()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: FREE_PLAY_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(now));
+}
+
+export function nextEasternMidnight(now = Date.now()) {
+  const start = easternYmd(now);
+  if (!start) return now + 24 * 60 * 60 * 1000;
+  const rolled = (ms) => easternYmd(ms) !== start;
+  let t = now;
+  for (let i = 0; i < 48 * 4; i += 1) {
+    t += 15 * 60 * 1000;
+    if (!rolled(t)) continue;
+    let lo = t - 15 * 60 * 1000;
+    let hi = t;
+    while (hi - lo > 1000) {
+      const mid = Math.floor((lo + hi) / 2);
+      if (rolled(mid)) hi = mid;
+      else lo = mid;
+    }
+    return hi;
+  }
+  return now + 24 * 60 * 60 * 1000;
+}
+
+export function parsePublicUntil(raw) {
+  if (raw == null || raw === false || raw === 0 || raw === "0") return 0;
+  if (typeof raw === "string") {
+    try {
+      return parsePublicUntil(JSON.parse(raw));
+    } catch {
+      const n = Number(raw);
+      return Number.isFinite(n) && n > Date.now() ? n : 0;
+    }
+  }
+  if (typeof raw === "number") return raw > Date.now() ? raw : 0;
+  if (typeof raw === "object") {
+    const until = Number(raw.until);
+    return Number.isFinite(until) && until > Date.now() ? until : 0;
+  }
+  if (raw === true || raw === 1 || raw === "1") return nextEasternMidnight();
+  return 0;
+}
+
+export function operatorSecret() {
+  return String(process.env.OPERATOR_SECRET || process.env.AUTH_SECRET || "").trim();
+}
+
+export function operatorAuthorized(req) {
+  const want = operatorSecret();
+  const got = String(req.headers["x-2dsg-operator"] || "").trim();
+  if (!want || !got) return false;
+  const a = Buffer.from(got);
+  const b = Buffer.from(want);
+  if (a.length !== b.length) {
+    timingSafeEqual(b, b);
+    return false;
+  }
+  return timingSafeEqual(a, b);
 }
 
 export function requestOrigin(req) {
