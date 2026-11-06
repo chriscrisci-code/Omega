@@ -10,7 +10,7 @@ function hudControl(event) {
   if (!(node instanceof Element)) return false;
   return Boolean(
     node.closest(
-      "button, a, input, #dock-bay, #device-pick, #wave-pick, #continue-btn, #continue-no, #continue-row, #ships-link, #controls-link, #xp-reset, #controls-page, #music-vol, #coin-slot, .touch-layer",
+      "button, a, input, #dock-bay, #device-pick, #wave-pick, #continue-btn, #continue-no, #continue-row, #ships-link, #controls-link, #boards-link, #xp-reset, #controls-page, #music-vol, #coin-slot, .touch-layer",
     ),
   );
 }
@@ -38,6 +38,7 @@ export class Input {
     this._saveTick = false;
     this._shipsClick = false;
     this._controlsClick = false;
+    this._boardsClick = false;
     this._continueClick = false;
     this.layout = "desktop";
     this.profile = "mouse";
@@ -434,7 +435,7 @@ export class Input {
   }
 
   get startPressed() {
-    if (this._shipsClick || this._controlsClick) return false;
+    if (this._shipsClick || this._controlsClick || this._boardsClick) return false;
     return this.keysPressed("fire") || this.anyPressed(["Space", "Enter"]) || this.padEdge("fire") || this.buttonPressed(0) || this.buttonPressed(9) || this._pointerStart;
   }
 
@@ -483,6 +484,14 @@ export class Input {
 
   get quitPressed() {
     return this.keysPressed("quit") || this.anyPressed(["Escape"]);
+  }
+
+  get boardLeft() {
+    return this.anyPressed(["ArrowLeft"]) || this.keysPressed("turnL") || this.keysPressed("strafeL");
+  }
+
+  get boardRight() {
+    return this.anyPressed(["ArrowRight"]) || this.keysPressed("turnR") || this.keysPressed("strafeR");
   }
 
   get letterLeft() {
@@ -564,6 +573,7 @@ export class Input {
     this._saveTick = false;
     this._shipsClick = false;
     this._controlsClick = false;
+    this._boardsClick = false;
     this._continueClick = false;
     this.keys.delete("__map__");
   }

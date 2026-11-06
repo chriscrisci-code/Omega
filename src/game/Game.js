@@ -118,10 +118,11 @@ export class Game {
       event.stopPropagation();
       this.input._controlsClick = true;
     });
-    this.hud.xpReset?.addEventListener("pointerdown", (event) => {
+    this.hud.boardsLink?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      this.resetXp();
+      this.input._boardsClick = true;
+      this.stepScoreBoard(1);
     });
 
     this.wingmen = [new Wingman(-1), new Wingman(1)];
@@ -2225,6 +2226,22 @@ export class Game {
     const board = SCORE_BOARDS[this.attractBoard] || SCORE_BOARDS[0];
     this.hud.showScores(this.scoreBoardOf(board.id), board.title);
     if (this.attractThenTitle) this.sfx("stab");
+  }
+
+  stepScoreBoard(dir) {
+    if (this.payOpen || this.pickingDevice || this.attractOnDemo) return;
+    if (this.mode !== TITLE && this.mode !== GAMEOVER) return;
+    const n = SCORE_BOARDS.length;
+    if (n < 1) return;
+    const step = dir < 0 ? -1 : 1;
+    if (this.attractPage !== "scores") {
+      this.attractPage = "scores";
+      this.attractBoard = step < 0 ? n - 1 : 0;
+    } else {
+      this.attractBoard = (this.attractBoard + step + n) % n;
+    }
+    this.attractTimer = this.attractBoardHold || ATTRACT_SCORES;
+    this.showScoreBoard();
   }
 
   rankEntry() {
@@ -5582,6 +5599,11 @@ export class Game {
       this.shoot(t);
     } else {
       this.ship.clearRail?.();
+    }
+    if ((this.mode === TITLE || this.mode === GAMEOVER) && !this.payOpen && !this.pickingDevice) {
+      if (this.input.boardLeft) this.stepScoreBoard(-1);
+      if (this.input.boardRight) this.stepScoreBoard(1);
+      if (this.attractPage === "scores" && this.input.quitPressed) this.beginAttractLoop("title");
     }
     if (this.mode === PLAYING && this.input.warpPressed) this.fireWarp();
     if (this.mode === PLAYING && !this.ship.docked && this.input.empPressed) this.fireEmp();

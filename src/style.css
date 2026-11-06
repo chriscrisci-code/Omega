@@ -187,7 +187,7 @@ body.is-attract .hud-center.is-demo .score-board {
 .hud-center.is-scores .tag,
 .hud-center.is-scores .help,
 .hud-center.is-scores .attract-rule,
-.hud-center.is-scores .ships-link {
+.hud-center.is-scores .ships-link:not(.boards-link) {
   display: none;
 }
 
@@ -656,6 +656,10 @@ body.is-attract .cta {
 .ships-link .vector-text {
   width: min(280px, 50vw);
   height: auto;
+}
+
+.boards-link .vector-text {
+  width: min(420px, 72vw);
 }
 
 .ships-page {

@@ -40,7 +40,7 @@ export class Hud {
     this.mode = document.querySelector("#mode");
     this.shipsLink = document.querySelector("#ships-link");
     this.controlsLink = document.querySelector("#controls-link");
-    this.xpReset = document.querySelector("#xp-reset");
+    this.boardsLink = document.querySelector("#boards-link");
     this.shipsPage = document.querySelector("#ships-page");
     this.controlsPage = document.querySelector("#controls-page");
     this.controls = new ControlsPage();
@@ -158,7 +158,7 @@ export class Hud {
     });
     this.shipsLink?.classList.add("is-hidden");
     this.paint(this.controlsLink, "C CONTROLS", 14, DIM, CYAN, "center");
-    this.paint(this.xpReset, "RESET XP", 12, DIM, CYAN, "center");
+    this.paint(this.boardsLink, "< LEADERBOARDS >", 12, DIM, CYAN, "center");
     this.shipsHeading && (this.shipsHeading.innerHTML = vectorTitleSvg("SHIPS", 36, CYAN, HOT));
     this.paint(this.shipsHint, "ESC RETURN  SPACE START", 11, DIM, CYAN, "center");
     this.paint(this.insertCoin, "INSERT", 12, CYAN, HOT, "center");
@@ -361,7 +361,7 @@ export class Hud {
     this.layout = id === "phone" ? "phone" : "desktop";
     this.shipsLink?.classList.add("is-hidden");
     this.paint(this.controlsLink, this.layout === "phone" ? "CONTROLS" : "C CONTROLS", 14, DIM, CYAN, "center");
-    this.paint(this.xpReset, "RESET XP", 12, DIM, CYAN, "center");
+    this.paint(this.boardsLink, "< LEADERBOARDS >", 12, DIM, CYAN, "center");
     this.paintHelp();
     this.refreshStartPrompt();
   }
