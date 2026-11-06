@@ -1026,6 +1026,22 @@ body:has(#controls-page:not(.is-hidden)) .version {
   margin-bottom: 16px;
 }
 
+.controls-music {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin: -8px 0 18px;
+}
+
+.controls-music .wave-btn {
+  min-width: 44px;
+}
+
+.controls-music .music-level {
+  min-width: 168px;
+}
+
 .controls-list {
   max-width: min(820px, 94vw);
   margin: 0 auto;

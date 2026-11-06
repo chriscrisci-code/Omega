@@ -63,6 +63,7 @@ export const blackHole = {
 export const music = {
   volume: 0.2,
   step: 0.1,
+  pctStep: 10,
   titleVol: 0,
   menuVol: 0.1,
   title: 0.35,
@@ -70,6 +71,36 @@ export const music = {
   dock: 0.38,
   dead: 0.18,
 };
+
+/** Audio-taper: 10% ≈ 0.02 of full, 90% ≈ 0.75, 100% = full mix. */
+const TAPER_K = 38.54;
+const TAPER_P = 1.188;
+
+export function musicTaperGain(pct) {
+  const x = Math.max(0, Math.min(1, (Number(pct) || 0) / 100));
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  return 10 ** ((-TAPER_K * (1 - x) ** TAPER_P) / 20);
+}
+
+export function musicTaperPct(gain) {
+  const g = Math.max(0, Math.min(1, Number(gain) || 0));
+  if (g <= 0) return 0;
+  if (g >= 0.999) return 100;
+  const db = 20 * Math.log10(g);
+  const t = Math.max(0, -db / TAPER_K);
+  const x = 1 - t ** (1 / TAPER_P);
+  return Math.round(Math.max(0, Math.min(100, x * 100)));
+}
+
+export function musicVolFromPct(pct) {
+  return musicTaperGain(pct) * (music.volume || 0.2);
+}
+
+export function musicPctFromVol(vol) {
+  const base = music.volume || 0.2;
+  return musicTaperPct((Math.max(0, Number(vol) || 0)) / base);
+}
 
 /** Gun hold-fire: 1 slow / 2 / 3 / 4 original stream / 5 twin. Missiles = ammo, +6 per level, reload at hub. EMP 1 off / 2 stun / 3 long / 4 kill. Shield 4 = 2x time. */
 export const shipLevels = {

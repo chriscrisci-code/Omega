@@ -1,4 +1,4 @@
-import { version } from "../config.js";
+import { musicPctFromVol, version } from "../config.js";
 import { ControlsPage } from "./ControlsPage.js";
 import { DockBay } from "./DockBay.js";
 import { shipMarksSvg, vectorTextSvg, vectorTitleSvg } from "./vectorText.js";
@@ -248,8 +248,8 @@ export class Hud {
   setHigh() {}
 
   setMusic(value) {
-    const pct = Math.round(Math.max(0, Math.min(1, Number(value) || 0)) * 100);
-    this.paint(this.musicLabel, `MUSIC ${pct}`, 10, DIM, CYAN, "center");
+    const pct = musicPctFromVol(value);
+    this.paint(this.musicLabel, `MUSIC ${pct}%`, 10, DIM, CYAN, "center");
   }
 
   setMode(label) {

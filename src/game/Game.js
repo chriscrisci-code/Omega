@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle, RenderTexture } from "pixi.js";
-import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, hunter as hunterCfg, hunterScale, lead as leadConfig, missiles, music, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, strike as strikeCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, hunter as hunterCfg, hunterScale, lead as leadConfig, missiles, music, musicPctFromVol, musicVolFromPct, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, strike as strikeCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -327,6 +327,7 @@ export class Game {
     this.hud.controls.onCapture = (id) => this.listenBind(id);
     this.hud.controls.onRemove = (id, key) => this.dropBind(id, key);
     this.hud.controls.onReset = () => this.resetBinds();
+    this.hud.controls.onMusic = (delta) => this.nudgeMusicPct(delta);
     this.hud.onMusic = (delta) => this.nudgeMusic(delta);
     this.hud.setPhoneDevice(maybePhone());
     this.noteVisit();
@@ -1662,7 +1663,7 @@ export class Game {
     this.storage.save(this.save);
     this.stopAttract();
     this.audio.unlock();
-    if (!(this.save.settings.music > 0)) this.applyMusicVol(music.volume);
+    if (!Number.isFinite(Number(this.save.settings.music))) this.applyMusicVol(music.volume);
     this.audio.restartMusic(this.musicOutLevel());
     this.enterFullscreen();
     this.wavePick = null;
@@ -2089,6 +2090,7 @@ export class Game {
       profile: this.input.profile,
       binds: this.input.binds,
       listening: this.input.capture,
+      music: this.save.settings.music,
     });
   }
 
@@ -2138,6 +2140,7 @@ export class Game {
 
   openControls() {
     this.stopAttract();
+    this.audio.unlock();
     this.mode = CONTROLS;
     this.input.capture = "";
     this.hud.showControls();
@@ -6198,15 +6201,24 @@ export class Game {
 
   tickMusicInput() {
     if (this.input.capture) return;
-    if (this.input.musicDownPressed) this.nudgeMusic(-music.step);
-    if (this.input.musicUpPressed) this.nudgeMusic(music.step);
+    if (this.input.musicDownPressed) this.nudgeMusicPct(-(music.pctStep || 10));
+    if (this.input.musicUpPressed) this.nudgeMusicPct(music.pctStep || 10);
+  }
+
+  playMusicVol() {
+    const vol = Number(this.save.settings.music);
+    if (!Number.isFinite(vol)) return music.volume;
+    return Math.max(0, Math.min(1, vol));
+  }
+
+  musicPct(vol = this.save.settings.music) {
+    return musicPctFromVol(vol);
   }
 
   musicOutLevel() {
     if (this.mode === TITLE || this.mode === INITIALS || this.mode === GAMEOVER) return music.titleVol;
-    if (this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE) {
-      const vol = Number(this.save.settings.music);
-      return vol > 0 ? vol : music.volume;
+    if (this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE || this.mode === CONTROLS) {
+      return this.playMusicVol();
     }
     return music.menuVol;
   }
@@ -6353,14 +6365,22 @@ export class Game {
   }
 
   applyMusicVol(value) {
-    const vol = Math.max(0, Math.min(1, Math.round((Number(value) || 0) * 10) / 10));
+    const vol = Math.max(0, Math.min(1, Math.round((Number(value) || 0) * 10000) / 10000));
     this.save.settings.music = vol;
     this.audio.setMusicVol(vol);
     this.hud.setMusic(vol);
+    if (this.mode === CONTROLS) this.refreshControls();
   }
 
   nudgeMusic(delta) {
     this.applyMusicVol((this.save.settings.music ?? music.volume) + delta);
+    this.storage.save(this.save);
+    this.audio.unlock();
+  }
+
+  nudgeMusicPct(delta) {
+    const next = Math.max(0, Math.min(100, this.musicPct() + Number(delta || 0)));
+    this.applyMusicVol(musicVolFromPct(next));
     this.storage.save(this.save);
     this.audio.unlock();
   }

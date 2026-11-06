@@ -1,3 +1,4 @@
+import { music, musicPctFromVol } from "../config.js";
 import { ACTIONS, PROFILE_NAMES, PROFILES, bindId, labelBind } from "../input/bindings.js";
 import { vectorTextSvg, vectorTitleSvg } from "./vectorText.js";
 
@@ -14,11 +15,13 @@ export class ControlsPage {
   constructor() {
     this.root = document.querySelector("#controls-page");
     this.profiles = document.querySelector("#controls-profiles");
+    this.music = document.querySelector("#controls-music");
     this.list = document.querySelector("#controls-list");
     this.onProfile = null;
     this.onCapture = null;
     this.onRemove = null;
     this.onReset = null;
+    this.onMusic = null;
     this.listening = "";
     paint(document.querySelector("#controls-heading"), "CONTROLS", 22, CYAN, HOT, "center");
     paint(document.querySelector("#controls-hint"), "CLICK A ROW   PRESS KEY MOUSE OR PAD   ESC RETURN", 8, DIM, CYAN, "center");
@@ -28,7 +31,46 @@ export class ControlsPage {
   render(state) {
     this.listening = state.listening || "";
     this.drawProfiles(state.profile);
+    this.drawMusic(state.music);
     this.drawList(state.binds);
+  }
+
+  musicPct(vol) {
+    return musicPctFromVol(vol);
+  }
+
+  drawMusic(vol) {
+    if (!this.music) return;
+    this.music.innerHTML = "";
+    const pct = this.musicPct(vol);
+    const minus = document.createElement("button");
+    minus.type = "button";
+    minus.className = "wave-btn";
+    minus.innerHTML = vectorTextSvg("-", 14, DIM, CYAN, "center");
+    minus.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onMusic?.(-(music.pctStep || 10));
+    });
+    const level = document.createElement("button");
+    level.type = "button";
+    level.className = `wave-btn start-btn music-level${pct > 0 ? " is-on" : ""}`;
+    level.innerHTML = vectorTextSvg(`MUSIC ${pct}%`, 12, pct > 0 ? CYAN : DIM, pct > 0 ? HOT : CYAN, "center");
+    level.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onMusic?.(pct > 0 ? -pct : 100);
+    });
+    const plus = document.createElement("button");
+    plus.type = "button";
+    plus.className = "wave-btn";
+    plus.innerHTML = vectorTextSvg("+", 14, DIM, CYAN, "center");
+    plus.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this.onMusic?.(music.pctStep || 10);
+    });
+    this.music.append(minus, level, plus);
   }
 
   drawProfiles(profile) {
