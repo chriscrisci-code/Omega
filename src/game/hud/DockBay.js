@@ -105,7 +105,7 @@ export class DockBay {
     this.bayBack = document.querySelector("#dock-bay-back");
 
     paint(document.querySelector("#dock-title"), "BAY", 7, CYAN, HOT, "center");
-    this.setHint("bay");
+    this.setHint();
     paint(this.bayBack, "BAY", 12, CYAN, HOT, "center");
     this.buildSeats();
 
@@ -206,37 +206,17 @@ export class DockBay {
   buildSeats() {
     if (!this.seats) return;
     this.seats.innerHTML = "";
-    const rows = [
-      { id: "gun0", name: "GUN 1" },
-      { id: "gun1", name: "GUN 2" },
-      { id: "laser", name: "LASER" },
-    ];
-    for (const row of rows) {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "dock-up dock-seat";
-      btn.dataset.id = row.id;
-      btn.innerHTML = vectorTextSvg(row.name, 12, CYAN, HOT, "center");
-      this.seats.appendChild(btn);
-    }
+    this.seats.hidden = true;
   }
 
-  setHint(kind) {
-    const line = kind === "gun"
-      ? "FIRE GUN  BAY  THRUST LAUNCH"
-      : kind === "laser"
-        ? "HOLD LASER 2s  BAY  THRUST LAUNCH"
-        : "LOADOUT BUY  GUN LASER  THRUST LAUNCH";
-    paint(document.querySelector("#dock-hint"), line, 6, DIM, CYAN, "center");
+  setHint() {
+    paint(document.querySelector("#dock-hint"), "LOADOUT BUY  THRUST LAUNCH", 6, DIM, CYAN, "center");
   }
 
   setSeat(id) {
     this.seat = id || null;
-    this.root?.classList.toggle("is-gunning", Boolean(this.seat));
-    this.seats?.querySelectorAll(".dock-seat").forEach((node) => {
-      node.classList.toggle("is-on", node.dataset.id === this.seat);
-    });
-    this.setHint(this.seat === "laser" ? "laser" : this.seat ? "gun" : "bay");
+    this.root?.classList.remove("is-gunning");
+    this.setHint();
     this.paintHero();
   }
 

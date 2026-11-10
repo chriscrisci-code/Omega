@@ -1,5 +1,5 @@
 import { Container, Graphics, Rectangle, RenderTexture } from "pixi.js";
-import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, hubGunner, hunter as hunterCfg, hunterScale, lead as leadConfig, missiles, music, musicPctFromVol, musicVolFromPct, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, strike as strikeCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
+import { applyDifficulty, assault, battleship as battleshipCfg, blackHole as holeCfg, camera as cameraConfig, castle, corvette as corvetteCfg, crane as craneCfg, debris as debrisConfig, bullets, colors, destroyer as destroyerConfig, emp, extraLifeEvery, gunAmmo, hubGunner, hunter as hunterCfg, hunterScale, lead as leadConfig, missiles, music, musicPctFromVol, musicVolFromPct, ore, raid, rocks, rockets, shield as shieldConfig, ship as shipConfig, shipLevels, station as stationCfg, strike as strikeCfg, tunnel as tunnelCfg, warp, world as worldConfig, xp as xpAwards } from "./config.js";
 import { chipBurst, Debris, shatter, wreckBurst } from "./entities/Debris.js";
 import { Asteroid } from "./entities/Asteroid.js";
 import { createBases } from "./entities/Base.js";
@@ -237,6 +237,8 @@ export class Game {
     this.missileCool = 0;
     this.missileQueued = 0;
     this.missileAmmo = 0;
+    this.gunAmmo = gunAmmo.start || 250;
+    this.empLeft = emp.sortie || 3;
     this.missileDropSide = 1;
     this.paused = false;
     this.hubDown = false;
@@ -318,7 +320,7 @@ export class Game {
     this.hud.onRemindEmail = (email) => this.sendRemind(email);
     this.hud.onPickWave = (n) => this.startRun(n);
     this.hud.bay.onBuy = (id) => this.buyUpgrade(id);
-    this.hud.bay.onSeat = (id) => this.enterHubSeat(id);
+    this.hud.bay.onSeat = () => {};
     this.hud.bay.onBay = () => this.leaveHubSeat();
     this.hud.onPickStart = (id) => {
       if (this.savePick) this.confirmSaveSlot(id);
@@ -1735,14 +1737,22 @@ export class Game {
     this.hub.forceDock(this.ship, 0);
     this.snapCamera();
     this.applyShieldLevel(true);
-    if (!resumed) this.reloadMissiles();
-    else this.clampMissileAmmo();
+    if (!resumed) {
+      this.reloadMissiles();
+      this.reloadGunAmmo();
+      this.resetEmpCharges();
+    } else {
+      this.clampMissileAmmo();
+      this.clampGunAmmo();
+      this.empLeft = Math.max(0, Math.min(emp.sortie || 3, Math.floor(Number(this.empLeft) || 0)));
+    }
     this.hud.setScore(this.score);
     this.hud.setXp(this.xp);
     this.hud.setPoints(this.points);
     this.hud.setLives(this.lives);
     this.paintKills();
     this.hud.setShield(this.ship.shieldEnergy, false, this.shieldPool());
+    this.syncAmmoHud();
     this.refreshDock();
     this.syncMissileHud();
     this.hubThreat = 0;
@@ -2537,11 +2547,51 @@ export class Game {
     this.syncMissileHud();
   }
 
+  gunAmmoCap() {
+    return gunAmmo.start || 250;
+  }
+
+  clampGunAmmo() {
+    this.gunAmmo = Math.max(0, Math.min(this.gunAmmoCap(), Math.floor(Number(this.gunAmmo) || 0)));
+  }
+
+  reloadGunAmmo() {
+    this.gunAmmo = this.gunAmmoCap();
+    this.syncAmmoHud();
+  }
+
+  syncAmmoHud() {
+    if (this.attractOnDemo) return;
+    this.hud.setAmmo(this.gunAmmo, this.gunAmmoCap());
+  }
+
+  hasGunAmmo() {
+    return this.attractOnDemo || this.gunAmmo > 0;
+  }
+
+  spendGunAmmo(n = 1) {
+    if (this.attractOnDemo) return true;
+    if (this.gunAmmo < n) return false;
+    this.gunAmmo = Math.max(0, this.gunAmmo - n);
+    this.syncAmmoHud();
+    return true;
+  }
+
+  resetEmpCharges() {
+    this.empLeft = emp.sortie || 3;
+    this.syncMissileHud();
+  }
+
   syncMissileHud() {
     if (this.attractOnDemo) return;
     const playing = this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE;
     const ammo = this.ship.can("rockets") ? "RKT" : "MSL";
-    this.hud.setSpecial(playing ? `${ammo}  ${this.missileAmmo}` : `WARP EMP ${ammo}`);
+    if (!playing) {
+      this.hud.setSpecial(`WARP EMP ${ammo}`);
+      return;
+    }
+    const empBit = this.empTier() > 1 ? `  EMP  ${this.empLeft}` : "";
+    this.hud.setSpecial(`${ammo}  ${this.missileAmmo}${empBit}`);
   }
 
   empCap() {
@@ -2683,6 +2733,7 @@ export class Game {
     this.addXp(xpAwards.upgrade);
     if (id === "shield") this.applyShieldLevel(true);
     if (id === "missile") this.reloadMissiles();
+    if (id === "emp") this.syncMissileHud();
     if (id === "gunship") this.syncWingmen({ revive: false });
     this.hud.setPoints(this.points);
     this.refreshDock();
@@ -2714,6 +2765,11 @@ export class Game {
     const spec = this.ship.noseGunCfg?.();
     const rail = spec && spec.charge > 0;
     if (!this.ship.can("noseGun")) {
+      this.ship.clearRail?.();
+      this.fireWasOn = this.input.fireHeld;
+      return;
+    }
+    if (!this.hasGunAmmo()) {
       this.ship.clearRail?.();
       this.fireWasOn = this.input.fireHeld;
       return;
@@ -2751,7 +2807,7 @@ export class Game {
 
   fireRailShot(spec) {
     const bullet = this.shots.find((shot) => !shot.alive);
-    if (!bullet) return;
+    if (!bullet || !this.spendGunAmmo(1)) return;
     const muzzle = this.ship.muzzle(0);
     bullet.fire(muzzle.x, muzzle.y, this.ship.rotation, {
       speed: spec.speed,
@@ -2778,7 +2834,7 @@ export class Game {
   fireGunShot() {
     const gun = this.gunTier();
     const bullet = this.shots.find((shot) => !shot.alive);
-    if (!bullet) return;
+    if (!bullet || !this.spendGunAmmo(1)) return;
     const dual = gun >= 5;
     const muzzle = this.ship.muzzle(dual ? (this.gun === 0 ? -1 : 1) : 0);
     bullet.fire(muzzle.x, muzzle.y, this.ship.rotation);
@@ -2846,16 +2902,7 @@ export class Game {
     return best;
   }
 
-  enterHubSeat(id) {
-    if (this.mode !== PLAYING || !this.ship.docked || this.attractOnDemo || !this.hub.alive) return;
-    if (id !== "gun0" && id !== "gun1" && id !== "laser") return;
-    this.stopHubLaser();
-    this.hubSeat = id;
-    this.hubGunAngle = this.ship.rotation;
-    this.hud.bay.setSeat(id);
-    this.hud.setMode(id === "laser" ? "LASER" : id === "gun1" ? "GUN 2" : "GUN 1");
-    this.sfx("on");
-  }
+  enterHubSeat() {}
 
   leaveHubSeat() {
     if (this.hubSeat && !this.hubLaserOn) this.sfx("off");
@@ -3512,6 +3559,8 @@ export class Game {
       nextLifeAt: this.nextLifeAt,
       castlesArmed: this.castlesArmed,
       bountyUnits: this.bountyUnits,
+      gunAmmo: this.gunAmmo,
+      empLeft: this.empLeft,
     });
   }
 
@@ -3594,6 +3643,9 @@ export class Game {
     this.loadoutBank = Math.max(0, Math.floor(Number(cp.loadout.bank) || 0));
     this.missileAmmo = Math.max(0, Math.floor(Number(cp.loadout.ammo) || 0));
     this.clampMissileAmmo();
+    this.gunAmmo = Math.max(0, Math.floor(Number(cp.gunAmmo ?? this.gunAmmoCap()) || 0));
+    this.clampGunAmmo();
+    this.empLeft = Math.max(0, Math.min(emp.sortie || 3, Math.floor(Number(cp.empLeft ?? emp.sortie) || 0)));
     this.score = 0;
     this.lives = Math.max(1, Math.floor(Number(cp.lives) || 0) || shipConfig.lives);
     this.cargo = Math.max(0, Math.floor(Number(cp.cargo) || 0));
@@ -4046,10 +4098,16 @@ export class Game {
 
   fireEmp(force = false) {
     if (this.empTier() <= 1) return;
+    if (!this.attractOnDemo && this.empLeft <= 0) return;
     if ((!force && this.empCool > 0) || this.emp.alive || !this.ship.alive || this.ship.docked) return;
     const reach = this.empReach();
     this.emp.fire(this.ship.x, this.ship.y, reach);
     this.empCool = emp.cooldown;
+    if (!this.attractOnDemo) {
+      this.empLeft = Math.max(0, this.empLeft - 1);
+      this.syncMissileHud();
+      this.hud.setMode(`EMP  ${this.empLeft}`);
+    }
     this.fx.burst(this.ship.x, this.ship.y, colors.cyanHot, 18, 160);
     this.fx.burst(this.ship.x, this.ship.y, colors.white, 8, 90);
     this.sfx("emp");
@@ -5067,6 +5125,8 @@ export class Game {
     this.hud.setPoints(this.points);
     this.hud.hideContinue();
     this.mode = PLAYING;
+    this.reloadGunAmmo();
+    this.resetEmpCharges();
     if (!this.hub.alive) this.restartWaveAfterHub();
     else {
       this.paused = false;
@@ -5313,6 +5373,8 @@ export class Game {
       this.ship.reset(this.ship.x, this.ship.y);
     }
     this.syncWingmen({ revive: true });
+    this.reloadGunAmmo();
+    this.resetEmpCharges();
     this.snapCamera();
   }
 
@@ -5679,6 +5741,7 @@ export class Game {
           this.cashKillBounty();
           this.bankKills();
           this.reloadMissiles();
+          this.reloadGunAmmo();
           this.refreshDock();
           this.hud.showDock(this.shipId);
           if (this.runDirty) this.writeCheckpoint();
@@ -5726,15 +5789,10 @@ export class Game {
         this.hud.hideDock();
       }
       this.hud.setShield(this.ship.shieldEnergy, this.ship.shieldOn, this.shieldPool());
+      this.syncAmmoHud();
       const modeLabel = this.input.mapHeld
         ? "MAP"
-        : this.hubSeat === "laser"
-          ? "LASER"
-          : this.hubSeat === "gun1"
-            ? "GUN 2"
-            : this.hubSeat === "gun0"
-              ? "GUN 1"
-              : this.homeOn && !this.ship.docked && this.hub.alive
+        : this.homeOn && !this.ship.docked && this.hub.alive
           ? "AUTOPILOT HOME"
           : this.ship.railT > 0
             ? this.railPrey?.alive

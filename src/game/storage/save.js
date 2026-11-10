@@ -1,4 +1,4 @@
-import { missiles, shipLevels, xp } from "../config.js";
+import { emp, gunAmmo as ammoCfg, missiles, shipLevels, xp } from "../config.js";
 import { guessProfile, normalizeBinds, preferDesktopMouse } from "../input/bindings.js";
 import { DEFAULT_SHIP_ID, PLAYABLE_SHIP_IDS, resolveShipId } from "../ships/catalog.js";
 import {
@@ -161,6 +161,8 @@ export function normalizeCheckpoint(data) {
     nextLifeAt: Math.max(0, Math.floor(Number(data.nextLifeAt) || 0)),
     castlesArmed: Boolean(data.castlesArmed),
     bountyUnits: Math.max(0, Math.floor(Number(data.bountyUnits) || 0)),
+    gunAmmo: Math.max(0, Math.min(ammoCfg.start || 250, Math.floor(Number(data.gunAmmo ?? ammoCfg.start) || 0))),
+    empLeft: Math.max(0, Math.min(emp.sortie || 3, Math.floor(Number(data.empLeft ?? emp.sortie) || 0))),
   };
 }
 

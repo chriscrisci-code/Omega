@@ -87,10 +87,25 @@ body.is-scoreboard #game {
 .ore-label,
 .xp-label,
 .ships-label,
-.shield-label,
 .special-label,
 [data-label="pts"] {
   margin-top: 12px;
+}
+
+.hud-bars {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.hud-bar-col {
+  text-align: right;
+}
+
+.hud-bars .label {
+  margin-top: 0;
 }
 
 #points .vector-text,
@@ -99,6 +114,7 @@ body.is-scoreboard #game {
   margin: 0 auto;
 }
 
+#ammo,
 #shield {
   width: 92px;
   height: 6px;
@@ -107,6 +123,7 @@ body.is-scoreboard #game {
   box-shadow: 0 0 10px rgba(142, 246, 255, 0.2);
 }
 
+#ammo-fill,
 #shield-fill {
   width: 100%;
   height: 100%;
@@ -115,13 +132,14 @@ body.is-scoreboard #game {
   transition: width 80ms linear;
 }
 
+#ammo.is-empty #ammo-fill,
+#shield.is-empty #shield-fill {
+  width: 0;
+}
+
 #shield.is-on {
   border-color: #c8f8ff;
   box-shadow: 0 0 14px rgba(142, 246, 255, 0.55);
-}
-
-#shield.is-empty #shield-fill {
-  width: 0;
 }
 
 .label {
@@ -1365,12 +1383,7 @@ body:has(#controls-page:not(.is-hidden)) .version {
 }
 
 .dock-seats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: center;
-  align-items: center;
-  margin: 4px 0 6px;
+  display: none;
 }
 
 .dock-seat {

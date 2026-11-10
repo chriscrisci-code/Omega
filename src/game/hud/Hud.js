@@ -33,6 +33,8 @@ export class Hud {
     this.padStatus = document.querySelector("#pad-status");
     this.shieldFill = document.querySelector("#shield-fill");
     this.shieldBar = document.querySelector("#shield");
+    this.ammoFill = document.querySelector("#ammo-fill");
+    this.ammoBar = document.querySelector("#ammo");
     this.special = document.querySelector("#special");
     this.alert = document.querySelector("#alert");
     this.alertTitle = this.alert?.querySelector(".alert-title");
@@ -131,6 +133,7 @@ export class Hud {
     this.paint(document.querySelector("[data-label=kills]"), "KILLS", 10, DIM, CYAN, "right");
     this.setKills(0);
     this.paint(document.querySelector("[data-label=ships]"), "SHIPS", 10, DIM, CYAN, "right");
+    this.paint(document.querySelector("[data-label=ammo]"), "AMMO", 10, DIM, CYAN, "right");
     this.paint(document.querySelector("[data-label=shield]"), "SHIELD", 10, DIM, CYAN, "right");
     this.paint(document.querySelector("[data-label=special]"), "WHEEL", 10, DIM, CYAN, "right");
     this.paint(this.alertTitle, "HUB UNDER ATTACK", 8, MAGENTA, PINK, "center");
@@ -289,6 +292,14 @@ export class Hud {
     this.shieldFill.style.width = `${Math.round(Math.max(0, Math.min(1, energy / pool)) * 100)}%`;
     this.shieldBar?.classList.toggle("is-on", Boolean(active));
     this.shieldBar?.classList.toggle("is-empty", energy <= 0.06);
+  }
+
+  setAmmo(current = 0, max = 1) {
+    if (!this.ammoFill) return;
+    const pool = Math.max(0.001, max);
+    const left = Math.max(0, Number(current) || 0);
+    this.ammoFill.style.width = `${Math.round(Math.max(0, Math.min(1, left / pool)) * 100)}%`;
+    this.ammoBar?.classList.toggle("is-empty", left <= 0);
   }
 
   setSpecial(name) {

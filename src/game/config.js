@@ -46,6 +46,11 @@ export const emp = {
   fade: 0.28,
   stun: 15,
   cooldown: 8,
+  sortie: 3,
+};
+
+export const gunAmmo = {
+  start: 250,
 };
 
 /** B. Gated off for now. Flip enabled to bring it back. */
@@ -102,7 +107,7 @@ export function musicPctFromVol(vol) {
   return musicTaperPct((Math.max(0, Number(vol) || 0)) / base);
 }
 
-/** Gun hold-fire: 1 slow / 2 / 3 / 4 original stream / 5 twin. Missiles = ammo, +6 per level, reload at hub. EMP 1 off / 2 stun / 3 long / 4 kill. Shield 4 = 2x time. */
+/** Gun hold-fire: 1 slow / 2 / 3 / 4 original stream / 5 twin. Nose ammo starts at 250, reloads at hub. Missiles = ammo, +6 per level, reload at hub. EMP 1 off / 2 stun / 3 long / 4 kill, 3 uses per sortie. Shield 4 = 2x time. */
 export const shipLevels = {
   gun: 5,
   missile: 7,
