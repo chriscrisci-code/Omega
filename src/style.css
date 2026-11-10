@@ -108,6 +108,27 @@ body.is-scoreboard #game {
   margin-top: 0;
 }
 
+.ammo-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+#ammo-count {
+  min-width: 40px;
+  min-height: 16px;
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 12px rgba(200, 248, 255, 0.75));
+  transition: opacity 2s ease-out;
+}
+
+#ammo-count.is-hot {
+  opacity: 1;
+  transition: none;
+}
+
 #points .vector-text,
 #ore .vector-text,
 #xp .vector-text {

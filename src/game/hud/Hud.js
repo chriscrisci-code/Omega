@@ -35,6 +35,9 @@ export class Hud {
     this.shieldBar = document.querySelector("#shield");
     this.ammoFill = document.querySelector("#ammo-fill");
     this.ammoBar = document.querySelector("#ammo");
+    this.ammoCount = document.querySelector("#ammo-count");
+    this.ammoShown = null;
+    this.ammoFade = 0;
     this.special = document.querySelector("#special");
     this.alert = document.querySelector("#alert");
     this.alertTitle = this.alert?.querySelector(".alert-title");
@@ -294,12 +297,20 @@ export class Hud {
     this.shieldBar?.classList.toggle("is-empty", energy <= 0.06);
   }
 
-  setAmmo(current = 0, max = 1) {
+  setAmmo(current = 0, max = 1, shot = false) {
     if (!this.ammoFill) return;
     const pool = Math.max(0.001, max);
-    const left = Math.max(0, Number(current) || 0);
+    const left = Math.max(0, Math.floor(Number(current) || 0));
     this.ammoFill.style.width = `${Math.round(Math.max(0, Math.min(1, left / pool)) * 100)}%`;
     this.ammoBar?.classList.toggle("is-empty", left <= 0);
+    if (!shot || !this.ammoCount) return;
+    if (this.ammoShown !== left) {
+      this.paint(this.ammoCount, String(left), 12, "#e8f4ff", "#ffffff", "right");
+      this.ammoShown = left;
+    }
+    this.ammoCount.classList.add("is-hot");
+    window.clearTimeout(this.ammoFade);
+    this.ammoFade = window.setTimeout(() => this.ammoCount?.classList.remove("is-hot"), 320);
   }
 
   setSpecial(name) {

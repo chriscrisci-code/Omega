@@ -2562,9 +2562,9 @@ export class Game {
     this.syncAmmoHud();
   }
 
-  syncAmmoHud() {
+  syncAmmoHud(shot = false) {
     if (this.attractOnDemo) return;
-    this.hud.setAmmo(this.gunAmmo, this.gunAmmoCap());
+    this.hud.setAmmo(this.gunAmmo, this.gunAmmoCap(), shot);
   }
 
   hasGunAmmo() {
@@ -2575,7 +2575,7 @@ export class Game {
     if (this.attractOnDemo) return true;
     if (this.gunAmmo < n) return false;
     this.gunAmmo = Math.max(0, this.gunAmmo - n);
-    this.syncAmmoHud();
+    this.syncAmmoHud(true);
     return true;
   }
 
