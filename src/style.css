@@ -1200,7 +1200,7 @@ body:has(#controls-page:not(.is-hidden)) .version {
 .dock-inspect {
   position: absolute;
   left: 50%;
-  top: calc(6% + 200px);
+  top: calc(6% + 100px);
   transform: translateX(-50%);
   width: max-content;
   height: min(38vh, 300px);
