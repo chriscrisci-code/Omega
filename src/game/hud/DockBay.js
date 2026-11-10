@@ -1,9 +1,75 @@
+import { ship as shipCfg } from "../config.js";
 import { catalogMiniSvg, DEFAULT_SHIP_ID, PLAYABLE_SHIP_IDS, SHIP_CATALOG, shipUnlockAt, unlockedShipIds } from "../ships/catalog.js";
+import { kitFor } from "../ships/kits.js";
 import { vectorTextSvg } from "./vectorText.js";
 
 const CYAN = "#66e0ff";
 const HOT = "#c8f8ff";
 const DIM = "#6d8a99";
+
+const SPECIAL_NAMES = {
+  autoShield: "AUTO SHIELD",
+  aiTurrets: "AI TURRETS",
+  wingmen: "WINGMEN",
+  pulseShield: "PULSE SHIELD",
+  multiHull: "MULTI HULL",
+  gunshipWing: "GUNSHIP WING",
+};
+
+function kitLines(id, loadout = {}) {
+  const kit = kitFor(id);
+  const stats = kit.stats || {};
+  const weapons = kit.weapons || {};
+  const speedMul = stats.speedMul ?? 1;
+  const turnMul = stats.turnMul ?? 1;
+  const levels = loadout.levels || {};
+  const max = loadout.max || {};
+  const ammo = loadout.ammoName || (weapons.rockets ? "RKT" : "MSL");
+  const nose = weapons.noseGun;
+  const missiles = weapons.missiles;
+  const turrets = weapons.turrets;
+  const tags = [];
+  if (nose && typeof nose === "object" && nose.charge) tags.push(nose.burst === "rocket" ? "RAIL ROCKET" : "RAIL GUN");
+  else if (nose) tags.push("NOSE GUN");
+  if (weapons.rockets) tags.push("ROCKETS");
+  else if (missiles && typeof missiles === "object" && missiles.volley > 1) tags.push(`TWIN ${ammo}`);
+  else if (missiles) tags.push(ammo === "RKT" ? "ROCKETS" : "MISSILES");
+  if (turrets?.mounts?.length) tags.push(`${turrets.mounts.length} TURRETS`);
+  for (const special of kit.specials || []) {
+    if (SPECIAL_NAMES[special]) tags.push(SPECIAL_NAMES[special]);
+  }
+  const load = [
+    { name: "GUN", level: levels.gun || 1, cap: max.gun || 0 },
+    { name: ammo, level: levels.missile || 1, cap: max.missile || 0 },
+    { name: "EMP", level: levels.emp || 1, cap: max.emp || 0 },
+    { name: "SHD", level: levels.shield || 1, cap: max.shield || 0 },
+  ];
+  if (loadout.showGunship) load.push({ name: "GSHP", level: levels.gunship || 0, cap: max.gunship || 0 });
+  return {
+    name: SHIP_CATALOG.find((item) => item.id === id)?.name || id,
+    ratings: [
+      { name: "SPEED", value: String(Math.round((shipCfg.maxSpeed || 520) * speedMul)), fill: speedMul / 1.28 },
+      { name: "MANEUVER", value: String(Math.round(turnMul * 100)), fill: turnMul },
+      { name: "TURN SPEED", value: String(Math.round((shipCfg.turnSpeed || 2.15) * turnMul * (180 / Math.PI))), fill: turnMul },
+    ],
+    facts: [
+      { name: "HULL", value: String(stats.hullHits || 1) },
+      { name: "SHIELD", value: `${Number(stats.shieldMul || 1).toFixed(stats.shieldMul % 1 ? 1 : 0)}X` },
+      stats.empCap ? { name: "EMP CAP", value: String(stats.empCap) } : null,
+      nose && typeof nose === "object" && nose.hits ? { name: "RAIL HIT", value: String(nose.hits) } : null,
+      nose && typeof nose === "object" && nose.charge ? { name: "RAIL CHARGE", value: `${nose.charge.toFixed(2)}S` } : null,
+    ].filter(Boolean),
+    load,
+    tags,
+  };
+}
+
+function statRow(label, value, fill) {
+  const bar = fill == null
+    ? ""
+    : `<div class="dock-stat-bar" aria-hidden="true"><span style="width:${Math.max(6, Math.min(100, fill * 100))}%"></span></div>`;
+  return `<div class="dock-stat">${vectorTextSvg(label, 6, DIM, CYAN, "left")}${bar}${vectorTextSvg(value, 6, CYAN, HOT, "right")}</div>`;
+}
 
 function paint(node, text, size, color, hot, align = "center") {
   if (!node) return;
@@ -13,7 +79,9 @@ function paint(node, text, size, color, hot, align = "center") {
 export class DockBay {
   constructor() {
     this.root = document.querySelector("#dock-bay");
+    this.inspect = document.querySelector("#dock-inspect");
     this.hero = document.querySelector("#dock-hero");
+    this.stats = document.querySelector("#dock-stats");
     this.ships = document.querySelector("#dock-ships");
     this.ups = document.querySelector("#dock-ups");
     this.onPickShip = null;
@@ -22,6 +90,7 @@ export class DockBay {
     this.onBay = null;
     this.shipId = DEFAULT_SHIP_ID;
     this.upKey = "";
+    this.upState = { points: 0, levels: { gun: 1, missile: 1, emp: 1, shield: 1 }, costs: {}, max: {} };
     this.rosterKey = "";
     this.unlocked = new Set(unlockedShipIds(0));
     this.seat = null;
@@ -91,6 +160,8 @@ export class DockBay {
   }
 
   setUpgrades(state) {
+    this.upState = state || this.upState;
+    this.paintInspect();
     if (!this.ups) return;
     const levels = state.levels || {};
     const costs = state.costs || {};
@@ -163,16 +234,28 @@ export class DockBay {
   }
 
   paintHero() {
-    if (!this.hero) return;
+    this.paintInspect();
+  }
+
+  paintInspect() {
     const open = this.root && !this.root.classList.contains("is-hidden") && !this.seat;
     if (!open) {
-      this.hero.classList.add("is-hidden");
-      this.hero.innerHTML = "";
+      this.inspect?.classList.add("is-hidden");
+      if (this.hero) this.hero.innerHTML = "";
+      if (this.stats) this.stats.innerHTML = "";
       return;
     }
     const spec = SHIP_CATALOG.find((item) => item.id === this.shipId) || null;
-    this.hero.innerHTML = catalogMiniSvg(spec, 280);
-    this.hero.classList.remove("is-hidden");
+    const sheet = kitLines(this.shipId, this.upState);
+    if (this.hero) this.hero.innerHTML = catalogMiniSvg(spec, 280);
+    if (this.stats) {
+      const ratings = sheet.ratings.map((row) => statRow(row.name, row.value, row.fill)).join("");
+      const facts = sheet.facts.map((row) => statRow(row.name, row.value)).join("");
+      const load = sheet.load.map((row) => statRow(row.name, row.cap ? `${row.level} / ${row.cap}` : String(row.level))).join("");
+      const tags = sheet.tags.map((tag) => `<div class="dock-tag">${vectorTextSvg(tag, 5, DIM, CYAN, "left")}</div>`).join("");
+      this.stats.innerHTML = `<div class="dock-sheet"><div class="dock-sheet-col">${vectorTextSvg(sheet.name, 12, CYAN, HOT, "left")}${ratings}<div class="dock-stat-gap"></div>${facts}</div><div class="dock-sheet-col">${vectorTextSvg("LOADOUT", 7, DIM, CYAN, "left")}${load}${tags ? `<div class="dock-tags">${tags}</div>` : ""}</div></div>`;
+    }
+    this.inspect?.classList.remove("is-hidden");
   }
 
   setState(shipId) {
