@@ -252,14 +252,19 @@ export class Hud {
     this.paint(this.musicLabel, `MUSIC ${pct}%`, 10, DIM, CYAN, "center");
   }
 
-  setMode(label) {
+  setMode(label, options = {}) {
     if (!this.mode) return;
     if (!label) {
       this.mode.hidden = true;
+      this.mode.classList.remove("is-warn");
       return;
     }
     this.mode.hidden = false;
-    this.paint(this.mode, label, label.length > 16 ? 7 : 11, CYAN, HOT, "center");
+    const warn = Boolean(options.warn);
+    this.mode.classList.toggle("is-warn", warn);
+    const color = warn ? MAGENTA : CYAN;
+    const hot = warn ? PINK : HOT;
+    this.paint(this.mode, label, label.length > 28 ? 6 : label.length > 16 ? 7 : 11, color, hot, "center");
   }
 
   setKills(current = 0, banked = 0) {
@@ -781,17 +786,19 @@ export class Hud {
     if (!this.alert) return;
     if (!info || !info.count) {
       this.alert.hidden = true;
-      this.alert.classList.remove("is-close");
+      this.alert.classList.remove("is-close", "is-recall");
       return;
     }
     this.alert.hidden = false;
     this.alert.classList.toggle("is-close", Boolean(info.close));
+    this.alert.classList.toggle("is-recall", Boolean(info.recall));
     const range = info.range >= 1000 ? `${(info.range / 1000).toFixed(1)}K` : `${Math.round(info.range)}`;
-    const color = info.close ? AMBER : MAGENTA;
-    const hot = info.close ? "#ffe0b0" : PINK;
+    const color = info.recall || info.close ? AMBER : MAGENTA;
+    const hot = info.recall || info.close ? "#ffe0b0" : PINK;
     const title = info.title || "HUB UNDER ATTACK";
     this.paint(this.alertTitle, title, title.length > 18 ? 6 : 8, color, hot, "center");
-    this.paint(this.alertSub, `${info.count} INBOUND  ${range}  SHIELD ${info.shield ?? 0}  HULL ${info.hull}`, 7, color, hot, "center");
+    const stats = `${info.count} INBOUND  ${range}  SHIELD ${info.shield ?? 0}  HULL ${info.hull}`;
+    this.paint(this.alertSub, info.hint ? `${info.hint}   ${stats}` : stats, 7, color, hot, "center");
   }
 
   paintContinue() {

@@ -66,7 +66,7 @@ export const SHIP_KITS = {
       empCap: 3,
     },
     weapons: {
-      noseGun: { charge: 0.75, hits: 50, speed: 1200, life: 10000 / 1200, coolMul: 2.2, burst: "rocket", sight: false },
+      noseGun: { charge: 0.75, hits: 50, speed: 1200, life: 10000 / 1200, coolMul: 2.2, burst: "rocket" },
       missiles: false,
       rockets: true,
       turrets: {

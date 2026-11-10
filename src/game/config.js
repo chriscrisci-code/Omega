@@ -340,6 +340,7 @@ export const raid = {
   first: 7,
   hits: 3,
   warn: 1700,
+  orbit: 250,
   hubHits: 18,
   hubShieldHits: [5, 4, 4],
   regenDelay: 2.2,
@@ -364,9 +365,9 @@ export const assault = {
   wave2: 85,
   wave3: 95,
   grow: 28,
-  w1Hunters: 2,
-  w1HunterEvery: 14,
-  w1RaidMax: 12,
+  w1Hunters: 11,
+  w1HunterEvery: 5.2,
+  w1RaidMax: 3,
   w1RaidEvery: 5.2,
   w2PerCastle: 2,
   hunterBoost: 10,
@@ -572,7 +573,8 @@ export function applyDifficulty(id) {
     raid.regenEvery = 0.65;
     assault.rest = 114;
     assault.wave1 = 180;
-    assault.w1RaidMax = 16;
+    assault.w1Hunters = 14;
+    assault.w1RaidMax = 4;
     assault.w1RaidEvery = 4.4;
     assault.grow = 32;
     rocks.startCount = 6;
@@ -603,8 +605,8 @@ export function applyDifficulty(id) {
     raid.regenEvery = 0.85;
     assault.rest = 84;
     assault.wave1 = 165;
-    assault.w1Hunters = 3;
-    assault.w1RaidMax = 20;
+    assault.w1Hunters = 18;
+    assault.w1RaidMax = 5;
     assault.w1RaidEvery = 3.6;
     assault.grow = 36;
     rocks.startCount = 8;

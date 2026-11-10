@@ -775,7 +775,8 @@ body.is-attract .cta {
   animation: pulse 0.9s ease-in-out infinite;
 }
 
-.hub-alert.is-close {
+.hub-alert.is-close,
+.hub-alert.is-recall {
   color: #ff9a3c;
   text-shadow: 0 0 18px rgba(255, 154, 60, 0.7);
   animation-duration: 0.45s;
@@ -795,6 +796,11 @@ body.is-attract .cta {
   bottom: 11%;
   transform: translateX(-50%);
   filter: drop-shadow(0 0 10px rgba(142, 246, 255, 0.45));
+}
+
+.mode-banner.is-warn {
+  filter: drop-shadow(0 0 12px rgba(255, 77, 154, 0.55));
+  animation: pulse 0.55s ease-in-out infinite;
 }
 
 .pad-status {

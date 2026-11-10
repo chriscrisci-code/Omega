@@ -252,6 +252,7 @@ export class Game {
     this.camOn = true;
     this.hubThreat = 0;
     this.hubThreatClose = false;
+    this.hubRecall = false;
     this.hubAlertOn = false;
     this.hubWarnPulse = 0;
     this.starBeepWait = 0;
@@ -613,7 +614,7 @@ export class Game {
     if (n <= 1) {
       return {
         hunterGlobal: assault.w1Hunters,
-        hunterPerCastle: 1,
+        hunterPerCastle: assault.w1Hunters,
         hunterEvery: assault.w1HunterEvery,
         raidMax: assault.w1RaidMax,
         raidEvery: assault.w1RaidEvery,
@@ -1746,6 +1747,7 @@ export class Game {
     this.syncMissileHud();
     this.hubThreat = 0;
     this.hubThreatClose = false;
+    this.hubRecall = false;
     this.hubAlertOn = false;
     this.hubWarnPulse = 0;
     this.battleWarn = 0;
@@ -2348,6 +2350,7 @@ export class Game {
     this.cooldown = 0;
     this.hubThreat = 0;
     this.hubThreatClose = false;
+    this.hubRecall = false;
     this.castlesArmed = false;
     this.assaultRest = false;
     for (const base of this.bases) base.resetCombat();
@@ -2378,6 +2381,7 @@ export class Game {
     this.lockMark.visible = false;
     this.hubThreat = 0;
     this.hubThreatClose = false;
+    this.hubRecall = false;
     this.hud.setHubAlert(null);
     this.hud.setMode("");
     this.clearRocks();
@@ -5010,6 +5014,7 @@ export class Game {
     this.lockMark.visible = false;
     this.hubThreat = 0;
     this.hubThreatClose = false;
+    this.hubRecall = false;
     this.strikeWarn = 0;
     this.beginAssault(this.assaultIndex, true);
     this.strikeTimer = strikeCfg.first;
@@ -5168,12 +5173,14 @@ export class Game {
     if (!this.hub.alive || (this.mode !== PLAYING && !this.attractOnDemo)) {
       this.hubThreat = 0;
       this.hubThreatClose = false;
+      this.hubRecall = false;
       this.hubAlertOn = false;
       this.hud.setHubAlert(null);
       return;
     }
     let count = 0;
     let nearest = Infinity;
+    let nearestRaid = Infinity;
     let incoming = 0;
     for (const enemy of this.enemies) {
       if (!enemy.alive) continue;
@@ -5188,6 +5195,7 @@ export class Game {
       if (enemy.role !== "raider" || dist > raid.warn) continue;
       count += 1;
       if (dist < nearest) nearest = dist;
+      if (dist < nearestRaid) nearestRaid = dist;
     }
     const battleshipStrike = this.battleship?.attacking && this.battleship.alive;
     if (battleshipStrike) {
@@ -5199,8 +5207,21 @@ export class Game {
       if (dist < nearest) nearest = dist;
     }
     const shown = incoming || count;
+    const circling = nearestRaid <= (raid.orbit || 250);
+    const away =
+      Math.hypot(
+        wrapDelta(this.ship.x - this.hub.x, space.width),
+        wrapDelta(this.ship.y - this.hub.y, space.height),
+      ) > this.viewRadius() * 0.85;
     this.hubThreat = shown;
     this.hubThreatClose = shown > 0 && (Boolean(battleshipStrike && this.battleship.holding) || nearest < raid.warn * 0.45);
+    this.hubRecall =
+      circling &&
+      away &&
+      !this.ship.docked &&
+      !this.homeOn &&
+      !this.inTunnel() &&
+      !this.attractOnDemo;
     if (shown && !this.hubAlertOn) {
       this.sfx("warn");
       this.hubWarnPulse = 1.6;
@@ -5210,7 +5231,7 @@ export class Game {
       this.hubWarnPulse -= t;
       if (this.hubWarnPulse <= 0) {
         this.sfx("warn");
-        this.hubWarnPulse = this.hubThreatClose ? 0.85 : 1.7;
+        this.hubWarnPulse = this.hubThreatClose || this.hubRecall ? 0.85 : 1.7;
       }
     } else {
       this.hubWarnPulse = 0;
@@ -5223,11 +5244,15 @@ export class Game {
             hull: this.hub.coreHp,
             shield: this.hub.shieldHp(),
             close: this.hubThreatClose,
+            recall: this.hubRecall,
+            hint: this.hubRecall ? "PRESS H" : "",
             title: battleshipStrike
               ? "BATTLESHIP IS ATTACKING THE HUB"
               : incoming
                 ? "INCOMING ATTACK DETECTED"
-                : undefined,
+                : this.hubRecall
+                  ? "RETURN TO HUB! UNDER ATTACK"
+                  : undefined,
           }
         : null,
     );
@@ -5729,6 +5754,7 @@ export class Game {
       if (this.yardWarn > 0) this.yardWarn = Math.max(0, this.yardWarn - t);
       if (this.strikeWarn > 0) this.strikeWarn = Math.max(0, this.strikeWarn - t);
       if (this.battleWarn > 0) this.battleWarn = Math.max(0, this.battleWarn - t);
+      const recall = this.hubRecall && !this.homeOn && !this.ship.docked;
       this.hud.setMode(
         this.saveFlash > 0
           ? "SAVED"
@@ -5738,7 +5764,17 @@ export class Game {
               ? "INCOMING ATTACK DETECTED"
               : this.yardWarn > 0
                 ? "BATTLESHIP BEING BUILT"
-                : modeLabel,
+                : recall
+                  ? "RETURN TO HUB!  UNDER ATTACK.  PRESS H"
+                  : modeLabel,
+        {
+          warn:
+            this.saveFlash <= 0 &&
+            this.battleWarn <= 0 &&
+            this.strikeWarn <= 0 &&
+            this.yardWarn <= 0 &&
+            recall,
+        },
       );
     } else if (this.mode === DYING) {
       this.leaveHubSeat();
@@ -5955,6 +5991,7 @@ export class Game {
     } else if (this.mode !== DYING) {
       this.hubThreat = 0;
       this.hubThreatClose = false;
+      this.hubRecall = false;
       this.hud.setHubAlert(null);
     }
 
@@ -6250,6 +6287,20 @@ export class Game {
     );
   }
 
+  railShotPassed() {
+    const shot = this.railShot;
+    const lock = this.railLock;
+    if (!shot?.alive || !lock) return false;
+    const space = this.space();
+    const nx = Math.cos(this.railAimA);
+    const ny = Math.sin(this.railAimA);
+    const shotAlong =
+      wrapDelta(shot.x - this.railAimX, space.width) * nx + wrapDelta(shot.y - this.railAimY, space.height) * ny;
+    const tgtAlong =
+      wrapDelta(lock.x - this.railAimX, space.width) * nx + wrapDelta(lock.y - this.railAimY, space.height) * ny;
+    return shotAlong > tgtAlong + (lock.radius || 20) + 48;
+  }
+
   railSightRot() {
     const charging = (this.ship.railT || 0) > 0;
     const angle = charging ? this.ship.rotation : this.railAimA;
@@ -6265,6 +6316,11 @@ export class Game {
     this.lookRailAlong(this.railAimX, this.railAimY, this.railAimA, body);
   }
 
+  holdRailCam(seconds = 2.4) {
+    this.railShot = null;
+    this.railHold = Math.max(this.railHold, seconds);
+  }
+
   tickLockCam(dt) {
     const playing = this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE;
     if (!playing || this.attractOnDemo) {
@@ -6277,16 +6333,19 @@ export class Game {
     }
     if (this.ship.alive && !this.ship.docked && (this.ship.railT || 0) > 0) {
       const prey = this.railSightTarget(this.space());
+      if (prey && this.railLock && prey !== this.railLock) {
+        this.railShot = null;
+        this.railHold = 0;
+        this.railLock = prey;
+      }
       this.railPrey = prey;
       const nose = this.ship.nose?.() || this.ship;
       this.lookRailAlong(nose.x, nose.y, this.ship.rotation, prey);
       return;
     }
     this.railPrey = null;
-    if (this.railShot && !this.railShot.alive) {
-      this.railShot = null;
-      this.railHold = 3;
-    }
+    if (this.railShot?.alive && this.railShotPassed()) this.holdRailCam();
+    else if (this.railShot && !this.railShot.alive) this.holdRailCam();
     if (this.railShot || this.railHold > 0) {
       if (!this.railShot && this.railHold > 0) this.railHold = Math.max(0, this.railHold - dt);
       if (this.railShot || this.railHold > 0) {
