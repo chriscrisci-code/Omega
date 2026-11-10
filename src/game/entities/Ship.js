@@ -500,7 +500,7 @@ export class Ship {
         this.shieldLock = shieldConfig.lock;
       }
     } else {
-      this.shieldEnergy = Math.min(this.shieldMax || shieldConfig.max, this.shieldEnergy + shieldConfig.recharge * dt);
+      this.shieldEnergy = Math.min(this.shieldMax || shieldConfig.max, this.shieldEnergy + shieldConfig.recharge * this.stat("shieldRegen", 1) * dt);
     }
     this.drawShield();
   }

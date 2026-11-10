@@ -10,12 +10,13 @@ export const SHIP_KITS = {
       hullHits: 1,
       hullIFrames: 0,
       shieldMul: 1,
+      shieldRegen: 1,
     },
     weapons: {
       noseGun: true,
       missiles: true,
     },
-    specials: ["autoShield"],
+    specials: [],
   },
   ASSAULT: {
     id: "ASSAULT",
@@ -26,6 +27,7 @@ export const SHIP_KITS = {
       hullHits: 3,
       hullIFrames: 0.55,
       shieldMul: 2,
+      shieldRegen: 1,
       empCap: 3,
     },
     weapons: {
@@ -63,6 +65,7 @@ export const SHIP_KITS = {
       hullHits: 3,
       hullIFrames: 0.55,
       shieldMul: 2,
+      shieldRegen: 1,
       empCap: 3,
     },
     weapons: {
@@ -98,12 +101,13 @@ export const SHIP_KITS = {
       hullHits: 1,
       hullIFrames: 0,
       shieldMul: 10,
+      shieldRegen: 1,
     },
     weapons: {
       noseGun: { charge: 1.5, hits: 200, speed: 1200, life: 10000 / 1200, coolMul: 2.2 },
       missiles: true,
     },
-    specials: ["autoShield", "gunshipWing"],
+    specials: ["gunshipWing"],
     wing: {
       kit: "GUNSHIP",
       skin: "GUNSHIP",
@@ -126,12 +130,13 @@ export const SHIP_KITS = {
       hullHits: 2,
       hullIFrames: 0.5,
       shieldMul: 1,
+      shieldRegen: 1,
     },
     weapons: {
       noseGun: true,
       missiles: { volley: 2 },
     },
-    specials: ["autoShield", "multiHull"],
+    specials: ["multiHull"],
   },
 };
 

@@ -8,7 +8,6 @@ const HOT = "#c8f8ff";
 const DIM = "#6d8a99";
 
 const SPECIAL_NAMES = {
-  autoShield: "AUTO SHIELD",
   aiTurrets: "AI TURRETS",
   wingmen: "WINGMEN",
   pulseShield: "PULSE SHIELD",
@@ -38,13 +37,20 @@ function kitLines(id, loadout = {}) {
   for (const special of kit.specials || []) {
     if (SPECIAL_NAMES[special]) tags.push(SPECIAL_NAMES[special]);
   }
+  const rail = nose && typeof nose === "object" && nose.charge;
+  const mul = (value) => `${Number(value || 1).toFixed((value || 1) % 1 ? 1 : 0)}X`;
   const load = [
     { name: "GUN", level: levels.gun || 1, cap: max.gun || 0 },
     { name: ammo, level: levels.missile || 1, cap: max.missile || 0 },
     { name: "EMP", level: levels.emp || 1, cap: max.emp || 0 },
     { name: "SHD", level: levels.shield || 1, cap: max.shield || 0 },
+    {
+      name: "GSHP",
+      level: loadout.showGunship ? levels.gunship || 0 : 0,
+      cap: loadout.showGunship ? max.gunship || 0 : 0,
+      blank: !loadout.showGunship,
+    },
   ];
-  if (loadout.showGunship) load.push({ name: "GSHP", level: levels.gunship || 0, cap: max.gunship || 0 });
   return {
     name: SHIP_CATALOG.find((item) => item.id === id)?.name || id,
     ratings: [
@@ -54,11 +60,12 @@ function kitLines(id, loadout = {}) {
     ],
     facts: [
       { name: "HULL", value: String(stats.hullHits || 1) },
-      { name: "SHIELD", value: `${Number(stats.shieldMul || 1).toFixed(stats.shieldMul % 1 ? 1 : 0)}X` },
-      stats.empCap ? { name: "EMP CAP", value: String(stats.empCap) } : null,
-      nose && typeof nose === "object" && nose.hits ? { name: "RAIL HIT", value: String(nose.hits) } : null,
-      nose && typeof nose === "object" && nose.charge ? { name: "RAIL CHARGE", value: `${nose.charge.toFixed(2)}S` } : null,
-    ].filter(Boolean),
+      { name: "SHIELD", value: mul(stats.shieldMul) },
+      { name: "SHIELD REGEN", value: mul(stats.shieldRegen) },
+      { name: "EMP CAP", value: String(stats.empCap || 4) },
+      { name: "RAIL HIT", value: rail ? String(nose.hits) : "-" },
+      { name: "RAIL CHARGE", value: rail ? `${Number(nose.charge).toFixed(2)}S` : "-" },
+    ],
     load,
     tags,
   };
@@ -251,7 +258,7 @@ export class DockBay {
     if (this.stats) {
       const ratings = sheet.ratings.map((row) => statRow(row.name, row.value, row.fill)).join("");
       const facts = sheet.facts.map((row) => statRow(row.name, row.value)).join("");
-      const load = sheet.load.map((row) => statRow(row.name, row.cap ? `${row.level} / ${row.cap}` : String(row.level))).join("");
+      const load = sheet.load.map((row) => statRow(row.name, row.blank ? "-" : row.cap ? `${row.level} / ${row.cap}` : String(row.level))).join("");
       const tags = sheet.tags.map((tag) => `<div class="dock-tag">${vectorTextSvg(tag, 7, DIM, CYAN, "left")}</div>`).join("");
       this.stats.innerHTML = `<div class="dock-sheet"><div class="dock-sheet-col">${vectorTextSvg(sheet.name, 16, CYAN, HOT, "left")}<div class="dock-stat-block">${ratings}<div class="dock-stat-gap"></div>${facts}</div></div><div class="dock-sheet-col">${vectorTextSvg("LOADOUT", 10, DIM, CYAN, "left")}<div class="dock-stat-block">${load}${tags ? `<div class="dock-tags">${tags}</div>` : ""}</div></div></div>`;
     }
