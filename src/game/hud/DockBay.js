@@ -68,7 +68,7 @@ function statRow(label, value, fill) {
   const bar = fill == null
     ? ""
     : `<div class="dock-stat-bar" aria-hidden="true"><span style="width:${Math.max(6, Math.min(100, fill * 100))}%"></span></div>`;
-  return `<div class="dock-stat">${vectorTextSvg(label, 6, DIM, CYAN, "left")}${bar}${vectorTextSvg(value, 6, CYAN, HOT, "right")}</div>`;
+  return `<div class="dock-stat">${vectorTextSvg(label, 9, DIM, CYAN, "left")}${bar}${vectorTextSvg(value, 9, CYAN, HOT, "right")}</div>`;
 }
 
 function paint(node, text, size, color, hot, align = "center") {
@@ -252,8 +252,8 @@ export class DockBay {
       const ratings = sheet.ratings.map((row) => statRow(row.name, row.value, row.fill)).join("");
       const facts = sheet.facts.map((row) => statRow(row.name, row.value)).join("");
       const load = sheet.load.map((row) => statRow(row.name, row.cap ? `${row.level} / ${row.cap}` : String(row.level))).join("");
-      const tags = sheet.tags.map((tag) => `<div class="dock-tag">${vectorTextSvg(tag, 5, DIM, CYAN, "left")}</div>`).join("");
-      this.stats.innerHTML = `<div class="dock-sheet"><div class="dock-sheet-col">${vectorTextSvg(sheet.name, 12, CYAN, HOT, "left")}${ratings}<div class="dock-stat-gap"></div>${facts}</div><div class="dock-sheet-col">${vectorTextSvg("LOADOUT", 7, DIM, CYAN, "left")}${load}${tags ? `<div class="dock-tags">${tags}</div>` : ""}</div></div>`;
+      const tags = sheet.tags.map((tag) => `<div class="dock-tag">${vectorTextSvg(tag, 7, DIM, CYAN, "left")}</div>`).join("");
+      this.stats.innerHTML = `<div class="dock-sheet"><div class="dock-sheet-col">${vectorTextSvg(sheet.name, 16, CYAN, HOT, "left")}<div class="dock-stat-block">${ratings}<div class="dock-stat-gap"></div>${facts}</div></div><div class="dock-sheet-col">${vectorTextSvg("LOADOUT", 10, DIM, CYAN, "left")}<div class="dock-stat-block">${load}${tags ? `<div class="dock-tags">${tags}</div>` : ""}</div></div></div>`;
     }
     this.inspect?.classList.remove("is-hidden");
   }

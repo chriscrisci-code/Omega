@@ -1199,11 +1199,15 @@ body:has(#controls-page:not(.is-hidden)) .version {
 
 .dock-inspect {
   position: absolute;
-  left: 5%;
+  left: 50%;
   top: 6%;
+  transform: translateX(-50%);
+  width: max-content;
+  height: min(38vh, 300px);
   display: flex;
-  align-items: flex-start;
-  gap: 28px;
+  align-items: stretch;
+  gap: 36px;
+  overflow: hidden;
   pointer-events: none;
   z-index: 4;
 }
@@ -1213,8 +1217,8 @@ body:has(#controls-page:not(.is-hidden)) .version {
 }
 
 .dock-hero {
-  width: min(34vh, 260px);
-  height: min(34vh, 260px);
+  width: min(38vh, 300px);
+  height: min(38vh, 300px);
   flex: 0 0 auto;
 }
 
@@ -1227,47 +1231,65 @@ body:has(#controls-page:not(.is-hidden)) .version {
 
 .dock-stats {
   flex: 0 0 auto;
+  display: flex;
+  height: 100%;
+  min-height: 0;
 }
 
 .dock-sheet {
   display: flex;
-  align-items: flex-start;
-  gap: 28px;
+  align-items: stretch;
+  gap: 36px;
+  height: 100%;
+  min-height: 0;
 }
 
 .dock-sheet-col {
-  width: 248px;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 0;
 }
 
 .dock-sheet-col:last-child {
-  width: 168px;
+  width: 220px;
 }
 
 .dock-sheet-col:last-child .dock-stat {
-  grid-template-columns: 44px auto;
-  gap: 10px;
+  grid-template-columns: 56px max-content;
+  gap: 12px;
+  justify-content: start;
 }
 
 .dock-sheet-col:last-child .dock-tags {
-  margin-top: 10px;
-  max-width: 168px;
+  margin-top: 14px;
+  max-width: 220px;
 }
 
 .dock-sheet-col > .vector-text {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+.dock-stat-block {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  min-height: 0;
 }
 
 .dock-stat {
   display: grid;
-  grid-template-columns: 96px minmax(40px, 1fr) auto;
-  gap: 6px;
+  grid-template-columns: 132px minmax(56px, 1fr) auto;
+  gap: 10px;
   align-items: center;
-  margin: 1px 0;
+  margin: 3px 0;
 }
 
 .dock-stat:not(:has(.dock-stat-bar)) {
-  grid-template-columns: 96px auto;
+  grid-template-columns: 132px auto;
 }
 
 .dock-stat .vector-text {
@@ -1276,7 +1298,7 @@ body:has(#controls-page:not(.is-hidden)) .version {
 }
 
 .dock-stat-bar {
-  height: 6px;
+  height: 10px;
   border: 1px solid rgba(102, 224, 255, 0.32);
   background: rgba(102, 224, 255, 0.08);
 }
@@ -1289,18 +1311,18 @@ body:has(#controls-page:not(.is-hidden)) .version {
 }
 
 .dock-stat-gap {
-  height: 6px;
+  height: 10px;
 }
 
 .dock-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  margin-top: 6px;
+  gap: 6px;
+  margin-top: 10px;
 }
 
 .dock-tag {
-  padding: 1px 5px;
+  padding: 3px 8px;
   border: 1px solid rgba(102, 224, 255, 0.32);
 }
 
@@ -1483,11 +1505,12 @@ body:has(.dock-bay:not(.is-hidden)) .mode-banner {
 }
 
 body.is-phone .dock-inspect {
-  left: 2%;
-  right: 2%;
+  left: 50%;
+  right: auto;
   top: 6%;
-  bottom: 250px;
-  gap: 10px;
+  height: auto;
+  max-height: calc(100vh - 280px);
+  gap: 14px;
 }
 
 body.is-phone .dock-hero {
@@ -1501,13 +1524,21 @@ body.is-phone .dock-stats {
   flex: 1 1 auto;
 }
 
+body.is-phone .dock-sheet-col {
+  width: 210px;
+}
+
+body.is-phone .dock-sheet-col:last-child {
+  width: 150px;
+}
+
 body.is-phone .dock-stat,
 body.is-phone .dock-stat:not(:has(.dock-stat-bar)) {
-  grid-template-columns: 84px auto;
+  grid-template-columns: 100px auto;
 }
 
 body.is-phone .dock-stat:has(.dock-stat-bar) {
-  grid-template-columns: 84px minmax(32px, 1fr) auto;
+  grid-template-columns: 100px minmax(32px, 1fr) auto;
 }
 
 body.is-phone .dock-bay {
