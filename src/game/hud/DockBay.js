@@ -41,9 +41,13 @@ function kitLines(id, loadout = {}) {
   const mul = (value) => `${Number(value || 1).toFixed((value || 1) % 1 ? 1 : 0)}X`;
   const load = [
     { name: "GUN", level: levels.gun || 1, cap: max.gun || 0 },
+    { name: "AMMO", level: levels.ammo || 1, cap: max.ammo || 0, sub: true },
     { name: ammo, level: levels.missile || 1, cap: max.missile || 0 },
+    { name: "TYPE", level: levels.missileType || 1, cap: max.missileType || 1, sub: true },
     { name: "EMP", level: levels.emp || 1, cap: max.emp || 0 },
+    { name: "CHARGES", level: levels.charges || 1, cap: max.charges || 0, sub: true },
     { name: "SHD", level: levels.shield || 1, cap: max.shield || 0 },
+    { name: "REGEN", level: levels.regen || 1, cap: max.regen || 0, sub: true },
     {
       name: "GSHP",
       level: loadout.showGunship ? levels.gunship || 0 : 0,
@@ -61,7 +65,6 @@ function kitLines(id, loadout = {}) {
     facts: [
       { name: "HULL", value: String(stats.hullHits || 1) },
       { name: "SHIELD", value: mul(stats.shieldMul) },
-      { name: "SHIELD REGEN", value: mul(stats.shieldRegen) },
       { name: "EMP CAP", value: String(stats.empCap || 4) },
       { name: "RAIL HIT", value: rail ? String(nose.hits) : "-" },
       { name: "RAIL CHARGE", value: rail ? `${Number(nose.charge).toFixed(2)}S` : "-" },
@@ -71,11 +74,12 @@ function kitLines(id, loadout = {}) {
   };
 }
 
-function statRow(label, value, fill) {
+function statRow(label, value, fill, extraClass = "") {
   const bar = fill == null
     ? ""
     : `<div class="dock-stat-bar" aria-hidden="true"><span style="width:${Math.max(6, Math.min(100, fill * 100))}%"></span></div>`;
-  return `<div class="dock-stat">${vectorTextSvg(label, 9, DIM, CYAN, "left")}${bar}${vectorTextSvg(value, 9, CYAN, HOT, "right")}</div>`;
+  const cls = extraClass ? ` dock-stat ${extraClass}` : " dock-stat";
+  return `<div class="${cls.trim()}">${vectorTextSvg(label, 9, DIM, CYAN, "left")}${bar}${vectorTextSvg(value, 9, CYAN, HOT, "right")}</div>`;
 }
 
 function paint(node, text, size, color, hot, align = "center") {
@@ -97,7 +101,7 @@ export class DockBay {
     this.onBay = null;
     this.shipId = DEFAULT_SHIP_ID;
     this.upKey = "";
-    this.upState = { points: 0, levels: { gun: 1, missile: 1, emp: 1, shield: 1 }, costs: {}, max: {} };
+    this.upState = { points: 0, levels: { gun: 1, ammo: 1, missile: 1, missileType: 1, emp: 1, charges: 1, shield: 1, regen: 1 }, costs: {}, max: {} };
     this.rosterKey = "";
     this.unlocked = new Set(unlockedShipIds(0));
     this.seat = null;
@@ -110,7 +114,7 @@ export class DockBay {
     this.buildSeats();
 
     this.buildShips();
-    this.setUpgrades({ points: 0, levels: { gun: 1, missile: 1, emp: 1, shield: 1 }, costs: {}, max: {} });
+    this.setUpgrades({ points: 0, levels: { gun: 1, ammo: 1, missile: 1, missileType: 1, emp: 1, charges: 1, shield: 1, regen: 1 }, costs: {}, max: {} });
     this.root?.addEventListener("pointerdown", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -174,19 +178,20 @@ export class DockBay {
     const costs = state.costs || {};
     const max = state.max || {};
     const points = state.points || 0;
-    const rows = [
-      { id: "gun", name: "GUN" },
-      { id: "missile", name: state.ammoName || "MSL" },
-      { id: "emp", name: "EMP" },
-      { id: "shield", name: "SHD" },
+    const cols = [
+      { id: "gun", name: "GUN", sub: { id: "ammo", name: "AMMO" } },
+      { id: "missile", name: state.ammoName || "MSL", sub: { id: "missileType", name: "TYPE" } },
+      { id: "emp", name: "EMP", sub: { id: "charges", name: "CHARGES" } },
+      { id: "shield", name: "SHD", sub: { id: "regen", name: "REGEN" } },
     ];
-    if (state.showGunship) rows.push({ id: "gunship", name: "GSHP" });
+    if (state.showGunship) cols.push({ id: "gunship", name: "GSHP" });
     const levelOf = (id) => (id === "gunship" ? levels.gunship || 0 : levels[id] || 1);
-    const key = `${state.ammoName || "MSL"}|${state.showGunship ? 1 : 0}|${points}|${rows.map((row) => `${row.id}:${levelOf(row.id)}:${costs[row.id] || 0}:${max[row.id] || 0}`).join("|")}`;
+    const stamp = (row) => `${row.id}:${levelOf(row.id)}:${costs[row.id] || 0}:${max[row.id] || 0}`;
+    const key = `${state.ammoName || "MSL"}|${state.showGunship ? 1 : 0}|${points}|${cols.map((col) => `${stamp(col)}${col.sub ? `|${stamp(col.sub)}` : ""}`).join("|")}`;
     if (key === this.upKey && this.ups.childElementCount) return;
     this.upKey = key;
     this.ups.innerHTML = "";
-    for (const row of rows) {
+    const paintBtn = (row) => {
       const level = levelOf(row.id);
       const cap = max[row.id] || level;
       const cost = costs[row.id] || 0;
@@ -199,7 +204,14 @@ export class DockBay {
       btn.dataset.id = row.id;
       const price = top ? "MAX" : `${need} LP`;
       btn.innerHTML = `${vectorTextSvg(`${row.name}  ${level}`, 12, can ? CYAN : DIM, can ? HOT : CYAN, "center")}${vectorTextSvg(price, 10, can ? CYAN : DIM, can ? HOT : CYAN, "center")}`;
-      this.ups.appendChild(btn);
+      return btn;
+    };
+    for (const col of cols) {
+      const wrap = document.createElement("div");
+      wrap.className = "dock-up-col";
+      wrap.appendChild(paintBtn(col));
+      if (col.sub) wrap.appendChild(paintBtn(col.sub));
+      this.ups.appendChild(wrap);
     }
   }
 
@@ -234,11 +246,11 @@ export class DockBay {
     }
     const spec = SHIP_CATALOG.find((item) => item.id === this.shipId) || null;
     const sheet = kitLines(this.shipId, this.upState);
-    if (this.hero) this.hero.innerHTML = catalogMiniSvg(spec, 280);
+    if (this.hero) this.hero.innerHTML = catalogMiniSvg(spec, 350);
     if (this.stats) {
       const ratings = sheet.ratings.map((row) => statRow(row.name, row.value, row.fill)).join("");
       const facts = sheet.facts.map((row) => statRow(row.name, row.value)).join("");
-      const load = sheet.load.map((row) => statRow(row.name, row.blank ? "-" : row.cap ? `${row.level} / ${row.cap}` : String(row.level))).join("");
+      const load = sheet.load.map((row) => statRow(row.name, row.blank ? "-" : row.cap ? `${row.level} / ${row.cap}` : String(row.level), null, row.sub ? "is-sub" : "")).join("");
       const tags = sheet.tags.map((tag) => `<div class="dock-tag">${vectorTextSvg(tag, 7, DIM, CYAN, "left")}</div>`).join("");
       this.stats.innerHTML = `<div class="dock-sheet"><div class="dock-sheet-col">${vectorTextSvg(sheet.name, 16, CYAN, HOT, "left")}<div class="dock-stat-block">${ratings}<div class="dock-stat-gap"></div>${facts}</div></div><div class="dock-sheet-col">${vectorTextSvg("LOADOUT", 10, DIM, CYAN, "left")}<div class="dock-stat-block">${load}${tags ? `<div class="dock-tags">${tags}</div>` : ""}</div></div></div>`;
     }

@@ -1218,10 +1218,10 @@ body:has(#controls-page:not(.is-hidden)) .version {
 .dock-inspect {
   position: absolute;
   left: 50%;
-  top: calc(6% + 100px);
+  top: calc(6% + 25px);
   transform: translateX(-50%);
   width: max-content;
-  height: min(38vh, 300px);
+  height: min(48vh, 375px);
   display: flex;
   align-items: stretch;
   gap: 36px;
@@ -1235,8 +1235,8 @@ body:has(#controls-page:not(.is-hidden)) .version {
 }
 
 .dock-hero {
-  width: min(38vh, 300px);
-  height: min(38vh, 300px);
+  width: min(48vh, 375px);
+  height: min(48vh, 375px);
   flex: 0 0 auto;
 }
 
@@ -1271,18 +1271,28 @@ body:has(#controls-page:not(.is-hidden)) .version {
 }
 
 .dock-sheet-col:last-child {
-  width: 220px;
+  width: 240px;
 }
 
 .dock-sheet-col:last-child .dock-stat {
-  grid-template-columns: 56px max-content;
+  grid-template-columns: 92px max-content;
   gap: 12px;
   justify-content: start;
+  min-height: 20px;
+}
+
+.dock-sheet-col:last-child .dock-stat-block {
+  gap: 2px;
+}
+
+.dock-sheet-col:last-child .dock-stat.is-sub {
+  padding-left: 10px;
 }
 
 .dock-sheet-col:last-child .dock-tags {
-  margin-top: 14px;
-  max-width: 220px;
+  margin-top: 8px;
+  max-width: 240px;
+  min-height: 36px;
 }
 
 .dock-sheet-col > .vector-text {
@@ -1378,8 +1388,14 @@ body:has(#controls-page:not(.is-hidden)) .version {
   flex-wrap: wrap;
   gap: 4px;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   margin: 2px 0 4px;
+}
+
+.dock-up-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .dock-seats {
@@ -1405,7 +1421,7 @@ body:has(#controls-page:not(.is-hidden)) .version {
 }
 
 .dock-up {
-  min-width: 144px;
+  min-width: 132px;
   margin: 0;
   padding: 6px 12px;
   background: transparent;
@@ -1547,7 +1563,7 @@ body.is-phone .dock-sheet-col {
 }
 
 body.is-phone .dock-sheet-col:last-child {
-  width: 150px;
+  width: 168px;
 }
 
 body.is-phone .dock-stat,

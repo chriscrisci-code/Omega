@@ -238,7 +238,7 @@ export class Game {
     this.missileQueued = 0;
     this.missileAmmo = 0;
     this.gunAmmo = gunAmmo.start || 250;
-    this.empLeft = emp.sortie || 3;
+    this.empLeft = emp.sortie || 1;
     this.missileDropSide = 1;
     this.paused = false;
     this.hubDown = false;
@@ -1737,6 +1737,7 @@ export class Game {
     this.hub.forceDock(this.ship, 0);
     this.snapCamera();
     this.applyShieldLevel(true);
+    this.applyRegenLevel();
     if (!resumed) {
       this.reloadMissiles();
       this.reloadGunAmmo();
@@ -1744,7 +1745,7 @@ export class Game {
     } else {
       this.clampMissileAmmo();
       this.clampGunAmmo();
-      this.empLeft = Math.max(0, Math.min(emp.sortie || 3, Math.floor(Number(this.empLeft) || 0)));
+      this.empLeft = Math.max(0, Math.min(this.empChargeCap(), Math.floor(Number(this.empLeft) || 0)));
     }
     this.hud.setScore(this.score);
     this.hud.setXp(this.xp);
@@ -2548,7 +2549,8 @@ export class Game {
   }
 
   gunAmmoCap() {
-    return gunAmmo.start || 250;
+    const n = Math.max(1, Math.min(shipLevels.ammo || 5, this.levels?.ammo || 1));
+    return Math.round((gunAmmo.start || 250) * ((gunAmmo.perBuy || 1.5) ** (n - 1)));
   }
 
   clampGunAmmo() {
@@ -2577,9 +2579,24 @@ export class Game {
     return true;
   }
 
+  empChargeCap() {
+    const n = Math.max(1, Math.min(shipLevels.charges || 4, this.levels?.charges || 1));
+    return (emp.sortie || 1) + (n - 1);
+  }
+
   resetEmpCharges() {
-    this.empLeft = emp.sortie || 3;
+    this.empLeft = this.empChargeCap();
     this.syncMissileHud();
+  }
+
+  regenMul() {
+    const top = shipLevels.regen || 4;
+    const n = Math.max(1, Math.min(top, this.levels?.regen || 1));
+    return 1 + (n - 1) * 0.4;
+  }
+
+  applyRegenLevel() {
+    if (this.ship) this.ship.regenBoost = this.regenMul();
   }
 
   syncMissileHud() {
@@ -2630,7 +2647,7 @@ export class Game {
     const max = id === "emp" ? this.empCap() : shipLevels[id];
     const level = this.levels[id] || 1;
     if (!max || level >= max) return 0;
-    return shipLevels.cost[id][level - 1] || 0;
+    return shipLevels.cost[id]?.[level - 1] || 0;
   }
 
   refreshDock() {
@@ -2644,16 +2661,24 @@ export class Game {
       },
       costs: {
         gun: this.upgradeCost("gun"),
+        ammo: this.upgradeCost("ammo"),
         missile: this.upgradeCost("missile"),
+        missileType: this.upgradeCost("missileType"),
         emp: this.upgradeCost("emp"),
+        charges: this.upgradeCost("charges"),
         shield: this.upgradeCost("shield"),
+        regen: this.upgradeCost("regen"),
         gunship: showGunship ? this.upgradeCost("gunship") : 0,
       },
       max: {
         gun: shipLevels.gun,
+        ammo: shipLevels.ammo,
         missile: shipLevels.missile,
+        missileType: shipLevels.missileType || 1,
         emp: this.empCap(),
+        charges: shipLevels.charges,
         shield: shipLevels.shield,
+        regen: shipLevels.regen,
         gunship: showGunship ? this.gunshipCap() : 0,
       },
       ammoName: this.ship.can("rockets") ? "RKT" : "MSL",
@@ -2724,6 +2749,7 @@ export class Game {
   buyUpgrade(id) {
     if (this.mode !== PLAYING || !this.ship.docked) return;
     if (id === "emp" && (this.levels.emp || 1) >= this.empCap()) return;
+    if (id === "missileType") return;
     if (id === "gunship" && (!this.ship.has("gunshipWing") || (this.levels.gunship || 0) >= this.gunshipCap())) return;
     const cost = this.upgradeCost(id);
     if (!cost || this.points < cost) return;
@@ -2733,6 +2759,9 @@ export class Game {
     this.addXp(xpAwards.upgrade);
     if (id === "shield") this.applyShieldLevel(true);
     if (id === "missile") this.reloadMissiles();
+    if (id === "ammo") this.reloadGunAmmo();
+    if (id === "charges") this.resetEmpCharges();
+    if (id === "regen") this.applyRegenLevel();
     if (id === "emp") this.syncMissileHud();
     if (id === "gunship") this.syncWingmen({ revive: false });
     this.hud.setPoints(this.points);
@@ -2741,7 +2770,8 @@ export class Game {
     this.writeCheckpoint();
     this.sfx("up");
     const ammoName = this.ship.can("rockets") ? "RKT" : "MSL";
-    this.hud.setMode(id === "missile" ? `${ammoName}  ${this.missileAmmo}` : `${id === "shield" ? "SHD" : id.toUpperCase()}  ${this.levels[id]}`);
+    const names = { missile: `${ammoName}  ${this.missileAmmo}`, shield: "SHD", ammo: "AMMO", charges: "CHARGES", regen: "REGEN" };
+    this.hud.setMode(names[id] ? (id === "missile" ? names.missile : `${names[id]}  ${this.levels[id]}`) : `${id.toUpperCase()}  ${this.levels[id]}`);
   }
 
   shoot(dt = 0) {
@@ -3369,9 +3399,13 @@ export class Game {
   packLevels(src = this.levels) {
     return {
       gun: src?.gun || 1,
+      ammo: src?.ammo || 1,
       missile: src?.missile || 1,
+      missileType: src?.missileType || 1,
       emp: src?.emp || 1,
+      charges: src?.charges || 1,
       shield: src?.shield || 1,
+      regen: src?.regen || 1,
       gunship: src?.gunship || 0,
     };
   }
@@ -3379,14 +3413,14 @@ export class Game {
   seedHullLoadout(id) {
     if (!this.hullLoadouts) this.hullLoadouts = {};
     if (this.hullLoadouts[id]) return this.hullLoadouts[id];
-    const row = this.packLevels({ gun: 1, missile: 1, emp: 1, shield: 1, gunship: 0 });
+    const row = this.packLevels({ gun: 1, ammo: 1, missile: 1, missileType: 1, emp: 1, charges: 1, shield: 1, regen: 1, gunship: 0 });
     this.hullLoadouts[id] = row;
     return row;
   }
 
   freshLoadout() {
     this.hullLoadouts = {};
-    const base = { gun: 1, missile: 1, emp: 1, shield: 1, gunship: 0 };
+    const base = { gun: 1, ammo: 1, missile: 1, missileType: 1, emp: 1, charges: 1, shield: 1, regen: 1, gunship: 0 };
     this.levels = { ...base };
     this.hullLoadouts[this.shipId] = this.packLevels(this.levels);
     this.points = 0;
@@ -3533,9 +3567,13 @@ export class Game {
   buildCheckpoint() {
     const loadout = {
       gun: this.levels?.gun,
+      ammoLevel: this.levels?.ammo,
       missile: this.levels?.missile,
+      missileType: this.levels?.missileType,
       emp: this.levels?.emp,
+      charges: this.levels?.charges,
       shield: this.levels?.shield,
+      regen: this.levels?.regen,
       gunship: this.levels?.gunship || 0,
       points: this.points,
       bank: this.loadoutBank,
@@ -3588,9 +3626,13 @@ export class Game {
     if (this.levels) {
       this.save.loadout = normalizeLoadout({
         gun: this.levels.gun,
+        ammoLevel: this.levels.ammo,
         missile: this.levels.missile,
+        missileType: this.levels.missileType,
         emp: this.levels.emp,
+        charges: this.levels.charges,
         shield: this.levels.shield,
+        regen: this.levels.regen,
         gunship: this.levels.gunship || 0,
         points: this.points,
         bank: this.loadoutBank,
@@ -3632,9 +3674,13 @@ export class Game {
     this.shipId = resolveShipId(cp.shipId, this.xp);
     this.levels = {
       gun: cp.loadout.gun,
+      ammo: cp.loadout.ammoLevel,
       missile: cp.loadout.missile,
+      missileType: cp.loadout.missileType,
       emp: cp.loadout.emp,
+      charges: cp.loadout.charges,
       shield: cp.loadout.shield,
+      regen: cp.loadout.regen,
       gunship: cp.loadout.gunship || 0,
     };
     this.hullLoadouts = normalizeHulls(cp.hulls || cp.loadout?.hulls);
@@ -3645,7 +3691,7 @@ export class Game {
     this.clampMissileAmmo();
     this.gunAmmo = Math.max(0, Math.floor(Number(cp.gunAmmo ?? this.gunAmmoCap()) || 0));
     this.clampGunAmmo();
-    this.empLeft = Math.max(0, Math.min(emp.sortie || 3, Math.floor(Number(cp.empLeft ?? emp.sortie) || 0)));
+    this.empLeft = Math.max(0, Math.min(this.empChargeCap(), Math.floor(Number(cp.empLeft ?? this.empChargeCap()) || 0)));
     this.score = 0;
     this.lives = Math.max(1, Math.floor(Number(cp.lives) || 0) || shipConfig.lives);
     this.cargo = Math.max(0, Math.floor(Number(cp.cargo) || 0));
@@ -3895,7 +3941,10 @@ export class Game {
     this.shipId = next;
     this.applyShipSkin();
     this.applyShieldLevel(true);
+    this.applyRegenLevel();
     this.clampMissileAmmo();
+    this.clampGunAmmo();
+    this.empLeft = Math.max(0, Math.min(this.empChargeCap(), Math.floor(Number(this.empLeft) || 0)));
     this.persistLoadout();
     this.refreshDock();
     this.hud.bay.setState(this.shipId);
@@ -5080,6 +5129,8 @@ export class Game {
     this.dockOpen = false;
     this.ship.reset(worldConfig.width / 2, worldConfig.height / 2);
     this.applyShipSkin();
+    this.applyShieldLevel(true);
+    this.applyRegenLevel();
     this.ship.setCargo(this.cargo);
     this.hub.forceDock(this.ship, 0);
     this.ship.invuln = Math.max(this.ship.invuln || 0, shipConfig.invulnTime);
@@ -5132,6 +5183,7 @@ export class Game {
       this.paused = false;
       this.ship.reset(this.ship.x, this.ship.y);
       this.applyShipSkin();
+      this.applyRegenLevel();
       this.snapCamera();
     }
     this.syncMissileHud();
@@ -5375,6 +5427,7 @@ export class Game {
     this.syncWingmen({ revive: true });
     this.reloadGunAmmo();
     this.resetEmpCharges();
+    this.applyRegenLevel();
     this.snapCamera();
   }
 

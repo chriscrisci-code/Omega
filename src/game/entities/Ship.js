@@ -151,6 +151,7 @@ export class Ship {
     this.shieldLock = 0;
     this.shieldSpin = 0;
     this.shieldFlash = 0;
+    this.regenBoost = 1;
     this.regenWave = 0;
     this.hullMax = this.hullMax || 1;
     this.hullHp = this.hullMax;
@@ -500,7 +501,7 @@ export class Ship {
         this.shieldLock = shieldConfig.lock;
       }
     } else {
-      this.shieldEnergy = Math.min(this.shieldMax || shieldConfig.max, this.shieldEnergy + shieldConfig.recharge * this.stat("shieldRegen", 1) * dt);
+      this.shieldEnergy = Math.min(this.shieldMax || shieldConfig.max, this.shieldEnergy + shieldConfig.recharge * this.stat("shieldRegen", 1) * (this.regenBoost || 1) * dt);
     }
     this.drawShield();
   }

@@ -44,9 +44,13 @@ const empty = {
   dailyAce: [],
   loadout: {
     gun: 1,
+    ammoLevel: 1,
     missile: 1,
+    missileType: 1,
     emp: 1,
+    charges: 1,
     shield: 1,
+    regen: 1,
     gunship: 0,
     points: 0,
     bank: 0,
@@ -114,9 +118,13 @@ export function normalizeLoadout(data) {
       : Math.max(0, Math.min(cap, Math.floor(Number(src.ammo) || 0)));
   return {
     gun: clampLevel(src.gun, shipLevels.gun || 5),
+    ammoLevel: clampLevel(src.ammoLevel, shipLevels.ammo || 5),
     missile,
+    missileType: clampLevel(src.missileType, shipLevels.missileType || 1),
     emp: clampLevel(src.emp, shipLevels.emp || 4),
+    charges: clampLevel(src.charges, shipLevels.charges || 4),
     shield: clampLevel(src.shield, shipLevels.shield || 4),
+    regen: clampLevel(src.regen, shipLevels.regen || 4),
     gunship: Math.max(0, Math.min(shipLevels.gunship || 2, Math.floor(Number(src.gunship) || 0))),
     points: Math.max(0, Math.floor(Number(src.points) || 0)),
     bank: Math.max(0, Math.floor(Number(src.bank) || 0) % (xp.orePerPoint || 5)),
@@ -129,8 +137,19 @@ export function normalizeHulls(data) {
   const out = {};
   for (const id of PLAYABLE_SHIP_IDS) {
     if (!data[id]) continue;
-    const row = normalizeLoadout(data[id]);
-    out[id] = { gun: row.gun, missile: row.missile, emp: row.emp, shield: row.shield, gunship: row.gunship };
+    const src = data[id] && typeof data[id] === "object" ? data[id] : {};
+    const row = normalizeLoadout({ ...src, ammoLevel: src.ammoLevel ?? src.ammo, ammo: null });
+    out[id] = {
+      gun: row.gun,
+      ammo: row.ammoLevel,
+      missile: row.missile,
+      missileType: row.missileType,
+      emp: row.emp,
+      charges: row.charges,
+      shield: row.shield,
+      regen: row.regen,
+      gunship: row.gunship,
+    };
   }
   return out;
 }
@@ -161,8 +180,14 @@ export function normalizeCheckpoint(data) {
     nextLifeAt: Math.max(0, Math.floor(Number(data.nextLifeAt) || 0)),
     castlesArmed: Boolean(data.castlesArmed),
     bountyUnits: Math.max(0, Math.floor(Number(data.bountyUnits) || 0)),
-    gunAmmo: Math.max(0, Math.min(ammoCfg.start || 250, Math.floor(Number(data.gunAmmo ?? ammoCfg.start) || 0))),
-    empLeft: Math.max(0, Math.min(emp.sortie || 3, Math.floor(Number(data.empLeft ?? emp.sortie) || 0))),
+    gunAmmo: Math.max(0, Math.min(
+      Math.round((ammoCfg.start || 250) * ((ammoCfg.perBuy || 1.5) ** ((shipLevels.ammo || 5) - 1))),
+      Math.floor(Number(data.gunAmmo ?? ammoCfg.start) || 0),
+    )),
+    empLeft: Math.max(0, Math.min(
+      (emp.sortie || 1) + ((shipLevels.charges || 4) - 1),
+      Math.floor(Number(data.empLeft ?? emp.sortie) || 0),
+    )),
   };
 }
 
