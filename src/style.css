@@ -1302,11 +1302,19 @@ body:has(#controls-page:not(.is-hidden)) .version {
   min-height: 20px;
 }
 
+.dock-sheet-col:last-child .dock-stat:has(.dock-stat-bar) {
+  grid-template-columns: 92px minmax(72px, 1fr);
+}
+
 .dock-sheet-col:last-child .dock-stat-block {
   gap: 2px;
 }
 
 .dock-sheet-col:last-child .dock-stat.is-sub {
+  padding-left: 0;
+}
+
+.dock-sheet-col:last-child .dock-stat.is-sub > .vector-text:first-child {
   padding-left: 10px;
 }
 
@@ -1358,6 +1366,27 @@ body:has(#controls-page:not(.is-hidden)) .version {
   display: block;
   height: 100%;
   background: #66e0ff;
+  box-shadow: 0 0 8px rgba(102, 224, 255, 0.55);
+}
+
+.dock-stat-bar.is-seg {
+  display: flex;
+  gap: 3px;
+  border: none;
+  background: transparent;
+}
+
+.dock-stat-bar.is-seg > span {
+  flex: 1 1 0;
+  min-width: 0;
+  border: 1px solid rgba(102, 224, 255, 0.32);
+  background: rgba(102, 224, 255, 0.08);
+  box-shadow: none;
+}
+
+.dock-stat-bar.is-seg > span.is-on {
+  background: #66e0ff;
+  border-color: rgba(102, 224, 255, 0.85);
   box-shadow: 0 0 8px rgba(102, 224, 255, 0.55);
 }
 
@@ -1613,6 +1642,10 @@ body.is-phone .dock-stat:not(:has(.dock-stat-bar)) {
 
 body.is-phone .dock-stat:has(.dock-stat-bar) {
   grid-template-columns: 100px minmax(32px, 1fr) auto;
+}
+
+body.is-phone .dock-sheet-col:last-child .dock-stat:has(.dock-stat-bar) {
+  grid-template-columns: 72px minmax(32px, 1fr);
 }
 
 body.is-phone .dock-bay {

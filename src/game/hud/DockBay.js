@@ -74,12 +74,22 @@ function kitLines(id, loadout = {}) {
   };
 }
 
-function statRow(label, value, fill, extraClass = "") {
-  const bar = fill == null
-    ? ""
-    : `<div class="dock-stat-bar" aria-hidden="true"><span style="width:${Math.max(6, Math.min(100, fill * 100))}%"></span></div>`;
+function segmentBar(level, cap) {
+  const n = Math.max(1, Math.floor(Number(cap) || 1));
+  const filled = Math.max(0, Math.min(n, Math.floor(Number(level) || 0)));
+  const segs = Array.from({ length: n }, (_, i) => `<span${i < filled ? ' class="is-on"' : ""}></span>`).join("");
+  return `<div class="dock-stat-bar is-seg" aria-hidden="true">${segs}</div>`;
+}
+
+function statRow(label, value, fill, extraClass = "", segments = null) {
+  const bar = segments
+    ? segmentBar(segments.level, segments.cap)
+    : fill == null
+      ? ""
+      : `<div class="dock-stat-bar" aria-hidden="true"><span style="width:${Math.max(6, Math.min(100, fill * 100))}%"></span></div>`;
+  const val = value ? vectorTextSvg(value, 9, CYAN, HOT, "right") : "";
   const cls = extraClass ? ` dock-stat ${extraClass}` : " dock-stat";
-  return `<div class="${cls.trim()}">${vectorTextSvg(label, 9, DIM, CYAN, "left")}${bar}${vectorTextSvg(value, 9, CYAN, HOT, "right")}</div>`;
+  return `<div class="${cls.trim()}">${vectorTextSvg(label, 9, DIM, CYAN, "left")}${bar}${val}</div>`;
 }
 
 function paint(node, text, size, color, hot, align = "center") {
@@ -256,7 +266,11 @@ export class DockBay {
     if (this.stats) {
       const ratings = sheet.ratings.map((row) => statRow(row.name, row.value, row.fill)).join("");
       const facts = sheet.facts.map((row) => statRow(row.name, row.value)).join("");
-      const load = sheet.load.map((row) => statRow(row.name, row.blank ? "-" : row.cap ? `${row.level} / ${row.cap}` : String(row.level), null, row.sub ? "is-sub" : "")).join("");
+      const load = sheet.load.map((row) => {
+        const sub = row.sub ? "is-sub" : "";
+        if (row.blank || !row.cap) return statRow(row.name, row.blank ? "-" : String(row.level), null, sub);
+        return statRow(row.name, "", null, sub, { level: row.level, cap: row.cap });
+      }).join("");
       const tags = sheet.tags.map((tag) => `<div class="dock-tag">${vectorTextSvg(tag, 7, DIM, CYAN, "left")}</div>`).join("");
       this.stats.innerHTML = `<div class="dock-sheet"><div class="dock-sheet-col">${vectorTextSvg(sheet.name, 16, CYAN, HOT, "left")}<div class="dock-stat-block">${ratings}<div class="dock-stat-gap"></div>${facts}</div></div><div class="dock-sheet-col">${vectorTextSvg("LOADOUT", 10, DIM, CYAN, "left")}<div class="dock-stat-block">${load}${tags ? `<div class="dock-tags">${tags}</div>` : ""}</div></div></div>`;
     }
