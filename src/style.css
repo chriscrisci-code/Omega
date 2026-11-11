@@ -1484,9 +1484,19 @@ body:has(#controls-page:not(.is-hidden)) .version {
 }
 
 #dock-title,
+#dock-points,
 #dock-hint {
   display: flex;
   justify-content: center;
+}
+
+#dock-points {
+  margin: 2px 0 4px;
+}
+
+#dock-points .vector-text {
+  width: auto;
+  height: auto;
 }
 
 .dock-ship .vector-text {
@@ -1495,6 +1505,7 @@ body:has(#controls-page:not(.is-hidden)) .version {
 }
 
 #dock-title .vector-text,
+#dock-points .vector-text,
 #dock-hint .vector-text {
   width: auto;
   height: auto;
@@ -1553,10 +1564,18 @@ body.is-phone:has(.hud-center.is-scores) .stick {
   pointer-events: none;
 }
 
-body:has(.dock-bay:not(.is-hidden)) .hud-bl,
 body:has(.dock-bay:not(.is-hidden)) .hud-br,
 body:has(.dock-bay:not(.is-hidden)) .mode-banner {
   display: none;
+}
+
+body:has(.dock-bay:not(.is-hidden)) .hud-bl > :not([data-label="pts"]):not(#points) {
+  display: none;
+}
+
+body.is-phone:has(.dock-bay:not(.is-hidden)) [data-label="pts"],
+body.is-phone:has(.dock-bay:not(.is-hidden)) #points {
+  display: flex;
 }
 
 body.is-phone .dock-inspect {

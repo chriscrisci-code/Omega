@@ -173,6 +173,7 @@ export class DockBay {
   setUpgrades(state) {
     this.upState = state || this.upState;
     this.paintInspect();
+    this.paintBank(this.upState.points);
     if (!this.ups) return;
     const levels = state.levels || {};
     const costs = state.costs || {};
@@ -219,6 +220,11 @@ export class DockBay {
     if (!this.seats) return;
     this.seats.innerHTML = "";
     this.seats.hidden = true;
+  }
+
+  paintBank(points = 0) {
+    const n = Math.max(0, Math.floor(Number(points) || 0));
+    paint(document.querySelector("#dock-points"), `${n} LP`, 14, CYAN, HOT, "center");
   }
 
   setHint() {
