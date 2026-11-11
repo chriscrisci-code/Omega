@@ -78,6 +78,13 @@ export const SFX_PATCHES = {
       { kind: "gun", dur: 0.2, noisePeak: 0.28, cutoff: 700, endCutoff: 140, q: 0.7, thump: 55, thumpPeak: 0.32, thumpDur: 0.16, flange: true },
     ],
   },
+  click: {
+    name: "CLICK",
+    voices: [
+      { kind: "gun", dur: 0.035, attack: 0.0004, noisePeak: 0.14, cutoff: 4800, endCutoff: 1600, q: 1.6, type: "highpass", thump: 0, thumpPeak: 0, thumpDur: 0.02 },
+      { kind: "tone", type: "square", freq: 2400, dur: 0.028, peak: 0.04, attack: 0.0003 },
+    ],
+  },
   turret: {
     name: "TURRET",
     voices: [
@@ -287,7 +294,7 @@ export const SFX_PATCHES = {
 };
 
 export const SFX_GROUPS = [
-  { name: "GUNS", ids: ["thud", "rail", "turret", "enemy"] },
+  { name: "GUNS", ids: ["thud", "rail", "turret", "enemy", "click"] },
   { name: "SPECIAL", ids: ["missile", "star", "warp", "emp", "hole", "laser"] },
   { name: "THRUST", ids: ["main", "side"] },
   { name: "HITS", ids: ["hit", "rock", "boom", "die", "hub"] },

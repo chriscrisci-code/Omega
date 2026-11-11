@@ -2801,6 +2801,7 @@ export class Game {
     }
     if (!this.hasGunAmmo()) {
       this.ship.clearRail?.();
+      this.clickEmptyGun();
       this.fireWasOn = this.input.fireHeld;
       return;
     }
@@ -2833,6 +2834,11 @@ export class Game {
     else if (released && this.ship.railReady) this.fireRailShot(spec);
     else this.ship.clearRail();
     this.fireWasOn = held;
+  }
+
+  clickEmptyGun() {
+    if (this.attractOnDemo) return;
+    if (this.input.firePressed) this.sfx("click");
   }
 
   fireRailShot(spec) {
