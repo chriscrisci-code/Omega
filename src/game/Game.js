@@ -5846,7 +5846,6 @@ export class Game {
       this.tickAssaultKit(t, space);
       if (!shieldWas && this.ship.shieldOn) this.sfx("on");
       else if (shieldWas && !this.ship.shieldOn) this.sfx("off");
-      if (this.cargo > 0) this.ship.setCargo(this.cargo);
       if (!this.ship.docked) {
         this.leaveHubSeat();
         this.dockOpen = false;

@@ -133,12 +133,10 @@ export class Ship {
       aftStar: new ThrustFlame(glow, { ...rcs, x: -10, y: 8, angle: Math.PI / 2 }),
     };
     this.shieldG = new Graphics();
-    this.cargoG = new Graphics();
     this.markG = new Graphics();
     this.railG = new Graphics();
     this.view.addChild(
       this.shieldG,
-      this.cargoG,
       this.g,
       this.markG,
       this.railG,
@@ -647,24 +645,7 @@ export class Ship {
     return "block";
   }
 
-  setCargo(count) {
-    if (!this.cargoG) return;
-    this.cargoG.clear();
-    const n = Math.min(6, Math.max(0, count));
-    for (let i = 0; i < n; i += 1) {
-      const a = (i / Math.max(1, n)) * Math.PI * 2 + this.shieldSpin * 0.7;
-      const r = 20 + (i % 2) * 4;
-      const x = Math.cos(a) * r;
-      const y = Math.sin(a) * r;
-      this.cargoG.moveTo(x, y - 3);
-      this.cargoG.lineTo(x + 2.2, y);
-      this.cargoG.lineTo(x, y + 3);
-      this.cargoG.lineTo(x - 2.2, y);
-      this.cargoG.closePath();
-      this.cargoG.stroke({ width: 1.1, color: colors.white, cap: "round", join: "round" });
-    }
-    this.cargoG.rotation = -this.rotation;
-  }
+  setCargo() {}
 
   beginWarp(dx, dy, duration) {
     this.warping = true;
