@@ -762,7 +762,6 @@ export class Game {
     this.hub.forceDock(this.ship, 0);
     this.syncWingmen({ revive: true });
     this.snapCamera();
-    this.dockOpen = true;
     this.hud.showDock(this.shipId);
     this.refreshDock();
     if (!silent) this.sfx("warp");
@@ -2587,6 +2586,13 @@ export class Game {
   resetEmpCharges() {
     this.empLeft = this.empChargeCap();
     this.syncMissileHud();
+  }
+
+  restockDock() {
+    this.reloadMissiles();
+    this.reloadGunAmmo();
+    this.resetEmpCharges();
+    this.empCool = 0;
   }
 
   regenMul() {
@@ -5799,8 +5805,7 @@ export class Game {
           this.depositOre();
           this.cashKillBounty();
           this.bankKills();
-          this.reloadMissiles();
-          this.reloadGunAmmo();
+          this.restockDock();
           this.refreshDock();
           this.hud.showDock(this.shipId);
           if (this.runDirty) this.writeCheckpoint();
