@@ -237,7 +237,7 @@ export class HudMarkers {
     const visible = targets.filter((target) => this.filters[target.kind] !== false);
     this.ensure(visible.length);
 
-    const pad = extras.hubAlert ? (extras.compact ? 52 : 92) : extras.compact ? 22 : 34;
+    const pad = extras.compact ? 22 : 34;
     const halfW = screen.width * 0.5 - pad;
     const halfH = screen.height * 0.5 - pad;
     const cos = Math.cos(camRot);
