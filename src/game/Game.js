@@ -333,7 +333,14 @@ export class Game {
     this.hud.controls.onMusic = (delta) => this.nudgeMusicPct(delta);
     this.hud.onMusic = (delta) => this.nudgeMusic(delta);
     this.hud.setPhoneDevice(maybePhone());
+    this.playRun = "";
+    this.playSentMs = 0;
+    this.playMarkAt = 0;
     this.noteVisit();
+    window.addEventListener("pagehide", () => this.flushPlay(true));
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") this.flushPlay(true);
+    });
     this.hud.onInsertCoin = () => this.openPayPortal();
     this.hud.onPickPack = (sku) => this.buyPack(sku);
     this.hud.onPickDest = (kind) => this.pickPayDest(kind);
@@ -1788,6 +1795,7 @@ export class Game {
     this.holdTunnel = false;
     this.leaveTunnel({ silent: true, dock: false });
     this.startingRun = false;
+    this.beginPlayClock();
   }
 
   sleepLateBases() {
@@ -2020,6 +2028,37 @@ export class Game {
     } catch {
       return "";
     }
+  }
+
+  beginPlayClock() {
+    if (this.attractOnDemo) return;
+    this.playRun = crypto.randomUUID?.() || `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    this.playSentMs = 0;
+    this.playMarkAt = performance.now();
+    this.flushPlay(true);
+  }
+
+  endPlayClock() {
+    this.flushPlay(true);
+    this.playRun = "";
+  }
+
+  flushPlay(force = false) {
+    if (this.attractOnDemo || !this.playRun) return;
+    const id = this.visitorId();
+    if (!id) return;
+    const now = performance.now();
+    const total = Math.max(0, now - (this.playMarkAt || now));
+    const delta = Math.floor(total - (this.playSentMs || 0));
+    if (!force && delta < 20000) return;
+    if (delta < 0) return;
+    this.playSentMs += Math.max(0, delta);
+    fetch("/api/visits", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id, play: true, run: this.playRun, ms: Math.max(0, delta) }),
+      keepalive: true,
+    }).catch(() => {});
   }
 
   noteVisit() {
@@ -5207,6 +5246,7 @@ export class Game {
 
   endRun(reason = "final") {
     if (this.mode === TITLE || this.mode === GAMEOVER || this.mode === INITIALS) return;
+    this.endPlayClock();
     this.closeSavePick({ silent: true });
     this.paused = false;
     this.hubDown = false;
@@ -5649,6 +5689,7 @@ export class Game {
     const space = this.space();
 
     this.touch.tick();
+    if (this.playRun && (this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE)) this.flushPlay(false);
     this.input.typeMode = this.mode === INITIALS;
     this.input.fineWheel = this.mode === INITIALS || this.mode === WAVEPICK || this.mode === STARTPICK || this.savePick;
     if (this.titleHold > 0) this.titleHold = Math.max(0, this.titleHold - t);

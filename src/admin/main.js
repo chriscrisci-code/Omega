@@ -128,17 +128,53 @@ function setMusic(vol) {
   paintCabinet();
 }
 
+function fmtPlay(ms) {
+  const s = Math.max(0, Math.round(Number(ms) / 1000) || 0);
+  if (s < 60) return `${s}S`;
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  if (m < 60) return rem ? `${m}M ${rem}S` : `${m}M`;
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return mm ? `${h}H ${mm}M` : `${h}H`;
+}
+
 function paintVisits(data) {
   const phoneToday = Number(data?.phone?.today) || 0;
   const deskToday = Number(data?.desktop?.today) || 0;
   const phoneAll = Number(data?.phone?.all) || 0;
   const deskAll = Number(data?.desktop?.all) || 0;
+  const ipToday = Number(data?.ip?.today) || 0;
+  const ipAll = Number(data?.ip?.all) || 0;
   const remindAll = Number(data?.remind?.all) || 0;
+  const playToday = data?.play?.today || {};
+  const playAll = data?.play?.all || {};
+  const gamesToday = Number(playToday.games) || 0;
+  const playersToday = Number(playToday.players) || 0;
+  const gamesAll = Number(playAll.games) || 0;
+  const playersAll = Number(playAll.players) || 0;
+  const msToday = Number(playToday.ms) || 0;
+  const msAll = Number(playAll.ms) || 0;
+  const avg = gamesAll > 0 ? msAll / gamesAll : 0;
   const today = document.getElementById("visits-today");
+  const ipTodayEl = document.getElementById("visits-ip-today");
   const all = document.getElementById("visits-all");
+  const ipAllEl = document.getElementById("visits-ip-all");
+  const playTodayEl = document.getElementById("visits-play-today");
+  const playAllEl = document.getElementById("visits-play-all");
+  const playAvgEl = document.getElementById("visits-play-avg");
   const remind = document.getElementById("visits-remind");
   if (today) today.innerHTML = `TODAY  PHONE  <strong>${phoneToday}</strong>  DESKTOP  <strong>${deskToday}</strong>`;
+  if (ipTodayEl) ipTodayEl.innerHTML = `TODAY  IP  <strong>${ipToday}</strong>`;
   if (all) all.innerHTML = `ALL  PHONE  <strong>${phoneAll}</strong>  DESKTOP  <strong>${deskAll}</strong>`;
+  if (ipAllEl) ipAllEl.innerHTML = `ALL  IP  <strong>${ipAll}</strong>`;
+  if (playTodayEl) {
+    playTodayEl.innerHTML = `PLAY TODAY  <strong>${gamesToday}</strong> GAMES  <strong>${playersToday}</strong> PLAYERS  <strong>${fmtPlay(msToday)}</strong>`;
+  }
+  if (playAllEl) {
+    playAllEl.innerHTML = `PLAY ALL  <strong>${gamesAll}</strong> GAMES  <strong>${playersAll}</strong> PLAYERS  <strong>${fmtPlay(msAll)}</strong>`;
+  }
+  if (playAvgEl) playAvgEl.innerHTML = `PLAY AVG  <strong>${fmtPlay(avg)}</strong>`;
   if (remind) remind.innerHTML = `REMIND  <strong>${remindAll}</strong>`;
 }
 

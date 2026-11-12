@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { Redis } from "@upstash/redis";
 
 export const PACKS = {
@@ -34,6 +34,10 @@ export function noStore(res) {
 export function clientIp(req) {
   const raw = req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "";
   return String(raw).split(",")[0].trim() || "local";
+}
+
+export function hashIp(ip) {
+  return createHash("sha256").update(`2dsg:${String(ip || "local")}`).digest("hex").slice(0, 24);
 }
 
 const FREE_PLAY_ZONE = "America/New_York";
