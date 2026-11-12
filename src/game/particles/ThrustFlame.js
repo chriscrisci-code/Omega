@@ -14,6 +14,7 @@ export class ThrustFlame {
       speed = 980,
       size = 8,
       stretch = 2.6,
+      burst = 2,
     } = options;
 
     this.originX = x;
@@ -24,10 +25,11 @@ export class ThrustFlame {
     this.speed = speed;
     this.size = size;
     this.stretch = stretch;
+    this.burst = burst;
 
     this.container = new ParticleContainer({
       blendMode: "add",
-      boundsArea: new Rectangle(-100, -100, 200, 200),
+      boundsArea: new Rectangle(-160, -160, 320, 320),
       dynamicProperties: {
         position: true,
         rotation: true,
@@ -91,8 +93,8 @@ export class ThrustFlame {
 
   update(dt, on) {
     if (on) {
-      this.emit();
-      this.emit();
+      const n = Math.max(1, this.burst | 0);
+      for (let i = 0; i < n; i += 1) this.emit();
     }
 
     for (const item of this.items) {

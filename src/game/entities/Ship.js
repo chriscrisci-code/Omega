@@ -30,6 +30,47 @@ function closePoly(pts) {
   return [...pts, pts[0], pts[1]];
 }
 
+function hullExtents(skin) {
+  const parts = skin ? [...(skin.hulls || []), ...(skin.lines || [])] : [HULL];
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  const pick = (sx, sy) => {
+    let x = 0;
+    let y = 0;
+    let score = -Infinity;
+    for (const poly of parts) {
+      for (let i = 0; i < poly.length; i += 2) {
+        const px = poly[i];
+        const py = poly[i + 1];
+        if (px < minX) minX = px;
+        if (px > maxX) maxX = px;
+        if (py < minY) minY = py;
+        if (py > maxY) maxY = py;
+        const s = px * sx + py * sy;
+        if (s > score) {
+          score = s;
+          x = px;
+          y = py;
+        }
+      }
+    }
+    return { x, y };
+  };
+  const np = pick(1, -1);
+  const ns = pick(1, 1);
+  const ap = pick(-1, -1);
+  const as = pick(-1, 1);
+  if (!Number.isFinite(minX)) {
+    minX = -12;
+    maxX = 16;
+    minY = -10;
+    maxY = 10;
+  }
+  return { minX, maxX, minY, maxY, np, ns, ap, as };
+}
+
 /** Hub-style expanding rings. Used only while an Assault shield is actually on. */
 export function paintAssaultShield(g, opts) {
   const radius = opts.radius;
@@ -62,41 +103,34 @@ export class Ship {
     this.view = new Container();
     this.g = new Graphics();
     const glow = createGlowTexture();
+    const rcs = {
+      tint: colors.white,
+      tintHot: 0xffffff,
+      size: 7,
+      speed: 920,
+      stretch: 2.4,
+      pool: 14,
+    };
     this.jets = {
-      rear: new ThrustFlame(glow, { x: -12, y: 0, angle: Math.PI, tint: colors.amber, tintHot: 0xfff6d0 }),
-      nose: new ThrustFlame(glow, {
-        x: 14,
+      rear: new ThrustFlame(glow, {
+        x: -12,
         y: 0,
-        angle: 0,
-        tint: colors.white,
-        tintHot: 0xffffff,
-        size: 6,
-        speed: 820,
-        stretch: 2.2,
-        pool: 12,
+        angle: Math.PI,
+        tint: colors.amber,
+        tintHot: 0xfff6d0,
+        size: 14,
+        speed: 1240,
+        stretch: 3.4,
+        pool: 24,
+        burst: 3,
       }),
-      left: new ThrustFlame(glow, {
-        x: 0,
-        y: -8,
-        angle: -Math.PI / 2,
-        tint: colors.white,
-        tintHot: 0xffffff,
-        size: 5.5,
-        speed: 780,
-        stretch: 2.1,
-        pool: 12,
-      }),
-      right: new ThrustFlame(glow, {
-        x: 0,
-        y: 8,
-        angle: Math.PI / 2,
-        tint: colors.white,
-        tintHot: 0xffffff,
-        size: 5.5,
-        speed: 780,
-        stretch: 2.1,
-        pool: 12,
-      }),
+      nose: new ThrustFlame(glow, { ...rcs, x: 14, y: 0, angle: 0, size: 10, speed: 1040, stretch: 2.9, pool: 16 }),
+      left: new ThrustFlame(glow, { ...rcs, x: 0, y: -8, angle: -Math.PI / 2, size: 9, speed: 980, stretch: 2.7 }),
+      right: new ThrustFlame(glow, { ...rcs, x: 0, y: 8, angle: Math.PI / 2, size: 9, speed: 980, stretch: 2.7 }),
+      nosePort: new ThrustFlame(glow, { ...rcs, x: 10, y: -8, angle: -Math.PI / 2 }),
+      noseStar: new ThrustFlame(glow, { ...rcs, x: 10, y: 8, angle: Math.PI / 2 }),
+      aftPort: new ThrustFlame(glow, { ...rcs, x: -10, y: -8, angle: -Math.PI / 2 }),
+      aftStar: new ThrustFlame(glow, { ...rcs, x: -10, y: 8, angle: Math.PI / 2 }),
     };
     this.shieldG = new Graphics();
     this.cargoG = new Graphics();
@@ -112,7 +146,16 @@ export class Ship {
       this.jets.nose.container,
       this.jets.left.container,
       this.jets.right.container,
+      this.jets.nosePort.container,
+      this.jets.noseStar.container,
+      this.jets.aftPort.container,
+      this.jets.aftStar.container,
     );
+    this.yawDir = 0;
+    this.yawHeld = 0;
+    this.yawBrake = 0;
+    this.yawBrakeDir = 0;
+    this.yawFlame = 0;
     this.radius = shipConfig.radius;
     this.kitDef = kitFor("DSF22");
     this.hullMax = 1;
@@ -126,6 +169,7 @@ export class Ship {
     this.undockLock = 0;
     this.dockHold = 0;
     this.skin = null;
+    this.placeJets();
     this.reset(0, 0);
   }
 
@@ -158,6 +202,7 @@ export class Ship {
     for (const gun of this.turrets || []) gun.cool = 0;
     this.warping = false;
     this.clearRail();
+    this.clearYaw();
     this.view.visible = true;
     this.draw();
     this.drawShield();
@@ -171,6 +216,7 @@ export class Ship {
     this.dockHold = 1;
     this.vx = 0;
     this.vy = 0;
+    this.clearYaw();
     this.shieldOn = false;
     this.shieldEnergy = this.shieldMax || shieldConfig.max;
     this.drawShield();
@@ -366,22 +412,92 @@ export class Ship {
     this.autoShield = false;
     this.bindTurrets();
     this.clearRail();
-    this.placeRearJet();
+    this.placeJets();
     this.draw();
     this.drawShield();
   }
 
-  placeRearJet() {
-    const dsf = -12;
-    if (!this.skin || this.skin.id === "DSF22") {
-      this.jets.rear.originX = dsf;
-      return;
+  placeJets() {
+    const e = hullExtents(this.skin);
+    const pad = 2.4;
+    this.jets.rear.originX = e.minX - 3;
+    this.jets.rear.originY = 0;
+    this.jets.nose.originX = e.maxX + 2;
+    this.jets.nose.originY = 0;
+    this.jets.left.originX = 0;
+    this.jets.left.originY = e.minY - 2;
+    this.jets.right.originX = 0;
+    this.jets.right.originY = e.maxY + 2;
+
+    const wide = Math.max(6, (e.maxY - e.minY) * 0.5);
+    let np = { ...e.np };
+    let ns = { ...e.ns };
+    let ap = { ...e.ap };
+    let as = { ...e.as };
+    if (Math.abs(ns.y - np.y) < 3.2) {
+      const hy = Math.max(3.2, wide * 0.35);
+      np = { x: e.maxX - 1.5, y: -hy };
+      ns = { x: e.maxX - 1.5, y: hy };
     }
-    let aft = 0;
-    for (const hull of this.skin.hulls || []) {
-      for (let i = 0; i < hull.length; i += 2) aft = Math.min(aft, hull[i]);
+    if (Math.abs(as.y - ap.y) < 3.2) {
+      const hy = Math.max(3.2, wide * 0.35);
+      ap = { x: e.minX + 1.5, y: -hy };
+      as = { x: e.minX + 1.5, y: hy };
     }
-    this.jets.rear.originX = (aft || dsf) - 3;
+    const seat = (jet, pt, ang) => {
+      jet.originX = pt.x + Math.cos(ang) * pad;
+      jet.originY = pt.y + Math.sin(ang) * pad;
+    };
+    seat(this.jets.nosePort, np, -Math.PI / 2);
+    seat(this.jets.noseStar, ns, Math.PI / 2);
+    seat(this.jets.aftPort, ap, -Math.PI / 2);
+    seat(this.jets.aftStar, as, Math.PI / 2);
+  }
+
+  clearYaw() {
+    this.yawDir = 0;
+    this.yawHeld = 0;
+    this.yawBrake = 0;
+    this.yawBrakeDir = 0;
+    this.yawFlame = 0;
+  }
+
+  yawWant(input) {
+    if (Math.abs(input.rotate) > 0.15) return Math.sign(input.rotate);
+    if (input.aim != null) {
+      const err = wrapDelta(input.aim - this.rotation, Math.PI * 2);
+      if (Math.abs(err) > 0.06) return Math.sign(err);
+    }
+    return 0;
+  }
+
+  tickYawJets(dt, want) {
+    if (want) {
+      this.yawHeld += dt;
+      this.yawDir = want;
+      this.yawBrake = 0;
+    } else {
+      if (this.yawDir && this.yawHeld > 0.07) {
+        this.yawBrakeDir = this.yawDir;
+        this.yawBrake = Math.min(0.18, 0.08 + this.yawHeld * 0.22);
+      }
+      this.yawDir = 0;
+      this.yawHeld = 0;
+    }
+    if (this.yawBrake > 0) this.yawBrake = Math.max(0, this.yawBrake - dt);
+    const cmd = want || (this.yawBrake > 0 ? -this.yawBrakeDir : 0);
+    this.yawFlame = cmd;
+    this.jets.nosePort.update(dt, cmd > 0);
+    this.jets.aftStar.update(dt, cmd > 0);
+    this.jets.noseStar.update(dt, cmd < 0);
+    this.jets.aftPort.update(dt, cmd < 0);
+  }
+
+  tickThrustJets(dt, opts = {}) {
+    this.jets.rear.update(dt, opts.rear ?? this.surge > 0.15);
+    this.jets.nose.update(dt, opts.nose ?? this.surge < -0.15);
+    this.jets.left.update(dt, opts.left ?? this.strafe > 0.15);
+    this.jets.right.update(dt, opts.right ?? this.strafe < -0.15);
   }
 
   draw() {
@@ -417,6 +533,18 @@ export class Ship {
     if (this.strafe > 0.15) {
       const flicker = -(12 + Math.random() * 3);
       mark(this.markG, 0.5, -8, 0.5, flicker);
+    }
+    if (this.yawFlame) {
+      const flick = 7 + Math.random() * 3;
+      const pair =
+        this.yawFlame > 0
+          ? [this.jets.nosePort, this.jets.aftStar]
+          : [this.jets.noseStar, this.jets.aftPort];
+      for (const jet of pair) {
+        const dx = Math.cos(jet.angle) * flick;
+        const dy = Math.sin(jet.angle) * flick;
+        mark(this.markG, jet.originX, jet.originY, jet.originX + dx, jet.originY + dy);
+      }
     }
   }
 
@@ -592,6 +720,7 @@ export class Ship {
 
     this.undockLock = Math.max(0, this.undockLock - dt);
     const step = this.turnSpeed() * dt;
+    const yawWant = this.yawWant(input);
     if (input.aim != null) this.rotation = turnToward(this.rotation, input.aim, step);
     this.rotation += input.rotate * step;
     this.surge = input.surge;
@@ -623,11 +752,9 @@ export class Ship {
     this.view.position.set(this.x, this.y);
     this.view.rotation = this.rotation;
     this.view.visible = this.invuln <= 0 || Math.floor(this.invuln * 14) % 2 === 0;
+    this.tickYawJets(dt, yawWant);
     this.drawMarks();
-    this.jets.rear.update(dt, this.surge > 0.15);
-    this.jets.nose.update(dt, this.surge < -0.15);
-    this.jets.left.update(dt, this.strafe > 0.15);
-    this.jets.right.update(dt, this.strafe < -0.15);
+    this.tickThrustJets(dt);
   }
 
   autopilotHome(dt, hub, bounds) {
@@ -651,6 +778,8 @@ export class Ship {
     }
     const dist = Math.hypot(dx, dy) || 1;
     const desired = Math.atan2(dy, dx);
+    const yawErr = wrapDelta(desired - this.rotation, Math.PI * 2);
+    const yawWant = Math.abs(yawErr) > 0.06 ? Math.sign(yawErr) : 0;
     this.rotation = turnToward(this.rotation, desired, this.turnSpeed() * dt);
     this.strafe = 0;
 
@@ -683,11 +812,9 @@ export class Ship {
     this.view.position.set(this.x, this.y);
     this.view.rotation = this.rotation;
     this.view.visible = this.invuln <= 0 || Math.floor(this.invuln * 14) % 2 === 0;
+    this.tickYawJets(dt, yawWant);
     this.drawMarks();
-    this.jets.rear.update(dt, this.surge > 0.15);
-    this.jets.nose.update(dt, false);
-    this.jets.left.update(dt, false);
-    this.jets.right.update(dt, false);
+    this.tickThrustJets(dt, { nose: false, left: false, right: false });
   }
 
   kill() {
@@ -702,6 +829,7 @@ export class Ship {
     this.autoShield = false;
     this.warping = false;
     this.clearRail();
+    this.clearYaw();
     this.drawShield();
     for (const jet of Object.values(this.jets)) jet.stop();
     this.view.visible = false;

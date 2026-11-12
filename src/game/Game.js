@@ -6326,7 +6326,7 @@ export class Game {
       const warping = this.ship.warping;
       this.audio.tickEngine(
         warping ? 0 : Math.abs(this.ship.surge),
-        warping ? 0 : Math.max(Math.abs(this.ship.strafe), Math.abs(this.input.rotate) * 0.8),
+        warping ? 0 : Math.max(Math.abs(this.ship.strafe), Math.abs(this.input.rotate) * 0.8, this.ship.yawFlame ? 0.65 : 0),
         this.ship.shieldOn ? 1 : 0,
         warping ? 1 : 0,
         warping ? Math.min(1, this.ship.warpT / this.ship.warpDur) : 0,
