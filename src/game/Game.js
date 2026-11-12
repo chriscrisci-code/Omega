@@ -2605,7 +2605,7 @@ export class Game {
     if (this.ship) this.ship.regenBoost = this.regenMul();
   }
 
-  syncMissileHud() {
+  syncMissileHud(flash = null) {
     if (this.attractOnDemo) return;
     const playing = this.mode === PLAYING || this.mode === DYING || this.mode === CONTINUE;
     const ammo = this.ship.can("rockets") ? "RKT" : "MSL";
@@ -2613,8 +2613,11 @@ export class Game {
       this.hud.setSpecial(`WARP EMP ${ammo}`);
       return;
     }
-    const empBit = this.empTier() > 1 ? `  EMP  ${this.empLeft}` : "";
-    this.hud.setSpecial(`${ammo}  ${this.missileAmmo}${empBit}`);
+    this.hud.setSpecial({
+      ammoName: ammo,
+      missiles: this.missileAmmo,
+      emp: this.empTier() > 1 ? this.empLeft : null,
+    }, flash);
   }
 
   empCap() {
@@ -2914,7 +2917,7 @@ export class Game {
     });
     if (!this.attractOnDemo) {
       this.missileAmmo = Math.max(0, this.missileAmmo - 1);
-      this.syncMissileHud();
+      this.syncMissileHud("msl");
     }
     this.missileCool = spec.cool ?? rockets.cooldown ?? shipLevels.gunCool[0];
     this.sfx("thud");
@@ -4116,7 +4119,7 @@ export class Game {
     if (want <= 1) this.missileDropSide *= -1;
     if (!this.attractOnDemo) {
       this.missileAmmo = Math.max(0, this.missileAmmo - shot);
-      this.syncMissileHud();
+      this.syncMissileHud("msl");
     }
     this.missileCool = missiles.cooldown;
     this.sfx("missile");
@@ -4166,7 +4169,7 @@ export class Game {
     this.empCool = emp.cooldown;
     if (!this.attractOnDemo) {
       this.empLeft = Math.max(0, this.empLeft - 1);
-      this.syncMissileHud();
+      this.syncMissileHud("emp");
       this.hud.setMode(`EMP  ${this.empLeft}`);
     }
     this.fx.burst(this.ship.x, this.ship.y, colors.cyanHot, 18, 160);

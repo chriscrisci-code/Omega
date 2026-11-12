@@ -129,6 +129,43 @@ body.is-scoreboard #game {
   transition: none;
 }
 
+.special-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: baseline;
+  min-height: 20px;
+}
+
+.special-live {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.special-emp-bit {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+#special .special-live .vector-text,
+#special-idle .vector-text {
+  width: auto;
+  height: auto;
+  margin-left: 0;
+}
+
+.special-count {
+  filter: drop-shadow(0 0 8px rgba(142, 246, 255, 0.45));
+  transition: filter 2s ease-out;
+}
+
+.special-count.is-hot {
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 12px rgba(200, 248, 255, 0.75));
+  transition: none;
+}
+
 #points .vector-text,
 #ore .vector-text,
 #xp .vector-text {

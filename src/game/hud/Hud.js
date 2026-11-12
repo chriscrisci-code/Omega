@@ -39,6 +39,19 @@ export class Hud {
     this.ammoShown = null;
     this.ammoFade = 0;
     this.special = document.querySelector("#special");
+    this.specialIdle = document.querySelector("#special-idle");
+    this.specialLive = document.querySelector("#special-live");
+    this.specialMslName = document.querySelector("#special-msl-name");
+    this.specialMsl = document.querySelector("#special-msl");
+    this.specialEmpBit = document.querySelector("#special-emp-bit");
+    this.specialEmpName = document.querySelector("#special-emp-name");
+    this.specialEmp = document.querySelector("#special-emp");
+    this.mslNameShown = null;
+    this.mslShown = null;
+    this.empNameShown = null;
+    this.empShown = null;
+    this.mslFade = 0;
+    this.empFade = 0;
     this.alert = document.querySelector("#alert");
     this.alertTitle = this.alert?.querySelector(".alert-title");
     this.alertSub = document.querySelector("#alert-sub");
@@ -313,12 +326,58 @@ export class Hud {
     this.ammoFade = window.setTimeout(() => this.ammoCount?.classList.remove("is-hot"), 320);
   }
 
-  setSpecial(name) {
+  pulseSpecial(node, text, fadeKey) {
+    if (!node) return;
+    this.paint(node, text, 14, "#e8f4ff", "#ffffff", "right");
+    node.classList.add("is-hot");
+    window.clearTimeout(this[fadeKey]);
+    this[fadeKey] = window.setTimeout(() => {
+      node.classList.remove("is-hot");
+      this.paint(node, text, 14, CYAN, HOT, "right");
+    }, 320);
+  }
+
+  setSpecial(spec, flash = null) {
     if (this.layout === "phone") {
       if (this.special) this.special.innerHTML = "";
       return;
     }
-    this.paint(this.special, name || "WARP EMP MSL", 14, CYAN, HOT, "right");
+    const idle = typeof spec === "string" || spec == null || spec.idle;
+    if (idle) {
+      const text = typeof spec === "string" ? spec : spec?.idle;
+      if (this.specialIdle) this.specialIdle.hidden = false;
+      if (this.specialLive) this.specialLive.hidden = true;
+      this.paint(this.specialIdle || this.special, text || "WARP EMP MSL", 14, CYAN, HOT, "right");
+      return;
+    }
+    if (this.specialIdle) this.specialIdle.hidden = true;
+    if (this.specialLive) this.specialLive.hidden = false;
+    const name = spec.ammoName || "MSL";
+    if (this.mslNameShown !== name) {
+      this.paint(this.specialMslName, name, 14, CYAN, HOT, "right");
+      this.mslNameShown = name;
+    }
+    const msl = String(Math.max(0, Math.floor(Number(spec.missiles) || 0)));
+    if (this.mslShown !== msl) {
+      this.paint(this.specialMsl, msl, 14, CYAN, HOT, "right");
+      this.mslShown = msl;
+    }
+    const showEmp = spec.emp != null;
+    if (this.specialEmpBit) this.specialEmpBit.hidden = !showEmp;
+    let emp = "";
+    if (showEmp) {
+      if (this.empNameShown !== "EMP") {
+        this.paint(this.specialEmpName, "EMP", 14, CYAN, HOT, "right");
+        this.empNameShown = "EMP";
+      }
+      emp = String(Math.max(0, Math.floor(Number(spec.emp) || 0)));
+      if (this.empShown !== emp) {
+        this.paint(this.specialEmp, emp, 14, CYAN, HOT, "right");
+        this.empShown = emp;
+      }
+    }
+    if (flash === "msl") this.pulseSpecial(this.specialMsl, msl, "mslFade");
+    if (flash === "emp" && showEmp) this.pulseSpecial(this.specialEmp, emp, "empFade");
   }
 
   attract(on) {
