@@ -16,6 +16,8 @@ function hudControl(event) {
 }
 
 const CORNER = 72;
+/** MouseEvent.buttons bits: left, middle, right, back, forward. */
+const MOUSE_BITS = [1, 4, 2, 8, 16];
 
 export class Input {
   constructor(target = window) {
@@ -29,6 +31,7 @@ export class Input {
     this.leftHeld = false;
     this.rightHeld = false;
     this.mouseHeld = { 0: false, 1: false, 2: false };
+    this._mouseFromPointer = { 0: false, 1: false, 2: false };
     this._pointerStart = false;
     this._warpTicks = 0;
     this._empTicks = 0;
@@ -77,8 +80,10 @@ export class Input {
       this.mouseX = event.clientX;
       this.mouseY = event.clientY;
       if (this.aimMode === "mouse") this.hasPointer = true;
+      if (!this.capture) this.syncMouseButtons(event);
     };
     this.onPointerDown = (event) => {
+      if (Number.isFinite(event.button) && event.button >= 0) this._mouseFromPointer[event.button] = true;
       if (this.capture) {
         if (hudControl(event) && !event.target.closest?.("#controls-page")) return;
         event.preventDefault();
@@ -90,19 +95,19 @@ export class Input {
       if (this.aimMode === "mouse") this.hasPointer = true;
       this.mouseX = event.clientX;
       this.mouseY = event.clientY;
-      this.mouseHeld[event.button] = true;
-      if (event.button === 0) {
-        this.leftHeld = true;
-        this._pointerStart = true;
-      }
-      if (event.button === 1) event.preventDefault();
-      if (event.button === 2) this.rightHeld = true;
-      this.fireMouse(event.button);
-      this.fireCorner(event.clientX, event.clientY);
-      this.noteTap(event);
+      this.applyMouseDown(event);
     };
     this.onMouseDown = (event) => {
-      if (typeof PointerEvent !== "undefined") return;
+      if (this._mouseFromPointer[event.button]) {
+        this._mouseFromPointer[event.button] = false;
+        if (this.capture || this.layout === "phone" || hudControl(event)) return;
+        if (typeof event.buttons !== "number") return;
+        for (let button = 0; button <= 2; button += 1) {
+          if (button === event.button) continue;
+          if (event.buttons & MOUSE_BITS[button]) this.pressMouse(button, event);
+        }
+        return;
+      }
       this.onPointerDown(event);
     };
     this.onAuxClick = (event) => {
@@ -111,9 +116,15 @@ export class Input {
       if (this.capture) this.finishCapture({ t: "mouse", b: 1 });
     };
     this.onPointerUp = (event) => {
-      this.mouseHeld[event.button] = false;
-      if (event.button === 0) this.leftHeld = false;
-      if (event.button === 2) this.rightHeld = false;
+      this.applyMouseUp(event);
+    };
+    this.onMouseUp = (event) => {
+      this.applyMouseUp(event);
+    };
+    this.onPointerCancel = () => {
+      this.releaseMouse(0);
+      this.releaseMouse(1);
+      this.releaseMouse(2);
     };
     this.onContextMenu = (event) => event.preventDefault();
     this.onWheel = (event) => {
@@ -154,7 +165,9 @@ export class Input {
     window.addEventListener("pointerdown", this.onPointerDown, true);
     window.addEventListener("auxclick", this.onAuxClick, true);
     window.addEventListener("mousedown", this.onMouseDown, true);
-    window.addEventListener("pointerup", this.onPointerUp);
+    window.addEventListener("mouseup", this.onMouseUp, true);
+    window.addEventListener("pointerup", this.onPointerUp, true);
+    window.addEventListener("pointercancel", this.onPointerCancel);
     window.addEventListener("contextmenu", this.onContextMenu);
     window.addEventListener("wheel", this.onWheel, { passive: false });
     window.addEventListener("pointerleave", () => {
@@ -162,6 +175,7 @@ export class Input {
       this.leftHeld = false;
       this.rightHeld = false;
       this.mouseHeld = { 0: false, 1: false, 2: false };
+      this._mouseFromPointer = { 0: false, 1: false, 2: false };
     });
     window.addEventListener("gamepadconnected", () => {
       this.padConnected = true;
@@ -235,6 +249,58 @@ export class Input {
   emitWheel(dir) {
     for (const row of ACTIONS) {
       if (this.has(row.id, (bind) => bind.t === "wheel" && bind.d === dir)) this.emit(row.id);
+    }
+  }
+
+  pressMouse(button, event) {
+    if (!Number.isFinite(button) || button < 0) return;
+    if (this.mouseHeld[button]) return;
+    this.mouseHeld[button] = true;
+    if (button === 0) {
+      this.leftHeld = true;
+      this._pointerStart = true;
+    }
+    if (button === 1) event?.preventDefault?.();
+    if (button === 2) this.rightHeld = true;
+    this.fireMouse(button);
+    if (event) {
+      this.fireCorner(event.clientX, event.clientY);
+      this.noteTap(event);
+    }
+  }
+
+  releaseMouse(button) {
+    if (!Number.isFinite(button) || button < 0) return;
+    if (!this.mouseHeld[button]) return;
+    this.mouseHeld[button] = false;
+    if (button === 0) this.leftHeld = false;
+    if (button === 2) this.rightHeld = false;
+  }
+
+  applyMouseDown(event) {
+    this.pressMouse(event.button, event);
+    if (typeof event.buttons !== "number") return;
+    if (event.pointerType && event.pointerType !== "mouse") return;
+    for (let button = 0; button <= 2; button += 1) {
+      if (event.buttons & MOUSE_BITS[button]) this.pressMouse(button, event);
+    }
+  }
+
+  applyMouseUp(event) {
+    this.releaseMouse(event.button);
+    if (typeof event.buttons !== "number") return;
+    if (event.pointerType && event.pointerType !== "mouse") return;
+    for (let button = 0; button <= 2; button += 1) {
+      if (!(event.buttons & MOUSE_BITS[button])) this.releaseMouse(button);
+    }
+  }
+
+  syncMouseButtons(event) {
+    if (event.pointerType && event.pointerType !== "mouse") return;
+    if (typeof event.buttons !== "number") return;
+    for (let button = 0; button <= 2; button += 1) {
+      if (event.buttons & MOUSE_BITS[button]) this.pressMouse(button, event);
+      else this.releaseMouse(button);
     }
   }
 
@@ -569,6 +635,7 @@ export class Input {
     this.padConnected = Boolean(pad);
     this.pressed.clear();
     this._pointerStart = false;
+    this._mouseFromPointer = { 0: false, 1: false, 2: false };
     this._warpTicks = 0;
     this._empTicks = 0;
     this._missileTicks = 0;
