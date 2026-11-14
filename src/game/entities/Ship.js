@@ -107,9 +107,9 @@ export class Ship {
     const rcs = {
       tint: colors.white,
       tintHot: 0xffffff,
-      size: 5.5,
-      speed: 200,
-      stretch: 1.45,
+      size: 4.2,
+      speed: 280,
+      stretch: 2.4,
       pool: 12,
     };
     this.jets = {
@@ -117,13 +117,13 @@ export class Ship {
         x: -12,
         y: 0,
         angle: Math.PI,
-        tint: colors.amber,
-        tintHot: 0xfff6d0,
-        size: 12,
-        speed: 240,
-        stretch: 1.45,
+        tint: colors.white,
+        tintHot: 0xffffff,
+        size: 8,
+        speed: 380,
+        stretch: 3.1,
         pool: 24,
-        burst: 4,
+        burst: 3,
         coolLife: 0.07,
         hotLife: 0.05,
       }),
@@ -521,8 +521,8 @@ export class Ship {
   paintJetFlame(jet, opts) {
     const len = opts.len;
     const half = opts.half;
-    const width = opts.width ?? 1.2;
-    const inset = opts.inset ?? 1.4;
+    const width = opts.width ?? 1.05;
+    const inset = opts.inset ?? 1.2;
     const c = Math.cos(jet.angle);
     const s = Math.sin(jet.angle);
     const px = -s;
@@ -541,39 +541,33 @@ export class Ship {
         x - px * half,
         y - py * half,
       ],
-      colors.orange,
-      colors.amber,
+      colors.white,
+      colors.white,
       width,
     );
-    if (opts.hot) {
-      strokeLine(this.markG, [x, y, x + c * len * 0.55, y + s * len * 0.55], colors.amber, 0xffffff, width * 1.15);
-      strokeLine(this.markG, [x, y, x + c * len * 0.38, y + s * len * 0.38], 0xffffff, 0xffffff, width * 0.55);
-    } else {
-      strokeLine(this.markG, [x, y, x + c * len * 0.62, y + s * len * 0.62], colors.amber, 0xfff6d0, width * 0.85);
-    }
+    strokeLine(this.markG, [x, y, x + c * len * 0.72, y + s * len * 0.72], colors.white, 0xffffff, width * 0.7);
   }
 
   drawMarks() {
     this.markG.clear();
     if (this.surge > 0.15) {
       this.paintJetFlame(this.jets.rear, {
-        len: 16 + Math.random() * 4,
-        half: 5.4 + Math.random() * 0.9,
-        width: 2.2,
-        hot: true,
-        inset: 1.2,
+        len: 20 + Math.random() * 5,
+        half: 1.7 + Math.random() * 0.4,
+        width: 1.15,
+        inset: 1,
       });
     }
-    if (this.surge < -0.15) this.paintJetFlame(this.jets.nose, { len: 9 + Math.random() * 3, half: 1.6 + Math.random() * 0.4, width: 1.05 });
-    if (this.strafe < -0.15) this.paintJetFlame(this.jets.right, { len: 8 + Math.random() * 2.5, half: 1.45 + Math.random() * 0.35, width: 1 });
-    if (this.strafe > 0.15) this.paintJetFlame(this.jets.left, { len: 8 + Math.random() * 2.5, half: 1.45 + Math.random() * 0.35, width: 1 });
+    if (this.surge < -0.15) this.paintJetFlame(this.jets.nose, { len: 9 + Math.random() * 2.5, half: 0.85 + Math.random() * 0.2, width: 0.9 });
+    if (this.strafe < -0.15) this.paintJetFlame(this.jets.right, { len: 8 + Math.random() * 2, half: 0.8 + Math.random() * 0.2, width: 0.85 });
+    if (this.strafe > 0.15) this.paintJetFlame(this.jets.left, { len: 8 + Math.random() * 2, half: 0.8 + Math.random() * 0.2, width: 0.85 });
     if (this.yawFlame) {
       const pair =
         this.yawFlame > 0
           ? [this.jets.nosePort, this.jets.aftStar]
           : [this.jets.noseStar, this.jets.aftPort];
       for (const jet of pair) {
-        this.paintJetFlame(jet, { len: 7 + Math.random() * 2.2, half: 1.25 + Math.random() * 0.3, width: 0.95 });
+        this.paintJetFlame(jet, { len: 7 + Math.random() * 2, half: 0.7 + Math.random() * 0.18, width: 0.8 });
       }
     }
   }
