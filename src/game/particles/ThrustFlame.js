@@ -25,11 +25,16 @@ export class ThrustFlame {
     this.speed = speed;
     this.size = size;
     this.stretch = stretch;
-    this.burst = burst;
+    this.burst = Math.max(1, burst | 0);
+    this.rate = this.burst * 36;
+    this.coolLife = 0.12;
+    this.hotLife = 0.09;
+    this.acc = 0;
+    this.lit = false;
 
     this.container = new ParticleContainer({
       blendMode: "add",
-      boundsArea: new Rectangle(-160, -160, 320, 320),
+      boundsArea: new Rectangle(-220, -220, 440, 440),
       dynamicProperties: {
         position: true,
         rotation: true,
@@ -79,7 +84,7 @@ export class ThrustFlame {
       item.alive = true;
       item.vx = dirX * speed + px * jitter;
       item.vy = dirY * speed + py * jitter;
-      item.life = hot ? 0.026 : 0.038;
+      item.life = hot ? this.hotLife : this.coolLife;
       item.maxLife = item.life;
       item.startSize = this.size * (hot ? rand(0.65, 0.9) : rand(0.85, 1.15));
       item.view.x = this.originX + px * rand(-1.2, 1.2);
@@ -87,19 +92,19 @@ export class ThrustFlame {
       item.view.rotation = this.angle;
       item.view.tint = hot ? this.tintHot : this.tint;
       item.view.alpha = 1;
-      return;
+      const scale = item.startSize / particleConfig.textureSize;
+      item.view.scaleX = scale * this.stretch;
+      item.view.scaleY = scale;
+      return true;
     }
+    return false;
   }
 
   update(dt, on) {
-    if (on) {
-      const n = Math.max(1, this.burst | 0);
-      for (let i = 0; i < n; i += 1) this.emit();
-    }
-
+    const step = Math.max(0, dt);
     for (const item of this.items) {
       if (!item.alive) continue;
-      item.life -= dt;
+      item.life -= step;
       if (item.life <= 0) {
         item.alive = false;
         item.view.alpha = 0;
@@ -108,17 +113,38 @@ export class ThrustFlame {
         continue;
       }
 
-      item.view.x += item.vx * dt;
-      item.view.y += item.vy * dt;
+      item.view.x += item.vx * step;
+      item.view.y += item.vy * step;
       const t = item.life / item.maxLife;
       const scale = (item.startSize / particleConfig.textureSize) * t;
       item.view.scaleX = scale * this.stretch;
       item.view.scaleY = scale;
       item.view.alpha = t;
     }
+
+    if (!on) {
+      this.lit = false;
+      this.acc = 0;
+      return;
+    }
+
+    if (!this.lit) {
+      this.lit = true;
+      this.acc = Math.max(this.acc, this.burst);
+    }
+    this.acc += this.rate * step;
+    const cap = Math.max(this.burst * 2, 8);
+    let want = Math.min(Math.floor(this.acc), cap);
+    while (want > 0 && this.emit()) {
+      this.acc -= 1;
+      want -= 1;
+    }
+    if (want > 0) this.acc = Math.min(this.acc, cap);
   }
 
   stop() {
+    this.lit = false;
+    this.acc = 0;
     for (const item of this.items) {
       item.alive = false;
       item.view.alpha = 0;
