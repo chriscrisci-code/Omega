@@ -7,6 +7,7 @@ import { catalogToGameSkin } from "../ships/catalog.js";
 import { turnToward, wrap, wrapCoord, wrapDelta } from "../math.js";
 
 export const HULL = [16, 0, -12, 10, -7, 0, -12, -10];
+const RCS_CANT = 0.42;
 
 function ringPts(sides, radius, turn = 0) {
   const points = [];
@@ -106,10 +107,10 @@ export class Ship {
     const rcs = {
       tint: colors.white,
       tintHot: 0xffffff,
-      size: 9,
-      speed: 360,
-      stretch: 2.2,
-      pool: 16,
+      size: 5.5,
+      speed: 200,
+      stretch: 1.45,
+      pool: 12,
     };
     this.jets = {
       rear: new ThrustFlame(glow, {
@@ -118,19 +119,21 @@ export class Ship {
         angle: Math.PI,
         tint: colors.amber,
         tintHot: 0xfff6d0,
-        size: 20,
-        speed: 420,
-        stretch: 2.8,
-        pool: 32,
-        burst: 3,
+        size: 12,
+        speed: 240,
+        stretch: 1.45,
+        pool: 24,
+        burst: 4,
+        coolLife: 0.07,
+        hotLife: 0.05,
       }),
-      nose: new ThrustFlame(glow, { ...rcs, x: 14, y: 0, angle: 0, size: 10, speed: 1040, stretch: 2.9, pool: 16 }),
-      left: new ThrustFlame(glow, { ...rcs, x: 0, y: -8, angle: -Math.PI / 2, size: 9, speed: 980, stretch: 2.7 }),
-      right: new ThrustFlame(glow, { ...rcs, x: 0, y: 8, angle: Math.PI / 2, size: 9, speed: 980, stretch: 2.7 }),
-      nosePort: new ThrustFlame(glow, { ...rcs, x: 10, y: -8, angle: -Math.PI / 2 }),
-      noseStar: new ThrustFlame(glow, { ...rcs, x: 10, y: 8, angle: Math.PI / 2 }),
-      aftPort: new ThrustFlame(glow, { ...rcs, x: -10, y: -8, angle: -Math.PI / 2 }),
-      aftStar: new ThrustFlame(glow, { ...rcs, x: -10, y: 8, angle: Math.PI / 2 }),
+      nose: new ThrustFlame(glow, { ...rcs, x: 14, y: 0, angle: 0 }),
+      left: new ThrustFlame(glow, { ...rcs, x: 0, y: -8, angle: -Math.PI / 2 }),
+      right: new ThrustFlame(glow, { ...rcs, x: 0, y: 8, angle: Math.PI / 2 }),
+      nosePort: new ThrustFlame(glow, { ...rcs, x: 10, y: -8, angle: -Math.PI / 2 + RCS_CANT }),
+      noseStar: new ThrustFlame(glow, { ...rcs, x: 10, y: 8, angle: Math.PI / 2 - RCS_CANT }),
+      aftPort: new ThrustFlame(glow, { ...rcs, x: -10, y: -8, angle: -Math.PI / 2 - RCS_CANT }),
+      aftStar: new ThrustFlame(glow, { ...rcs, x: -10, y: 8, angle: Math.PI / 2 + RCS_CANT }),
     };
     this.shieldG = new Graphics();
     this.markG = new Graphics();
@@ -443,13 +446,14 @@ export class Ship {
       as = { x: e.minX + 1.5, y: hy };
     }
     const seat = (jet, pt, ang) => {
+      jet.angle = ang;
       jet.originX = pt.x + Math.cos(ang) * pad;
       jet.originY = pt.y + Math.sin(ang) * pad;
     };
-    seat(this.jets.nosePort, np, -Math.PI / 2);
-    seat(this.jets.noseStar, ns, Math.PI / 2);
-    seat(this.jets.aftPort, ap, -Math.PI / 2);
-    seat(this.jets.aftStar, as, Math.PI / 2);
+    seat(this.jets.nosePort, np, -Math.PI / 2 + RCS_CANT);
+    seat(this.jets.noseStar, ns, Math.PI / 2 - RCS_CANT);
+    seat(this.jets.aftPort, ap, -Math.PI / 2 - RCS_CANT);
+    seat(this.jets.aftStar, as, Math.PI / 2 + RCS_CANT);
   }
 
   clearYaw() {
@@ -514,7 +518,11 @@ export class Ship {
     this.drawMarks();
   }
 
-  paintJetFlame(jet, len, half, width = 1.55) {
+  paintJetFlame(jet, opts) {
+    const len = opts.len;
+    const half = opts.half;
+    const width = opts.width ?? 1.2;
+    const inset = opts.inset ?? 1.4;
     const c = Math.cos(jet.angle);
     const s = Math.sin(jet.angle);
     const px = -s;
@@ -524,8 +532,8 @@ export class Ship {
     strokeGlow(
       this.markG,
       [
-        x - c * 5,
-        y - s * 5,
+        x - c * inset,
+        y - s * inset,
         x + px * half,
         y + py * half,
         x + c * len,
@@ -537,21 +545,36 @@ export class Ship {
       colors.amber,
       width,
     );
-    strokeLine(this.markG, [x, y, x + c * len * 0.7, y + s * len * 0.7], colors.amber, 0xfff6d0, width * 0.9);
+    if (opts.hot) {
+      strokeLine(this.markG, [x, y, x + c * len * 0.55, y + s * len * 0.55], colors.amber, 0xffffff, width * 1.15);
+      strokeLine(this.markG, [x, y, x + c * len * 0.38, y + s * len * 0.38], 0xffffff, 0xffffff, width * 0.55);
+    } else {
+      strokeLine(this.markG, [x, y, x + c * len * 0.62, y + s * len * 0.62], colors.amber, 0xfff6d0, width * 0.85);
+    }
   }
 
   drawMarks() {
     this.markG.clear();
-    if (this.surge > 0.15) this.paintJetFlame(this.jets.rear, 42 + Math.random() * 16, 4.6 + Math.random() * 1.8, 1.75);
-    if (this.surge < -0.15) this.paintJetFlame(this.jets.nose, 24 + Math.random() * 8, 2.8 + Math.random() * 1, 1.35);
-    if (this.strafe < -0.15) this.paintJetFlame(this.jets.right, 20 + Math.random() * 6, 2.4 + Math.random() * 0.8, 1.25);
-    if (this.strafe > 0.15) this.paintJetFlame(this.jets.left, 20 + Math.random() * 6, 2.4 + Math.random() * 0.8, 1.25);
+    if (this.surge > 0.15) {
+      this.paintJetFlame(this.jets.rear, {
+        len: 16 + Math.random() * 4,
+        half: 5.4 + Math.random() * 0.9,
+        width: 2.2,
+        hot: true,
+        inset: 1.2,
+      });
+    }
+    if (this.surge < -0.15) this.paintJetFlame(this.jets.nose, { len: 9 + Math.random() * 3, half: 1.6 + Math.random() * 0.4, width: 1.05 });
+    if (this.strafe < -0.15) this.paintJetFlame(this.jets.right, { len: 8 + Math.random() * 2.5, half: 1.45 + Math.random() * 0.35, width: 1 });
+    if (this.strafe > 0.15) this.paintJetFlame(this.jets.left, { len: 8 + Math.random() * 2.5, half: 1.45 + Math.random() * 0.35, width: 1 });
     if (this.yawFlame) {
       const pair =
         this.yawFlame > 0
           ? [this.jets.nosePort, this.jets.aftStar]
           : [this.jets.noseStar, this.jets.aftPort];
-      for (const jet of pair) this.paintJetFlame(jet, 14 + Math.random() * 5, 1.8 + Math.random() * 0.6, 1.15);
+      for (const jet of pair) {
+        this.paintJetFlame(jet, { len: 7 + Math.random() * 2.2, half: 1.25 + Math.random() * 0.3, width: 0.95 });
+      }
     }
   }
 

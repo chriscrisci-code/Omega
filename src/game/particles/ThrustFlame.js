@@ -15,6 +15,8 @@ export class ThrustFlame {
       size = 8,
       stretch = 2.6,
       burst = 2,
+      coolLife = 0.08,
+      hotLife = 0.055,
     } = options;
 
     this.originX = x;
@@ -27,8 +29,8 @@ export class ThrustFlame {
     this.stretch = stretch;
     this.burst = Math.max(1, burst | 0);
     this.rate = this.burst * 28;
-    this.coolLife = 0.2;
-    this.hotLife = 0.14;
+    this.coolLife = coolLife;
+    this.hotLife = hotLife;
     this.acc = 0;
     this.lit = false;
 
