@@ -106,10 +106,10 @@ export class Ship {
     const rcs = {
       tint: colors.white,
       tintHot: 0xffffff,
-      size: 7,
-      speed: 920,
-      stretch: 2.4,
-      pool: 14,
+      size: 9,
+      speed: 360,
+      stretch: 2.2,
+      pool: 16,
     };
     this.jets = {
       rear: new ThrustFlame(glow, {
@@ -118,10 +118,10 @@ export class Ship {
         angle: Math.PI,
         tint: colors.amber,
         tintHot: 0xfff6d0,
-        size: 14,
-        speed: 1240,
-        stretch: 3.4,
-        pool: 24,
+        size: 20,
+        speed: 420,
+        stretch: 2.8,
+        pool: 32,
         burst: 3,
       }),
       nose: new ThrustFlame(glow, { ...rcs, x: 14, y: 0, angle: 0, size: 10, speed: 1040, stretch: 2.9, pool: 16 }),
@@ -514,35 +514,44 @@ export class Ship {
     this.drawMarks();
   }
 
+  paintJetFlame(jet, len, half, width = 1.55) {
+    const c = Math.cos(jet.angle);
+    const s = Math.sin(jet.angle);
+    const px = -s;
+    const py = c;
+    const x = jet.originX;
+    const y = jet.originY;
+    strokeGlow(
+      this.markG,
+      [
+        x - c * 5,
+        y - s * 5,
+        x + px * half,
+        y + py * half,
+        x + c * len,
+        y + s * len,
+        x - px * half,
+        y - py * half,
+      ],
+      colors.orange,
+      colors.amber,
+      width,
+    );
+    strokeLine(this.markG, [x, y, x + c * len * 0.7, y + s * len * 0.7], colors.amber, 0xfff6d0, width * 0.9);
+  }
+
   drawMarks() {
     this.markG.clear();
-    if (this.surge > 0.15) {
-      const flicker = 13 + Math.random() * 4;
-      strokeGlow(this.markG, [-7, 0, -12, 3.2, -flicker, 0, -12, -3.2], colors.orange, colors.amber, 1.2);
-    }
-    if (this.surge < -0.15) {
-      const flicker = 18 + Math.random() * 3;
-      mark(this.markG, 14, 0, flicker, 0);
-    }
-    if (this.strafe < -0.15) {
-      const flicker = 12 + Math.random() * 3;
-      mark(this.markG, 0.5, 8, 0.5, flicker);
-    }
-    if (this.strafe > 0.15) {
-      const flicker = -(12 + Math.random() * 3);
-      mark(this.markG, 0.5, -8, 0.5, flicker);
-    }
+    if (this.surge > 0.15) this.paintJetFlame(this.jets.rear, 42 + Math.random() * 16, 4.6 + Math.random() * 1.8, 1.75);
+    if (this.surge < -0.15) this.paintJetFlame(this.jets.nose, 24 + Math.random() * 8, 2.8 + Math.random() * 1, 1.35);
+    if (this.strafe < -0.15) this.paintJetFlame(this.jets.right, 20 + Math.random() * 6, 2.4 + Math.random() * 0.8, 1.25);
+    if (this.strafe > 0.15) this.paintJetFlame(this.jets.left, 20 + Math.random() * 6, 2.4 + Math.random() * 0.8, 1.25);
     if (this.yawFlame) {
-      const flick = 7 + Math.random() * 3;
       const pair =
         this.yawFlame > 0
           ? [this.jets.nosePort, this.jets.aftStar]
           : [this.jets.noseStar, this.jets.aftPort];
-      for (const jet of pair) {
-        const dx = Math.cos(jet.angle) * flick;
-        const dy = Math.sin(jet.angle) * flick;
-        mark(this.markG, jet.originX, jet.originY, jet.originX + dx, jet.originY + dy);
-      }
+      for (const jet of pair) this.paintJetFlame(jet, 14 + Math.random() * 5, 1.8 + Math.random() * 0.6, 1.15);
     }
   }
 

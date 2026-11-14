@@ -1,4 +1,4 @@
-import { Particle, ParticleContainer, Rectangle } from "pixi.js";
+import { Container, Sprite } from "pixi.js";
 import { particles as particleConfig } from "../config.js";
 import { rand } from "../math.js";
 
@@ -26,38 +26,25 @@ export class ThrustFlame {
     this.size = size;
     this.stretch = stretch;
     this.burst = Math.max(1, burst | 0);
-    this.rate = this.burst * 36;
-    this.coolLife = 0.12;
-    this.hotLife = 0.09;
+    this.rate = this.burst * 28;
+    this.coolLife = 0.2;
+    this.hotLife = 0.14;
     this.acc = 0;
     this.lit = false;
 
-    this.container = new ParticleContainer({
-      blendMode: "add",
-      boundsArea: new Rectangle(-220, -220, 440, 440),
-      dynamicProperties: {
-        position: true,
-        rotation: true,
-        vertex: true,
-        color: true,
-      },
-    });
-
+    this.container = new Container();
+    this.container.eventMode = "none";
     this.items = [];
     for (let i = 0; i < pool; i += 1) {
-      const view = new Particle({
-        texture,
-        x: 0,
-        y: 0,
-        anchorX: 0.5,
-        anchorY: 0.5,
-        scaleX: 0,
-        scaleY: 0,
-        alpha: 0,
-        rotation: angle,
-        tint,
-      });
-      this.container.addParticle(view);
+      const view = new Sprite(texture);
+      view.anchor.set(0.5);
+      view.blendMode = "add";
+      view.tint = tint;
+      view.alpha = 0;
+      view.scale.set(0);
+      view.visible = false;
+      view.rotation = angle;
+      this.container.addChild(view);
       this.items.push({
         view,
         alive: false,
@@ -79,22 +66,21 @@ export class ThrustFlame {
     for (const item of this.items) {
       if (item.alive) continue;
       const hot = Math.random() < 0.4;
-      const speed = this.speed + rand(0, 220);
-      const jitter = rand(-28, 28);
+      const speed = this.speed + rand(0, 90);
+      const jitter = rand(-18, 18);
       item.alive = true;
       item.vx = dirX * speed + px * jitter;
       item.vy = dirY * speed + py * jitter;
       item.life = hot ? this.hotLife : this.coolLife;
       item.maxLife = item.life;
-      item.startSize = this.size * (hot ? rand(0.65, 0.9) : rand(0.85, 1.15));
-      item.view.x = this.originX + px * rand(-1.2, 1.2);
-      item.view.y = this.originY + py * rand(-1.2, 1.2);
+      item.startSize = this.size * (hot ? rand(0.7, 1) : rand(0.95, 1.25));
+      item.view.position.set(this.originX + px * rand(-1.2, 1.2), this.originY + py * rand(-1.2, 1.2));
       item.view.rotation = this.angle;
       item.view.tint = hot ? this.tintHot : this.tint;
       item.view.alpha = 1;
       const scale = item.startSize / particleConfig.textureSize;
-      item.view.scaleX = scale * this.stretch;
-      item.view.scaleY = scale;
+      item.view.scale.set(scale * this.stretch, scale);
+      item.view.visible = true;
       return true;
     }
     return false;
@@ -108,18 +94,17 @@ export class ThrustFlame {
       if (item.life <= 0) {
         item.alive = false;
         item.view.alpha = 0;
-        item.view.scaleX = 0;
-        item.view.scaleY = 0;
+        item.view.scale.set(0);
+        item.view.visible = false;
         continue;
       }
 
       item.view.x += item.vx * step;
       item.view.y += item.vy * step;
       const t = item.life / item.maxLife;
-      const scale = (item.startSize / particleConfig.textureSize) * t;
-      item.view.scaleX = scale * this.stretch;
-      item.view.scaleY = scale;
-      item.view.alpha = t;
+      const scale = (item.startSize / particleConfig.textureSize) * (0.45 + 0.55 * t);
+      item.view.scale.set(scale * this.stretch, scale);
+      item.view.alpha = 0.35 + 0.65 * t;
     }
 
     if (!on) {
@@ -148,8 +133,8 @@ export class ThrustFlame {
     for (const item of this.items) {
       item.alive = false;
       item.view.alpha = 0;
-      item.view.scaleX = 0;
-      item.view.scaleY = 0;
+      item.view.scale.set(0);
+      item.view.visible = false;
     }
   }
 }

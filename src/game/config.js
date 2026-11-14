@@ -1,6 +1,6 @@
 /** Tune feel, colors, and Steam-ready defaults here. */
 
-export const version = "0.1.5";
+export const version = "0.1.6";
 
 export const settings = {
   resolutionCap: 4,
