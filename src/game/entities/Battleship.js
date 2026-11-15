@@ -32,6 +32,29 @@ function paintPlate(g, color, hot, w, h) {
   strokeLine(g, [-hw * 0.7, 0, hw * 0.7, 0], color, hot, 0.85);
 }
 
+function paintSection(g, color, hot, w, h, core) {
+  g.clear();
+  const hw = w * 0.5;
+  const hh = h * 0.5;
+  const cut = Math.min(10, hw * 0.18);
+  strokeGlow(g, [-hw + cut, -hh, hw - cut, -hh, hw, -hh + cut, hw, hh - cut, hw - cut, hh, -hw + cut, hh, -hw, hh - cut, -hw, -hh + cut], color, hot, core ? 1.5 : 1.15);
+  if (core) {
+    strokeGlow(g, boxPts(0, 0, w * 0.58, h * 0.58), colors.white, colors.white, 1.15);
+    strokeGlow(g, boxPts(0, 0, w * 0.28, h * 0.28), color, colors.white, 0.95);
+  } else {
+    strokeGlow(g, boxPts(0, 0, w * 0.58, h * 0.38), color, colors.white, 0.75);
+  }
+}
+
+function ovalPts(rx, ry, sides = 18, ox = 0, oy = 0) {
+  const pts = [];
+  for (let i = 0; i < sides; i += 1) {
+    const a = (i / sides) * Math.PI * 2;
+    pts.push(ox + Math.cos(a) * rx, oy + Math.sin(a) * ry);
+  }
+  return pts;
+}
+
 function hullOutline() {
   return [
     540, 0,
@@ -177,6 +200,20 @@ function plateSlots() {
   ];
 }
 
+function sectionSlots() {
+  return [
+    { id: "bow", name: "BOW", lx: 390, ly: CY, w: 96, h: 36 },
+    { id: "fore", name: "FORE", lx: 280, ly: CY, w: 86, h: 40 },
+    { id: "foreMid", name: "FORE MID", lx: 170, ly: CY, w: 82, h: 42 },
+    { id: "midFore", name: "MID FORE", lx: 70, ly: CY, w: 78, h: 44 },
+    { id: "core", name: "CORE", lx: 0, ly: CY, w: 92, h: 52, core: true },
+    { id: "midAft", name: "MID AFT", lx: -90, ly: CY, w: 80, h: 46 },
+    { id: "aftMid", name: "AFT MID", lx: -190, ly: CY, w: 88, h: 48 },
+    { id: "aft", name: "AFT", lx: -300, ly: CY, w: 94, h: 50 },
+    { id: "stern", name: "STERN", lx: -410, ly: CY, w: 100, h: 52 },
+  ];
+}
+
 export class Battleship {
   constructor(station) {
     this.station = station;
@@ -197,17 +234,22 @@ export class Battleship {
     this.rotation = 0;
     this.gunCool = 0;
     this.gunSign = 0;
-    this.radius = 140;
-    this.maxHp = (cfg.acrpShots || 10) * acrpShotHits();
-    this.hp = this.maxHp;
+    this.radius = 280;
     this.view = new Container();
     this.keel = new Graphics();
     this.view.addChild(this.keel);
     this.plates = [];
-    this.hits = [];
+    this.sections = [];
+    this.hits = this.sections;
     this.worldLayer = null;
     this.buildPlates();
-    this.buildHits();
+    this.buildSections();
+    this.shieldG = new Graphics();
+    this.view.addChild(this.shieldG);
+    this.shieldMax = Math.max(1, cfg.shieldHits || 80);
+    this.shieldHp = 0;
+    this.maxHp = this.sections.reduce((n, part) => n + part.maxHp, 0);
+    this.hp = this.maxHp;
     this.paintKeel(false);
     this.view.visible = false;
   }
@@ -252,20 +294,34 @@ export class Battleship {
     paintHull(this.keel, this.color, this.hotColor, 0, CY);
   }
 
-  buildHits() {
-    this.hits = plateSlots().map((slot) => ({
-      lx: slot.lx,
-      ly: slot.ly,
-      radius: Math.max(slot.w, slot.h) * 0.68,
-      x: 0,
-      y: 0,
-      alive: false,
-      kind: "battleship",
-      name: this.name,
-      color: this.color,
-      hotColor: this.hotColor,
-      ship: this,
-    }));
+  buildSections() {
+    const rail = acrpShotHits();
+    for (const slot of sectionSlots()) {
+      const g = new Graphics();
+      paintSection(g, this.color, slot.core ? colors.white : this.hotColor, slot.w, slot.h, slot.core);
+      g.position.set(slot.lx, slot.ly);
+      g.visible = false;
+      this.view.addChild(g);
+      const hp = slot.core ? rail * 2 : rail;
+      this.sections.push({
+        id: slot.id,
+        core: Boolean(slot.core),
+        lx: slot.lx,
+        ly: slot.ly,
+        radius: Math.max(slot.w, slot.h) * (slot.core ? 0.72 : 0.62),
+        graphic: g,
+        maxHp: hp,
+        hp,
+        x: 0,
+        y: 0,
+        alive: false,
+        kind: "battleship",
+        name: slot.core ? "BATTLESHIP CORE" : `BATTLESHIP ${slot.name}`,
+        color: this.color,
+        hotColor: slot.core ? colors.white : this.hotColor,
+        ship: this,
+      });
+    }
   }
 
   sync() {
@@ -275,33 +331,83 @@ export class Battleship {
     this.x = at.x;
     this.y = at.y;
     if (this.attacking) this.view.rotation = this.rotation;
-    const live = this.alive && this.hp > 0;
-    for (const hit of this.hits) {
-      const pos = this.localToWorld(hit.lx, hit.ly);
-      hit.x = pos.x;
-      hit.y = pos.y;
-      hit.alive = live;
+    const show = this.alive && this.view.visible && (this.built || this.attacking);
+    for (const part of this.sections) {
+      const pos = this.localToWorld(part.lx, part.ly);
+      part.x = pos.x;
+      part.y = pos.y;
+      part.alive = show && part.hp > 0;
+      part.graphic.visible = part.alive;
     }
+    this.hp = this.hullHp();
   }
 
   hitParts() {
-    if (!this.alive || this.hp <= 0) return [];
+    if (!this.alive || (!this.built && !this.attacking)) return [];
     this.sync();
-    return this.hits;
+    return this.sections.filter((part) => part.alive);
+  }
+
+  hullHp() {
+    return this.sections.reduce((n, part) => n + Math.max(0, part.hp), 0);
+  }
+
+  refreshHull() {
+    this.hp = this.hullHp();
+    const max = Math.max(1, this.maxHp);
+    this.keel.alpha = 0.42 + 0.58 * Math.max(0, this.hp / max);
+  }
+
+  woundSection(part, amount = 1) {
+    if (!this.alive || !part || part.hp <= 0) return false;
+    part.hp -= amount;
+    if (part.hp > 0) {
+      this.refreshHull();
+      return false;
+    }
+    part.hp = 0;
+    part.alive = false;
+    part.graphic.visible = false;
+    this.refreshHull();
+    return part.core ? "core" : "section";
   }
 
   wound(amount = 1) {
-    if (!this.alive) return false;
-    this.hp -= amount;
-    this.keel.alpha = 0.42 + 0.58 * Math.max(0, this.hp / this.maxHp);
-    return this.hp <= 0;
+    const core = this.sections.find((part) => part.core) || this.sections[0];
+    return this.woundSection(core, amount) === "core";
+  }
+
+  dropShields() {
+    this.shieldHp = 0;
+    this.drawShield();
+  }
+
+  raiseShields() {
+    this.shieldHp = this.shieldMax;
+    this.drawShield();
+  }
+
+  drawShield() {
+    this.shieldG.clear();
+    if (!this.alive || this.shieldHp <= 0) return;
+    const t = this.shieldHp / Math.max(1, this.shieldMax);
+    strokeGlow(this.shieldG, ovalPts(560, 108, 20, 0, CY), this.color, colors.white, 1.2 + t * 0.25);
+    strokeGlow(this.shieldG, ovalPts(430, 78, 16, 0, CY), this.color, this.hotColor, 0.95 + t * 0.2);
+    this.shieldG.alpha = 0.32 + t * 0.5;
+    this.view.addChild(this.shieldG);
   }
 
   resetHull() {
     this.wrecked = false;
-    this.hp = this.maxHp;
     this.alive = true;
     this.keel.alpha = 1;
+    this.shieldHp = 0;
+    for (const part of this.sections) {
+      part.hp = part.maxHp;
+      part.alive = true;
+    }
+    this.refreshHull();
+    this.drawShield();
   }
 
   localToWorld(lx, ly) {
@@ -346,6 +452,7 @@ export class Battleship {
   beginAttack() {
     if (!this.alive || this.wrecked || this.attacking || !this.worldLayer) return false;
     this.complete();
+    this.raiseShields();
     this.ox = this.station.x;
     this.oy = this.station.y;
     this.rotation = this.station.rotation;
@@ -360,6 +467,7 @@ export class Battleship {
     this.gunCool = 0.4;
     this.gunSign = 0;
     this.sync();
+    this.drawShield();
     return true;
   }
 
@@ -424,7 +532,12 @@ export class Battleship {
     this.built = false;
     this.alive = false;
     this.hp = 0;
-    for (const hit of this.hits) hit.alive = false;
+    this.shieldHp = 0;
+    this.drawShield();
+    for (const part of this.sections) {
+      part.alive = false;
+      part.graphic.visible = false;
+    }
     this.view.visible = false;
     this.paintKeel(false);
     for (const plate of this.plates) {
@@ -458,9 +571,11 @@ export class Battleship {
     this.building = false;
     this.built = true;
     this.resetHull();
+    this.raiseShields();
     this.view.visible = true;
     this.paintKeel(true);
     for (const plate of this.plates) this.seat(plate);
+    this.drawShield();
   }
 
   setBuild(wave, force = false) {
@@ -468,6 +583,7 @@ export class Battleship {
     if (wave < cfg.fromWave) this.hide();
     else if (this.wrecked && !force) return;
     else if (this.attacking && !force) return;
+    else if (wave >= (cfg.launchWave || 13)) this.complete();
     else if (this.built && !this.building && !force) return;
     else if (force || !this.building) this.startYard();
   }

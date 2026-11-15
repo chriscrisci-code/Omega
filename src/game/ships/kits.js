@@ -104,7 +104,7 @@ export const SHIP_KITS = {
       shieldRegen: 1,
     },
     weapons: {
-      noseGun: { charge: 1.5, hits: 200, speed: 1200, life: 10000 / 1200, coolMul: 2.2 },
+      noseGun: { charge: 1.5, hits: 200, speed: 1200, life: 10000 / 1200, coolMul: 2.2 }, // rail: punches through shields; leftover hits hull
       missiles: true,
     },
     specials: ["gunshipWing"],

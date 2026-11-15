@@ -1,6 +1,6 @@
 /** Tune feel, colors, and Steam-ready defaults here. */
 
-export const version = "0.1.9";
+export const version = "0.1.10";
 
 export const settings = {
   resolutionCap: 4,
@@ -108,7 +108,7 @@ export function musicPctFromVol(vol) {
   return musicTaperPct((Math.max(0, Number(vol) || 0)) / base);
 }
 
-/** Gun hold-fire: 1 slow / 2 / 3 / 4 original stream / 5 twin. Nose ammo starts at 250, x1.5 per ammo buy. Missiles = ammo, +6 per level, reload at hub. Missile type 1 only for now. EMP 1 off / 2 stun / 3 long / 4 kill. Charges = EMP uses per sortie, start 1. Shield 4 = 2x time. Regen speeds recharge. */
+/** Gun hold-fire: 1 slow / 2 / 3 / 4 original stream / 5 twin. Nose ammo starts at 250, x1.5 per ammo buy. Missiles = ammo, +6 per level, reload at hub. Missile type 1 only for now. EMP 1 off / 2 stun / 3 long / 4 kill (kill EMP still only drops Battleship shields). Charges = EMP uses per sortie, start 1. Shield 4 = 2x time. Regen speeds recharge. Railguns pierce shields; leftover hits hull. */
 export const shipLevels = {
   gun: 5,
   ammo: 5,
@@ -404,7 +404,7 @@ export const tunnel = {
   oy: 0.78,
 };
 
-/** Unarmed yard tugs. Waves 5–6 assemble the station; wave 9 a battleship. */
+/** Unarmed yard tugs. Waves 5–6 assemble the station; wave 9 a battleship, which launches on wave 13. */
 export const crane = {
   hp: 4,
   speed: 96,
@@ -449,19 +449,24 @@ export const station = {
   shift: [70, 95],
 };
 
-/** Wave 9 scaffold on the station. ~8× destroyer length. 10 ACRP rail shots to kill.
- *  Once built and the player has ACRP, the next wave undocks and crawls to the Hub. */
+/** Wave 9 scaffold on the station. Nine lockable hull sections (core last).
+ *  Railguns punch through shields (same as destroyers); leftover hits the section.
+ *  EMP never wounds the hull — even kill-tier only drops the shields.
+ *  Wave 13 undocks it and it crawls toward the Hub. */
 export const battleship = {
   fromWave: 9,
+  launchWave: 13,
   plates: 6,
   startPlates: 2,
+  sections: 9,
   score: 1200,
   length: 1080,
   beam: 172,
   acrpShots: 10,
+  shieldHits: 80,
   approach: 1500,
-  speed: 32,
-  turn: 0.28,
+  speed: 12,
+  turn: 0.22,
   gunCool: 1.45,
   gunSpeed: 480,
   gunLife: 3.8,

@@ -68,6 +68,7 @@ function kitLines(id, loadout = {}) {
       { name: "EMP CAP", value: String(stats.empCap || 4) },
       { name: "RAIL HIT", value: rail ? String(nose.hits) : "-" },
       { name: "RAIL CHARGE", value: rail ? `${Number(nose.charge).toFixed(2)}S` : "-" },
+      { name: "RAIL", value: rail ? "PIERCES SHIELDS" : "-" },
     ],
     load,
     tags,

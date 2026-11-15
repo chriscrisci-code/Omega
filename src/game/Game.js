@@ -30,7 +30,7 @@ import { ATTRACT_FLASH, ATTRACT_HOLD, ATTRACT_PLAY, ATTRACT_SCORES, ATTRACT_SCEN
 import { applyScoreToBoards, fetchGlobalBoards, submitGlobalScore } from "./storage/boards.js";
 import { ALPHA, SAVE_KEY, SAVE_SLOT_COUNT, SCORE_BOARDS, clampCredits, makePayId, makeSlot, missileAmmoCap, normalizeCheckpoint, normalizeHulls, normalizeLoadout, normalizePayId, normalizeSlots, padScoreRows, scoreQualifies } from "./storage/save.js";
 import { damp, dampAngle, dampWrap, hits, hitsBeam, pick, rand, rayAlong, turnToward, wrap, wrapCoord, wrapDelta } from "./math.js";
-import { ACRP33_ID, DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, shipUnlocked, unlockedShipIds } from "./ships/catalog.js";
+import { DEFAULT_SHIP_ID, GUNSHIP_ID, SHIP_CATALOG, resolveShipId, shipUnlockAt, unlockedShipIds } from "./ships/catalog.js";
 import { GameAudio } from "./audio/Audio.js";
 
 const TITLE = "title";
@@ -1218,17 +1218,22 @@ export class Game {
   }
 
   armBattleshipAttack() {
-    if (this.attractOnDemo || this.battleshipAttackWave || this.battleship?.attacking || this.battleship?.wrecked) return;
-    if (!this.battleship?.built || !this.battleship.alive) return;
-    if (!shipUnlocked(ACRP33_ID, this.xp)) return;
-    this.battleshipAttackWave = this.assaultIndex + 1;
+    if (this.attractOnDemo || this.battleship?.attacking || this.battleship?.wrecked) return;
+    this.battleshipAttackWave = battleshipCfg.launchWave || 13;
   }
 
   maybeLaunchBattleship(silent = false) {
     if (this.attractOnDemo || this.battleship?.wrecked || this.battleship?.attacking) return;
-    if (!this.battleshipAttackWave || this.assaultIndex < this.battleshipAttackWave) return;
-    if (!this.battleship?.built || !this.battleship.alive) return;
-    if (!this.battleship.beginAttack()) return;
+    const launchAt = battleshipCfg.launchWave || this.battleshipAttackWave || 13;
+    if (this.assaultIndex < launchAt) return;
+    if (this.inTunnel?.()) return;
+    const ship = this.battleship;
+    if (!ship) return;
+    if (!ship.built || !ship.alive) {
+      if (this.assaultIndex >= (battleshipCfg.fromWave || 9)) ship.complete();
+    }
+    if (!ship.built || !ship.alive) return;
+    if (!ship.beginAttack()) return;
     this.battleWarn = 6.5;
     if (!silent) this.sfx("warn");
   }
@@ -1785,6 +1790,8 @@ export class Game {
     this.pips.view.visible = true;
     this.station.reset(this.assaultIndex);
     this.battleship.setBuild(this.assaultIndex, true);
+    this.armBattleshipAttack();
+    this.maybeLaunchBattleship(true);
     this.syncStation();
     this.hud.setHubAlert(null);
     this.hud.setOre(this.cargo, this.hub.ore, this.hub.upgradeName());
@@ -3092,7 +3099,7 @@ export class Game {
       vy: Math.sin(this.hubGunAngle) * 220,
     };
     if (kind === "enemy") this.chipEnemy(hit, impact, 1, "hub");
-    else if (kind === "station") this.chipStationPart(hit, impact);
+    else if (kind === "station") this.chipStationPart(hit, impact, 1, "hub");
     else this.chipRock(hit, impact);
   }
 
@@ -4372,7 +4379,7 @@ export class Game {
     };
     if (hit.kind === "enemy") this.chipEnemy(hit.body, impact, missiles.damage, "missile");
     else if (hit.kind === "star") this.detonateMissile(hit.body, hit.body);
-    else if (hit.kind === "part") this.chipStationPart(hit.body, impact, missiles.damage);
+    else if (hit.kind === "part") this.chipStationPart(hit.body, impact, missiles.damage, "missile");
     else if (hit.kind === "rock") this.chipRock(hit.body, impact, missiles.damage);
     else if (hit.kind === "base") {
       const space = this.space();
@@ -4602,9 +4609,9 @@ export class Game {
     else this.sfx("hit");
   }
 
-  chipStationPart(part, impact, amount = 1) {
+  chipStationPart(part, impact, amount = 1, via = "shot") {
     if (part?.kind === "battleship") {
-      this.chipBattleship(part, impact, amount);
+      this.chipBattleship(part, impact, amount, via);
       return;
     }
     if (!part?.alive) return;
@@ -4664,23 +4671,42 @@ export class Game {
     if (part.joint || part.clamp) this.station.checkBreaks(this.space());
   }
 
-  chipBattleship(part, impact, amount = 1) {
+  chipBattleship(part, impact, amount = 1, via = "shot") {
     const ship = part?.ship || this.battleship;
-    if (!ship?.alive) return;
+    if (!ship?.alive || !part || part.hp <= 0) return;
     const x = impact?.x ?? part?.x ?? ship.x;
     const y = impact?.y ?? part?.y ?? ship.y;
-    const dead = ship.wound(amount);
-    this.spawnShards(null, { x, y, vx: 0, vy: 0, rotation: ship.rotation, radius: 28 }, {
+    if (ship.shieldHp > 0) {
+      this.shieldHitFlash(x, y, ship.hotColor);
+      const cost = Math.max(1, amount);
+      if (via === "rail") {
+        const leftover = Math.max(0, cost - ship.shieldHp);
+        ship.shieldHp = Math.max(0, ship.shieldHp - cost);
+        ship.drawShield();
+        if (leftover <= 0) {
+          this.sfx(ship.shieldHp > 0 ? "block" : "pop");
+          return;
+        }
+        amount = leftover;
+      } else {
+        ship.shieldHp = Math.max(0, ship.shieldHp - cost);
+        ship.drawShield();
+        this.sfx(ship.shieldHp > 0 ? "block" : "pop");
+        return;
+      }
+    }
+    const dead = ship.woundSection(part, amount);
+    this.spawnShards(null, { x, y, vx: 0, vy: 0, rotation: ship.rotation, radius: dead ? 36 : 22 }, {
       color: ship.color,
-      hotColor: ship.hotColor,
-      kick: debrisConfig.rockKick * 0.55,
+      hotColor: part.core ? colors.white : ship.hotColor,
+      kick: debrisConfig.rockKick * (dead ? 0.7 : 0.55),
       life: dead ? 2.2 : 1.4,
       wreck: dead ? 10 : 5,
     });
-    this.fx.emit(8, {
+    this.fx.emit(dead ? 12 : 8, {
       x,
       y,
-      color: ship.hotColor,
+      color: part.core ? colors.white : ship.hotColor,
       speed: 90,
       speedVar: 40,
       life: 0.2,
@@ -4690,7 +4716,13 @@ export class Game {
       this.sfx("hit");
       return;
     }
-    this.killBattleship(ship, { x, y });
+    this.noteLockDeath(part);
+    this.sfx("pop");
+    this.fx.burst(x, y, ship.color, part.core ? 22 : 16, part.core ? 200 : 150);
+    for (const missile of this.missiles) {
+      if (missile.target === part) missile.target = null;
+    }
+    if (dead === "core" || ship.hullHp() <= 0) this.killBattleship(ship, { x, y });
   }
 
   killBattleship(ship, at) {
@@ -6002,6 +6034,20 @@ export class Game {
           else enemy.stun(emp.stun * (this.empTier() >= 3 ? 2 : 1));
         }
       }
+      const ship = this.battleship;
+      if (ship?.alive && !this.emp.hit.has(ship)) {
+        const tagged = hits(this.emp, ship, space.width, space.height)
+          || ship.hitParts().some((part) => hits(this.emp, part, space.width, space.height));
+        if (tagged) {
+          this.emp.hit.add(ship);
+          if (ship.shieldHp > 0) {
+            ship.dropShields();
+            this.fx.burst(ship.x, ship.y, colors.cyanHot, 22, 180);
+            this.fx.burst(ship.x, ship.y, colors.white, 12, 120);
+            this.sfx("pop");
+          }
+        }
+      }
       for (const dart of [...this.missiles, ...this.hubMissiles, ...this.castleStars]) {
         if (!dart.alive || dart.blind || this.emp.hit.has(dart)) continue;
         if (!hits(this.emp, dart, space.width, space.height)) continue;
@@ -6212,7 +6258,7 @@ export class Game {
           const burst = shot.burst || "";
           const at = { x: shot.x, y: shot.y };
           shot.kill();
-          this.chipStationPart(part, shot, dmg);
+          this.chipStationPart(part, shot, dmg, this.gunVia(shot));
           if (rail) this.burstRail(at, burst);
           break;
         }
@@ -6239,7 +6285,7 @@ export class Game {
           if (this.enemies.includes(at)) this.chipEnemy(at, missile, missiles.damage, "missile");
           else if (this.castleStars.includes(at)) this.detonateMissile(at, at);
           else if (this.asteroids.includes(at)) this.chipRock(at, missile, missiles.damage);
-          else this.chipStationPart(at, missile, missiles.damage);
+          else this.chipStationPart(at, missile, missiles.damage, "missile");
           continue;
         }
         for (const base of this.bases) {
