@@ -104,7 +104,7 @@ function paintCabinet() {
   const publicLine = document.getElementById("public-now");
   if (publicLine) {
     publicLine.textContent = publicOn
-      ? "PUBLIC  UNTIL MIDNIGHT ET"
+      ? "PUBLIC  ON"
       : happyHour
         ? "PUBLIC  3-4 PM ET"
         : "PUBLIC  OFF";

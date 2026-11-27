@@ -1,11 +1,10 @@
 import {
   FREE_PLAY_KEY,
   isEasternFreePlay,
-  nextEasternMidnight,
   noStore,
   operatorAuthorized,
   operatorSecret,
-  parsePublicUntil,
+  parsePublicOn,
   redis,
 } from "./_lib.js";
 
@@ -18,22 +17,29 @@ function clientIp(req) {
   return String(raw).split(",")[0].trim() || "local";
 }
 
-function payload(until, now = Date.now()) {
+function payload(publicOn, now = Date.now()) {
   const hour = isEasternFreePlay(now);
-  const publicOn = until > now;
+  const on = Boolean(publicOn);
   return {
-    freePlay: publicOn || hour,
-    publicOn,
+    freePlay: on || hour,
+    publicOn: on,
     hour,
-    until: publicOn ? until : 0,
+    until: 0,
   };
 }
 
-async function readUntil(store) {
+function stickyRecord(raw) {
+  return raw && typeof raw === "object" && raw.on === true;
+}
+
+async function readOn(store) {
   try {
-    return parsePublicUntil(await store.get(FREE_PLAY_KEY));
+    const raw = await store.get(FREE_PLAY_KEY);
+    const on = parsePublicOn(raw);
+    if (on && !stickyRecord(raw)) await store.set(FREE_PLAY_KEY, { on: true });
+    return on;
   } catch {
-    return 0;
+    return false;
   }
 }
 
@@ -46,9 +52,9 @@ export default async function handler(req, res) {
 
   if (req.method === "GET") {
     try {
-      return res.status(200).json(payload(await readUntil(redis())));
+      return res.status(200).json(payload(await readOn(redis())));
     } catch {
-      return res.status(200).json(payload(0));
+      return res.status(200).json(payload(false));
     }
   }
 
@@ -78,9 +84,9 @@ export default async function handler(req, res) {
     if (hits === 1) await store.expire(RATE_KEY + ip, RATE_WINDOW);
     if (hits > RATE_MAX) return res.status(429).json({ error: "rate" });
 
-    if (on) await store.set(FREE_PLAY_KEY, { until: nextEasternMidnight() });
+    if (on) await store.set(FREE_PLAY_KEY, { on: true });
     else await store.del(FREE_PLAY_KEY);
-    return res.status(200).json(payload(await readUntil(store)));
+    return res.status(200).json(payload(await readOn(store)));
   } catch (err) {
     console.error("[freeplay]", err);
     return res.status(500).json({ error: "store" });

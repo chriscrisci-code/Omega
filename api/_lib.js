@@ -99,23 +99,26 @@ export function nextEasternMidnight(now = Date.now()) {
   return now + 24 * 60 * 60 * 1000;
 }
 
-export function parsePublicUntil(raw) {
-  if (raw == null || raw === false || raw === 0 || raw === "0") return 0;
+export function parsePublicOn(raw) {
+  if (raw == null || raw === false || raw === 0 || raw === "0") return false;
   if (typeof raw === "string") {
     try {
-      return parsePublicUntil(JSON.parse(raw));
+      return parsePublicOn(JSON.parse(raw));
     } catch {
       const n = Number(raw);
-      return Number.isFinite(n) && n > Date.now() ? n : 0;
+      if (Number.isFinite(n) && n > Date.now()) return true;
+      const s = raw.trim().toLowerCase();
+      return s === "true" || s === "1" || s === "on";
     }
   }
-  if (typeof raw === "number") return raw > Date.now() ? raw : 0;
+  if (typeof raw === "number") return raw === 1 || raw > Date.now();
   if (typeof raw === "object") {
+    if (raw.on === true || raw.on === 1 || raw.on === "1") return true;
+    if (raw.on === false || raw.on === 0 || raw.on === "0") return false;
     const until = Number(raw.until);
-    return Number.isFinite(until) && until > Date.now() ? until : 0;
+    return Number.isFinite(until) && until > Date.now();
   }
-  if (raw === true || raw === 1 || raw === "1") return nextEasternMidnight();
-  return 0;
+  return raw === true || raw === 1 || raw === "1";
 }
 
 export function operatorSecret() {
